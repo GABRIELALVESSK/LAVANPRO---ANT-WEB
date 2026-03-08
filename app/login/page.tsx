@@ -38,24 +38,53 @@ export default function LoginPage() {
 
         try {
             if (mode === 'register') {
-                const { data, error } = await supabase.auth.signUp({
+                // Verificar se este e-mail já foi pré-cadastrado por um gestor
+                const { data: invite } = await supabase
+                    .from('collaborators')
+                    .select('owner_id')
+                    .eq('email', email)
+                    .maybeSingle();
+
+                const role = invite ? 'collaborator' : 'owner';
+                const ownerId = invite ? invite.owner_id : null;
+
+                const { data: authData, error: authError } = await supabase.auth.signUp({
                     email,
                     password,
                     options: {
                         data: {
                             full_name: name,
+                            role: role,
+                            owner_id: ownerId
                         }
                     }
                 });
-                if (error) throw error;
-                showToast("Conta criada com sucesso! Verifique seu e-mail.", "success");
+
+                if (authError) throw authError;
+
+                // Se era um colaborador, atualiza a tabela com o ID real dele
+                if (invite && authData.user) {
+                    await supabase
+                        .from('collaborators')
+                        .update({ user_id: authData.user.id })
+                        .eq('email', email);
+                }
+
+                showToast(invite ? "Vínculo com a lavanderia concluído! Verifique seu e-mail para ativar." : "Conta criada com sucesso! Verifique seu e-mail.", "success");
                 setMode('login');
             } else {
                 const { data, error } = await supabase.auth.signInWithPassword({
                     email,
                     password,
                 });
-                if (error) throw error;
+
+                if (error) {
+                    if (error.message.includes("Invalid login credentials")) {
+                        throw new Error("Credenciais inválidas. Se você foi convidado, precisa clicar em 'Cadastrar' primeiro para criar sua senha.");
+                    }
+                    throw error;
+                }
+
                 showToast("Bem-vindo de volta!", "success");
                 router.refresh(); // Refresh to sync cookies for middleware
                 router.push('/dashboard');

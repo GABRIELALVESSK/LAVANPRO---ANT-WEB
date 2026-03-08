@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
 import { Sidebar } from "@/components/sidebar";
+import { Header } from "@/components/header";
 import { UserCircle, Store, Bell, Shield, Camera, LogIn, Edit, UploadCloud, Users, Plus, Trash2, Key } from "lucide-react";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
@@ -18,17 +19,20 @@ export default function SettingsPage() {
   const [collaborators, setCollaborators] = useState<any[]>([]);
   const [isLoadingUsers, setIsLoadingUsers] = useState(false);
   const [isSavingUser, setIsSavingUser] = useState(false);
-  const [profileForm, setProfileForm] = useState({ name: 'Admin Dashboard', email: 'admin@lavanderiapro.com', phone: '(11) 98765-4321', role: 'Gerente Geral' });
+  const [isDeletingUserId, setIsDeletingUserId] = useState<string | null>(null);
+  const [profileForm, setProfileForm] = useState({ name: '', email: '', phone: '(11) 98765-4321', role: 'Gerente Geral' });
   const [laundryForm, setLaundryForm] = useState({ name: 'Lavanderia Pro Centro', cnpj: '12.345.678/0001-90', email: 'contato@lavanderiapro.com', phone: '(11) 3000-4000', address: 'Av. Paulista, 1000 - Bela Vista, São Paulo - SP, 01310-100' });
   const [notificationsSettings, setNotificationsSettings] = useState({ emailSummary: true, newOrderAlerts: true, weeklyReports: false, orderCreated: true, orderReady: true, deliveryScheduled: true });
   const [newUserForm, setNewUserForm] = useState({ name: '', email: '', role: 'Atendente', password: '' });
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [userToDelete, setUserToDelete] = useState<any>(null);
   const [isResetPasswordModalOpen, setIsResetPasswordModalOpen] = useState(false);
   const [resettingUserEmail, setResettingUserEmail] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [isSavingAll, setIsSavingAll] = useState(false);
   const [toasts, setToasts] = useState<{ id: string; message: string; type: "success" | "error" | "info" }[]>([]);
-  const { user } = useAuth();
-  const isAdmin = true; // Simulating admin access
+  const { user, loading } = useAuth();
+  const isAdmin = user?.user_metadata?.role === 'owner' || user?.user_metadata?.role === 'Gerente';
 
   const showToast = (message: string, type: "success" | "error" | "info" = "success") => {
     const id = Math.random().toString(36).substring(2, 9);
@@ -50,6 +54,23 @@ export default function SettingsPage() {
     if (savedNotifications) setNotificationsSettings(JSON.parse(savedNotifications));
   }, []);
 
+  // Sync profile with authenticated user
+  useEffect(() => {
+    if (user && !loading) {
+      setProfileForm(prev => {
+        // If we have saved data in localStorage, keep it unless it looks like mock data
+        const isMockName = prev.name === '' || prev.name === 'Admin Dashboard';
+        const isMockEmail = prev.email === '' || prev.email === 'admin@lavanderiapro.com';
+
+        return {
+          ...prev,
+          name: isMockName ? (user.user_metadata?.full_name || user.email?.split('@')[0] || '') : prev.name,
+          email: isMockEmail ? (user.email || '') : prev.email,
+        };
+      });
+    }
+  }, [user, loading]);
+
   useEffect(() => {
     if (activeTab === "users" && isAdmin) {
       fetchCollaborators();
@@ -62,7 +83,7 @@ export default function SettingsPage() {
     const { data, error } = await supabase
       .from('collaborators')
       .select('*')
-      .eq('user_id', user.id)
+      .eq('owner_id', user.id) // Filtra apenas para esta lavanderia
       .order('created_at', { ascending: false });
 
     if (data) setCollaborators(data);
@@ -89,7 +110,7 @@ export default function SettingsPage() {
         name: (document.getElementById('edit-name') as HTMLInputElement).value,
         email: (document.getElementById('edit-email') as HTMLInputElement).value,
         role: (document.getElementById('edit-role') as HTMLSelectElement).value,
-        password: (document.getElementById('edit-password') as HTMLInputElement).value || selectedUser.password
+        // password: (document.getElementById('edit-password') as HTMLInputElement).value || selectedUser.password
       })
       .eq('id', selectedUser.id);
 
@@ -103,20 +124,29 @@ export default function SettingsPage() {
     setIsSavingUser(false);
   };
 
-  const handleDeleteUser = async (id: string) => {
-    if (!confirm("Tem certeza que deseja excluir este colaborador?")) return;
+  const confirmDeleteUser = (collab: any) => {
+    setUserToDelete(collab);
+    setIsDeleteModalOpen(true);
+  };
 
+  const handleDeleteUser = async () => {
+    if (!userToDelete) return;
+
+    setIsDeletingUserId(userToDelete.id);
     const { error } = await supabase
       .from('collaborators')
       .delete()
-      .eq('id', id);
+      .eq('id', userToDelete.id);
 
     if (error) {
       showToast("Erro ao excluir colaborador: " + error.message, "error");
     } else {
       showToast("Colaborador removido com sucesso!", "success");
       fetchCollaborators();
+      setIsDeleteModalOpen(false);
     }
+    setIsDeletingUserId(null);
+    setUserToDelete(null);
   };
 
   const handleNewUser = () => {
@@ -139,8 +169,7 @@ export default function SettingsPage() {
         name: newUserForm.name,
         email: newUserForm.email,
         role: newUserForm.role,
-        password: newUserForm.password,
-        user_id: user?.id
+        owner_id: user?.id
       }
     ]);
 
@@ -216,7 +245,12 @@ export default function SettingsPage() {
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto bg-brand-bg">
+        <main className="flex-1 overflow-y-auto bg-brand-bg relative">
+          {loading && (
+            <div className="absolute inset-0 bg-brand-bg/50 backdrop-blur-sm z-50 flex items-center justify-center">
+              <div className="size-12 border-4 border-brand-primary/30 border-t-brand-primary rounded-full animate-spin"></div>
+            </div>
+          )}
           <div className="px-8 space-y-8 py-8">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               <button
@@ -226,13 +260,15 @@ export default function SettingsPage() {
                 <UserCircle className={`${activeTab === "account" ? "text-brand-primary" : "text-brand-muted"} size-8`} />
                 <span className="text-sm font-bold">Minha Conta</span>
               </button>
-              <button
-                onClick={() => setActiveTab("laundry")}
-                className={`p-6 rounded-xl border-2 shadow-xl flex flex-col items-center text-center gap-3 transition-all ${activeTab === "laundry" ? "bg-brand-card border-brand-primary text-white" : "bg-brand-card border-brand-darkBorder text-brand-muted hover:border-brand-primary/50 hover:text-white"}`}
-              >
-                <Store className={`${activeTab === "laundry" ? "text-brand-primary" : "text-brand-muted"} size-8`} />
-                <span className="text-sm font-bold">Dados da Lavanderia</span>
-              </button>
+              {isAdmin && (
+                <button
+                  onClick={() => setActiveTab("laundry")}
+                  className={`p-6 rounded-xl border-2 shadow-xl flex flex-col items-center text-center gap-3 transition-all ${activeTab === "laundry" ? "bg-brand-card border-brand-primary text-white" : "bg-brand-card border-brand-darkBorder text-brand-muted hover:border-brand-primary/50 hover:text-white"}`}
+                >
+                  <Store className={`${activeTab === "laundry" ? "text-brand-primary" : "text-brand-muted"} size-8`} />
+                  <span className="text-sm font-bold">Dados da Lavanderia</span>
+                </button>
+              )}
               <button
                 onClick={() => setActiveTab("notifications")}
                 className={`p-6 rounded-xl border-2 shadow-xl flex flex-col items-center text-center gap-3 transition-all ${activeTab === "notifications" ? "bg-brand-card border-brand-primary text-white" : "bg-brand-card border-brand-darkBorder text-brand-muted hover:border-brand-primary/50 hover:text-white"}`}
@@ -364,27 +400,29 @@ export default function SettingsPage() {
                     </div>
                   </div>
 
-                  <div className="bg-brand-card p-8 rounded-xl border border-brand-darkBorder shadow-xl">
-                    <h4 className="text-lg font-bold mb-6">Preferências do Sistema</h4>
-                    <div className="space-y-6">
-                      <div className="space-y-2">
-                        <label className="text-xs font-bold uppercase tracking-wider text-brand-muted">Idioma do Painel</label>
-                        <select className="w-full bg-brand-bg border border-brand-darkBorder rounded-lg text-sm font-semibold focus:ring-brand-primary py-2.5 px-4 outline-none text-white">
-                          <option>Português (Brasil)</option>
-                          <option>English (US)</option>
-                          <option>Español</option>
-                        </select>
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-xs font-bold uppercase tracking-wider text-brand-muted">Moeda Padrão</label>
-                        <select className="w-full bg-brand-bg border border-brand-darkBorder rounded-lg text-sm font-semibold focus:ring-brand-primary py-2.5 px-4 outline-none text-white">
-                          <option>Real (BRL)</option>
-                          <option>Dólar (USD)</option>
-                          <option>Euro (EUR)</option>
-                        </select>
+                  {isAdmin && (
+                    <div className="bg-brand-card p-8 rounded-xl border border-brand-darkBorder shadow-xl">
+                      <h4 className="text-lg font-bold mb-6">Preferências do Sistema</h4>
+                      <div className="space-y-6">
+                        <div className="space-y-2">
+                          <label className="text-xs font-bold uppercase tracking-wider text-brand-muted">Idioma do Painel</label>
+                          <select className="w-full bg-brand-bg border border-brand-darkBorder rounded-lg text-sm font-semibold focus:ring-brand-primary py-2.5 px-4 outline-none text-white">
+                            <option>Português (Brasil)</option>
+                            <option>English (US)</option>
+                            <option>Español</option>
+                          </select>
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-xs font-bold uppercase tracking-wider text-brand-muted">Moeda Padrão</label>
+                          <select className="w-full bg-brand-bg border border-brand-darkBorder rounded-lg text-sm font-semibold focus:ring-brand-primary py-2.5 px-4 outline-none text-white">
+                            <option>Real (BRL)</option>
+                            <option>Dólar (USD)</option>
+                            <option>Euro (EUR)</option>
+                          </select>
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  )}
                 </div>
 
                 <div className="bg-brand-card rounded-xl border border-brand-darkBorder shadow-xl overflow-hidden">
@@ -593,30 +631,39 @@ export default function SettingsPage() {
                       ) : collaborators.length === 0 ? (
                         <tr><td colSpan={4} className="px-6 py-8 text-center text-brand-muted">Nenhum colaborador encontrado. Adicione no botão acima.</td></tr>
                       ) : (
-                        collaborators.map((user) => (
-                          <tr key={user.id} className="hover:bg-white/5 transition-colors">
+                        collaborators.map((collaborator) => (
+                          <tr key={collaborator.id} className="hover:bg-white/5 transition-colors">
                             <td className="px-6 py-4">
                               <div className="flex items-center gap-3">
                                 <div className="size-8 rounded-full bg-brand-primary/20 text-brand-primary flex items-center justify-center font-bold text-xs uppercase">
-                                  {user.name?.substring(0, 2) || "U"}
+                                  {collaborator.name?.substring(0, 2) || "U"}
                                 </div>
-                                <span className="text-sm font-semibold text-white">{user.name}</span>
+                                <span className="text-sm font-semibold text-white">{collaborator.name}</span>
                               </div>
                             </td>
-                            <td className="px-6 py-4 text-sm text-brand-muted">{user.email}</td>
+                            <td className="px-6 py-4 text-sm text-brand-muted">{collaborator.email}</td>
                             <td className="px-6 py-4">
-                              <span className="px-2.5 py-1 bg-brand-bg text-brand-muted rounded-full text-xs font-semibold border border-brand-darkBorder">{user.role}</span>
+                              <span className="px-2.5 py-1 bg-brand-bg text-brand-muted rounded-full text-xs font-semibold border border-brand-darkBorder">{collaborator.role}</span>
                             </td>
                             <td className="px-6 py-4 text-right">
                               <div className="flex items-center justify-end gap-2">
-                                <button onClick={() => handleEditUser(user)} className="p-2 text-brand-muted hover:text-brand-primary transition-colors" title="Editar">
+                                <button onClick={() => handleEditUser(collaborator)} className="p-2 text-brand-muted hover:text-brand-primary transition-colors" title="Editar">
                                   <Edit className="size-4" />
                                 </button>
-                                <button onClick={() => handleResetPassword(user.email)} className="p-2 text-brand-muted hover:text-amber-500 transition-colors" title="Resetar Senha">
+                                <button onClick={() => handleResetPassword(collaborator.email)} className="p-2 text-brand-muted hover:text-amber-500 transition-colors" title="Resetar Senha">
                                   <Key className="size-4" />
                                 </button>
-                                <button onClick={() => handleDeleteUser(user.id)} className="p-2 text-brand-muted hover:text-red-500 transition-colors" title="Excluir">
-                                  <Trash2 className="size-4" />
+                                <button
+                                  onClick={() => confirmDeleteUser(collaborator)}
+                                  className={`p-2 transition-colors ${isDeletingUserId === collaborator.id ? "text-slate-500 cursor-not-allowed" : "text-brand-muted hover:text-red-500"}`}
+                                  title="Excluir"
+                                  disabled={isDeletingUserId === collaborator.id}
+                                >
+                                  {isDeletingUserId === collaborator.id ? (
+                                    <div className="size-4 border-2 border-slate-500 border-t-white rounded-full animate-spin"></div>
+                                  ) : (
+                                    <Trash2 className="size-4" />
+                                  )}
                                 </button>
                               </div>
                             </td>
@@ -775,6 +822,43 @@ export default function SettingsPage() {
           </div>
         </div>
       )}
+
+      {/* Delete Confirmation Modal */}
+      {isDeleteModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md">
+          <div className="bg-brand-card rounded-2xl border border-brand-darkBorder shadow-2xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in duration-200">
+            <div className="p-6 border-b border-brand-darkBorder flex justify-between items-center bg-red-500/10">
+              <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                <Trash2 className="size-5 text-red-500" /> Confirmar Exclusão
+              </h3>
+              <button onClick={() => setIsDeleteModalOpen(false)} className="text-brand-muted hover:text-white transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-x"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <p className="text-sm text-brand-muted">
+                Deseja realmente excluir o colaborador <span className="text-white font-bold">{userToDelete?.name}</span>? Esta ação não pode ser desfeita.
+              </p>
+            </div>
+            <div className="p-6 border-t border-brand-darkBorder flex justify-end gap-3 bg-brand-bg/50">
+              <button
+                onClick={() => setIsDeleteModalOpen(false)}
+                className="px-4 py-2 text-sm font-bold text-brand-muted hover:bg-brand-card rounded-lg transition-colors border border-brand-darkBorder"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleDeleteUser}
+                disabled={isDeletingUserId === userToDelete?.id}
+                className="px-4 py-2 text-sm font-bold text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors shadow-lg shadow-red-600/20 disabled:opacity-50"
+              >
+                {isDeletingUserId === userToDelete?.id ? "Excluindo..." : "Confirmar Exclusão"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Reset Password Modal */}
       {isResetPasswordModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md">
