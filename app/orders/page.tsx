@@ -40,6 +40,15 @@ export default function OrdersPage() {
         { driver: "Lucas Mendes", status: "Oeste • Em pausa", icon: Timer, progress: 85 },
     ];
 
+    const inProgressOrders = [
+        { id: "#ORD-2856", client: "Carlos Machado", service: "Lavagem Completa", status: "Lavando", time: "45 min", progress: 30, bgColor: "bg-brand-primary", textColor: "text-brand-muted" },
+        { id: "#ORD-2854", client: "Maria Oliveira", service: "Edredom", status: "Secando", time: "2h 15m", progress: 65, bgColor: "bg-brand-primary", textColor: "text-brand-muted" },
+        { id: "#ORD-2851", client: "João Silva", service: "Apenas Passar", status: "Passando", time: "1h 30m", progress: 85, bgColor: "bg-blue-500", textColor: "text-blue-500" },
+        { id: "#ORD-2850", client: "Ana Paula", service: "Lavagem a Seco", status: "Finalizado", time: "3h", progress: 100, bgColor: "bg-emerald-500", textColor: "text-emerald-500" },
+        { id: "#ORD-2849", client: "Roberto Dias", service: "Lavagem Completa", status: "Parado", time: "4h 10m", progress: 40, bgColor: "bg-rose-500", textColor: "text-rose-500" },
+        { id: "#ORD-2848", client: "Pousada Sol", service: "Enxoval (50kg)", status: "Triagem", time: "15 min", progress: 10, bgColor: "bg-brand-primary", textColor: "text-brand-muted" },
+    ];
+
     const alerts = [
         { id: "#ORD-2849", type: "Atraso", desc: "Excedeu 4h do tempo de lavagem.", color: "text-rose-500", fullDesc: "Motorista Ricardo Camargo preso no trânsito próximo à Av. Paulista. Previsão de chegada estendida em 40 minutos." },
         { id: "#ORD-2710", type: "Ausente", desc: "Cliente ausente (3ª tentativa).", color: "text-amber-500", fullDesc: "O cliente não estava em casa na 3ª tentativa de entrega. Retornar amanhã ou entrar em contato." },
@@ -107,76 +116,57 @@ export default function OrdersPage() {
                         {/* Main Content Grid */}
                         <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
 
-                            {/* GPS Tracking Section */}
+                            {/* Orders In Progress Section */}
                             <motion.div
                                 initial={{ opacity: 0, scale: 0.98 }}
                                 animate={{ opacity: 1, scale: 1 }}
-                                className="xl:col-span-2 bg-brand-card rounded-2xl border border-brand-darkBorder shadow-2xl overflow-hidden"
+                                className="xl:col-span-2 bg-brand-card rounded-2xl border border-brand-darkBorder shadow-2xl overflow-hidden flex flex-col"
                             >
                                 <div className="p-6 border-b border-brand-darkBorder flex items-center justify-between">
                                     <div className="flex items-center gap-3">
-                                        <div className="p-2 bg-blue-500/10 text-blue-500 rounded-lg">
-                                            <Navigation className="size-5" />
+                                        <div className="p-2 bg-brand-primary/10 text-brand-primary rounded-lg">
+                                            <Activity className="size-5" />
                                         </div>
                                         <div>
-                                            <h3 className="text-lg font-bold text-white">Pedidos por Rota / Motorista</h3>
-                                            <p className="text-xs text-brand-muted">Posicionamento GPS em tempo real</p>
+                                            <h3 className="text-lg font-bold text-white">Pedidos em Andamento</h3>
+                                            <p className="text-xs text-brand-muted">Acompanhamento das ordens de serviço atuais</p>
                                         </div>
                                     </div>
-                                    <button onClick={() => setIsMapExpanded(true)} className="text-xs font-bold text-brand-primary hover:underline">Expandir Mapa</button>
+                                    <button className="text-xs font-bold text-brand-primary hover:underline">Ver Todos</button>
                                 </div>
 
-                                <div className="p-6 space-y-6">
-                                    {routes.map((route, idx) => (
-                                        <div key={route.driver} className="space-y-3">
-                                            <div className="flex items-center justify-between">
-                                                <div className="flex items-center gap-4">
-                                                    <div className="size-10 rounded-full bg-brand-bg border border-brand-darkBorder flex items-center justify-center text-white font-bold text-xs uppercase">
-                                                        {route.driver.split(' ').map(n => n[0]).join('')}
-                                                    </div>
-                                                    <div>
-                                                        <p className="text-sm font-bold text-white">{route.driver}</p>
-                                                        <p className="text-xs text-brand-muted flex items-center gap-1">
-                                                            <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                                                            {route.status}
-                                                        </p>
-                                                    </div>
-                                                </div>
-                                                <button onClick={() => setIsMapExpanded(true)} className="p-2 text-brand-muted hover:text-white hover:bg-white/5 rounded-lg transition-colors">
-                                                    <MapPin className="size-4" />
-                                                </button>
-                                            </div>
-                                            <div className="relative h-1.5 w-full bg-brand-bg rounded-full overflow-hidden">
-                                                <motion.div
-                                                    initial={{ width: 0 }}
-                                                    animate={{ width: `${route.progress}%` }}
-                                                    transition={{ duration: 1, delay: 0.5 + idx * 0.2 }}
-                                                    className="absolute h-full bg-brand-primary rounded-full"
-                                                />
-                                            </div>
-                                        </div>
-                                    ))}
-
-                                    {/* Mock Map Background Container */}
-                                    <div onClick={() => setIsMapExpanded(true)} className="mt-8 relative h-64 bg-brand-bg border border-brand-darkBorder rounded-xl overflow-hidden group cursor-pointer">
-                                        <div className="absolute inset-0 bg-[url('https://lh3.googleusercontent.com/aida-public/AG-M0yG0Lp7m1_yK-W4d-qJt7Rz4f8v_tA-m3q0o5PzY=s2048')] opacity-30 mix-blend-overlay grayscale group-hover:grayscale-0 transition-all duration-500" />
-                                        <div className="absolute inset-0 bg-gradient-to-t from-brand-bg via-transparent to-transparent" />
-
-                                        {/* Animated Pulse Points */}
-                                        <div className="absolute top-1/4 left-1/3 size-4 bg-brand-primary rounded-full">
-                                            <div className="absolute inset-0 animate-ping bg-brand-primary rounded-full opacity-50" />
-                                        </div>
-                                        <div className="absolute bottom-1/3 right-1/4 size-4 bg-emerald-500 rounded-full">
-                                            <div className="absolute inset-0 animate-ping bg-emerald-500 rounded-full opacity-50" />
-                                        </div>
-
-                                        <div className="absolute bottom-4 left-4 bg-brand-card/80 backdrop-blur-md p-3 rounded-lg border border-brand-darkBorder flex items-center gap-3">
-                                            <div className="size-8 bg-brand-primary rounded-lg flex items-center justify-center">
-                                                <Truck className="size-4 text-white" />
-                                            </div>
-                                            <p className="text-xs font-bold text-white">3 veículos ativos no momento</p>
-                                        </div>
-                                    </div>
+                                <div className="p-0 overflow-x-auto">
+                                    <table className="w-full text-left border-collapse min-w-[600px]">
+                                        <thead>
+                                            <tr className="border-b border-brand-darkBorder text-xs font-bold uppercase tracking-wider text-brand-muted">
+                                                <th className="p-4 pl-6 font-semibold">Pedido</th>
+                                                <th className="p-4 font-semibold">Cliente</th>
+                                                <th className="p-4 font-semibold">Serviço</th>
+                                                <th className="p-4 font-semibold">Status</th>
+                                                <th className="p-4 pr-6 text-right font-semibold">Tempo</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-brand-darkBorder">
+                                            {inProgressOrders.map((order) => (
+                                                <tr key={order.id} className="hover:bg-white/5 transition-colors group cursor-pointer" onClick={() => setActiveList('Andamento Detalhe')}>
+                                                    <td className="p-4 pl-6">
+                                                        <span className="font-bold text-white group-hover:text-brand-primary transition-colors">{order.id}</span>
+                                                    </td>
+                                                    <td className="p-4 text-sm text-brand-muted font-medium">{order.client}</td>
+                                                    <td className="p-4 text-sm text-brand-muted">{order.service}</td>
+                                                    <td className="p-4">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="relative w-24 h-1.5 bg-brand-bg rounded-full overflow-hidden">
+                                                                <div className={`absolute h-full rounded-full ${order.bgColor}`} style={{ width: `${order.progress}%` }} />
+                                                            </div>
+                                                            <span className={`text-xs font-bold ${order.textColor}`}>{order.status}</span>
+                                                        </div>
+                                                    </td>
+                                                    <td className="p-4 pr-6 text-right font-bold text-white text-sm">{order.time}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
                                 </div>
                             </motion.div>
 
@@ -244,6 +234,55 @@ export default function OrdersPage() {
                                             </div>
                                             <ArrowRight className="size-4 text-brand-muted group-hover:text-white" />
                                         </div>
+                                    </div>
+                                </motion.div>
+
+                                {/* Reduced GPS Tracking Card */}
+                                <motion.div
+                                    initial={{ opacity: 0, x: 20 }}
+                                    animate={{ opacity: 1, x: 0 }}
+                                    transition={{ delay: 0.3 }}
+                                    className="bg-brand-card rounded-2xl border border-brand-darkBorder overflow-hidden"
+                                >
+                                    <div className="p-5 border-b border-brand-darkBorder flex items-center justify-between">
+                                        <div className="flex items-center gap-3">
+                                            <div className="p-1.5 bg-blue-500/10 text-blue-500 rounded-lg">
+                                                <Navigation className="size-4" />
+                                            </div>
+                                            <h3 className="text-base font-bold text-white">Rotas Ativas</h3>
+                                        </div>
+                                        <button onClick={() => setIsMapExpanded(true)} className="text-[10px] font-bold text-brand-primary hover:underline uppercase tracking-wider">Expandir Mapa</button>
+                                    </div>
+                                    <div className="p-5 space-y-4">
+                                        {routes.map((route, idx) => (
+                                            <div key={route.driver} className="space-y-3">
+                                                <div className="flex items-center justify-between">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="size-8 rounded-full bg-brand-bg border border-brand-darkBorder flex items-center justify-center text-white font-bold text-xs uppercase">
+                                                            {route.driver.split(' ').map(n => n[0]).join('')}
+                                                        </div>
+                                                        <div>
+                                                            <p className="text-sm font-bold text-white">{route.driver}</p>
+                                                            <p className="text-[10px] text-brand-muted flex items-center gap-1">
+                                                                <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                                                {route.status}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                    <button onClick={() => setIsMapExpanded(true)} className="p-1.5 text-brand-muted hover:text-white hover:bg-white/5 rounded-lg transition-colors">
+                                                        <MapPin className="size-3" />
+                                                    </button>
+                                                </div>
+                                                <div className="relative h-1.5 w-full bg-brand-bg rounded-full overflow-hidden">
+                                                    <motion.div
+                                                        initial={{ width: 0 }}
+                                                        animate={{ width: `${route.progress}%` }}
+                                                        transition={{ duration: 1, delay: 0.5 + idx * 0.2 }}
+                                                        className="absolute h-full bg-brand-primary rounded-full"
+                                                    />
+                                                </div>
+                                            </div>
+                                        ))}
                                     </div>
                                 </motion.div>
                             </div>
