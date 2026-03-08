@@ -4,25 +4,30 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 
 export function SupabaseConnectionTest() {
-  const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
+  const [status, setStatus] = useState<'loading' | 'success' | 'error' | 'demo'>('loading');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
     async function testConnection() {
+      // Check if we are using the dummy Supabase URL
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+      if (!supabaseUrl || supabaseUrl.includes('dummy') || supabaseUrl === '') {
+        setStatus('demo');
+        return;
+      }
+
       try {
-        // A simple query to test the connection.
-        // We query a non-existent table just to see if the network request succeeds
-        // and returns a Supabase error (which means the connection works).
         const { error } = await supabase.from('_dummy_table_test_connection').select('*').limit(1);
-        
-        // If we get an error about the table not existing, the connection is working!
-        if (error && error.code === '42P01') {
-           setStatus('success');
+
+        // If we get an error about the table not existing, or specific schema cache errors, 
+        // the connection IS working because it reached the database.
+        if (error && (error.code === '42P01' || error.message?.includes('schema cache') || error.message?.includes('not find the table'))) {
+          setStatus('success');
         } else if (error) {
-           setStatus('error');
-           setErrorMessage(error.message);
+          setStatus('error');
+          setErrorMessage(error.message);
         } else {
-           setStatus('success');
+          setStatus('success');
         }
       } catch (err: any) {
         setStatus('error');
@@ -37,6 +42,15 @@ export function SupabaseConnectionTest() {
     return (
       <div className="p-4 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 rounded-lg text-sm mb-6 border border-blue-200 dark:border-blue-800">
         Testing Supabase connection...
+      </div>
+    );
+  }
+
+  if (status === 'demo') {
+    return (
+      <div className="p-4 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 rounded-lg text-sm mb-6 border border-amber-200 dark:border-amber-800 flex items-center gap-2">
+        <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></div>
+        <strong className="font-semibold">Modo de Demonstração:</strong> O sistema está rodando localmente sem conexão ativa ao banco de dados. Os dados exibidos são fictícios.
       </div>
     );
   }

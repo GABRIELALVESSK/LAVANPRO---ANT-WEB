@@ -1,7 +1,60 @@
 @import "tailwindcss";
 
 @theme {
-  --color-primary: #6600ff;
-  --color-background-light: #f7f5f8;
-  --color-background-dark: #170f23;
+  --font-sans: "Inter", sans-serif;
+
+  --color-brand-bg: #050510;
+  --color-brand-card: #1e1e2e;
+  --color-brand-primary: #8b5cf6;
+  --color-brand-primaryHover: #7c3aed;
+  --color-brand-text: #e2e8f0;
+  --color-brand-muted: #94a3b8;
+  --color-brand-darkBorder: #2d2d42;
+
+  /* Login page colors */
+  --color-primary: #7C3AED;
+  --color-background-light: #F8FAFC;
+  --color-background-dark: #0F172A;
+  --color-navy-900: #0F172A;
+  --color-navy-950: #020617;
+}
+
+@layer base {
+  body {
+    background-color: var(--color-brand-bg);
+    color: var(--color-brand-text);
+    font-family: var(--font-sans);
+  }
+}
+
+@layer utilities {
+
+  /* Subtle gradient overlay for the hero section background */
+  .hero-bg {
+    background: radial-gradient(circle at 50% 0%, rgba(139, 92, 246, 0.15) 0%, rgba(5, 5, 16, 0) 70%);
+  }
+
+  /* Card hover effects */
+  .feature-card {
+    transition: all 0.3s ease;
+    border: 1px solid transparent;
+  }
+
+  .feature-card:hover {
+    transform: translateY(-5px);
+    border-color: var(--color-brand-primary);
+    box-shadow: 0 10px 30px -10px rgba(139, 92, 246, 0.2);
+  }
+
+  /* Accordion transition */
+  .accordion-content {
+    transition: max-height 0.3s ease-out, opacity 0.3s ease;
+    max-height: 0;
+    overflow: hidden;
+    opacity: 0;
+  }
+
+  .accordion-content.active {
+    opacity: 1;
+  }
 }

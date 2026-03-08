@@ -6,18 +6,18 @@ interface HeaderProps {
   showActions?: boolean;
 }
 
-export function Header({ 
-  title = "Painel de Faturamento Detalhado", 
+export function Header({
+  title = "Painel de Faturamento Detalhado",
   subtitle = "Análise financeira completa das operações",
   showActions = true
 }: HeaderProps) {
   return (
-    <header className="flex items-center justify-between px-8 py-4 border-b border-slate-200 dark:border-slate-800 sticky top-0 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md z-10">
+    <header className="flex items-center justify-between px-8 py-4 border-b border-brand-darkBorder sticky top-0 bg-brand-bg/90 backdrop-blur-md z-10">
       <div>
-        <h1 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">
+        <h1 className="text-2xl font-black text-white tracking-tight">
           {title}
         </h1>
-        <p className="text-sm text-slate-500 dark:text-slate-400">
+        <p className="text-sm text-brand-muted">
           {subtitle}
         </p>
       </div>
@@ -28,10 +28,10 @@ export function Header({
             <input
               type="text"
               placeholder="Buscar relatório..."
-              className="pl-10 pr-4 py-2 bg-slate-100 dark:bg-slate-800 border-none rounded-lg focus:ring-2 focus:ring-primary w-64 text-sm outline-none"
+              className="pl-10 pr-4 py-2 bg-brand-card border border-brand-darkBorder rounded-lg focus:ring-2 focus:ring-brand-primary w-64 text-sm outline-none text-white placeholder-brand-muted"
             />
           </div>
-          <button className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg text-sm font-bold hover:bg-primary/90 transition-all">
+          <button className="flex items-center gap-2 px-4 py-2 bg-brand-primary text-white rounded-lg text-sm font-bold hover:bg-brand-primaryHover transition-all shadow-lg shadow-brand-primary/20">
             <FileDown className="size-5" />
             Exportar PDF
           </button>

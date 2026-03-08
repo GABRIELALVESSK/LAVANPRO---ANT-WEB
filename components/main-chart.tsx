@@ -9,36 +9,65 @@ import {
   YAxis,
 } from "recharts";
 
-const data = [
-  { date: "01 Mai", total: 1200 },
-  { date: "05 Mai", total: 1300 },
-  { date: "10 Mai", total: 1100 },
-  { date: "15 Mai", total: 1600 },
-  { date: "20 Mai", total: 1400 },
-  { date: "24 Mai", total: 2450 },
-  { date: "28 Mai", total: 2100 },
-  { date: "30 Mai", total: 2300 },
-];
+interface MainChartProps {
+  activeRange?: string;
+  customDates?: { start: string; end: string };
+}
 
-export function MainChart() {
+const dataSets: Record<string, any[]> = {
+  'hoje': [
+    { date: "08:00", total: 100 },
+    { date: "10:00", total: 450 },
+    { date: "12:00", total: 320 },
+    { date: "14:00", total: 845 },
+    { date: "16:00", total: 600 },
+    { date: "18:00", total: 720 },
+  ],
+  '7d': [
+    { date: "Seg", total: 800 },
+    { date: "Ter", total: 950 },
+    { date: "Qua", total: 720 },
+    { date: "Qui", total: 1200 },
+    { date: "Sex", total: 1500 },
+    { date: "Sáb", total: 1800 },
+    { date: "Dom", total: 1100 },
+  ],
+  '30d': [
+    { date: "01 Mai", total: 4200 },
+    { date: "05 Mai", total: 5800 },
+    { date: "10 Mai", total: 4900 },
+    { date: "15 Mai", total: 7200 },
+    { date: "20 Mai", total: 6800 },
+    { date: "24 Mai", total: 9100 },
+    { date: "28 Mai", total: 8500 },
+    { date: "30 Mai", total: 12400 },
+  ],
+  'custom': [
+    { date: "Período", total: 14280 },
+  ]
+};
+
+export function MainChart({ activeRange, customDates: _customDates }: MainChartProps) {
+  const data = dataSets[activeRange || '30d'] || dataSets['30d'];
+
   return (
-    <div className="bg-white dark:bg-slate-800 p-8 rounded-xl border border-slate-100 dark:border-slate-700 shadow-sm">
+    <div className="bg-brand-card p-8 rounded-xl border border-brand-darkBorder shadow-xl">
       <div className="flex justify-between items-center mb-8">
         <div>
-          <h4 className="text-lg font-bold">Evolução do Faturamento Diário</h4>
-          <p className="text-sm text-slate-500 dark:text-slate-400">
-            Total acumulado nos últimos 30 dias
+          <h4 className="text-lg font-bold text-white">Evolução do Faturamento {activeRange === 'hoje' ? 'Hoje' : 'Diário'}</h4>
+          <p className="text-sm text-brand-muted">
+            Total acumulado no período selecionado
           </p>
         </div>
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">
-            <span className="size-3 rounded-full bg-primary"></span>
-            <span className="text-xs font-medium text-slate-500">Este mês</span>
+            <span className="size-3 rounded-full bg-brand-primary"></span>
+            <span className="text-xs font-medium text-slate-500">Período Atual</span>
           </div>
           <div className="flex items-center gap-2">
-            <span className="size-3 rounded-full bg-slate-300"></span>
-            <span className="text-xs font-medium text-slate-500">
-              Mês anterior
+            <span className="size-3 rounded-full bg-slate-700"></span>
+            <span className="text-xs font-medium text-brand-muted">
+              Período Anterior
             </span>
           </div>
         </div>
@@ -58,7 +87,7 @@ export function MainChart() {
               tickLine={false}
               tick={{ fontSize: 12, fill: "#94a3b8" }}
               dy={10}
-              hide
+              hide={activeRange === 'hoje'}
             />
             <YAxis
               axisLine={false}
@@ -71,7 +100,7 @@ export function MainChart() {
               content={({ active, payload }) => {
                 if (active && payload && payload.length) {
                   return (
-                    <div className="bg-slate-900 text-white p-3 rounded-lg shadow-xl text-xs z-10">
+                    <div className="bg-slate-900 border border-brand-darkBorder text-white p-3 rounded-lg shadow-xl text-xs z-10">
                       <p className="font-bold opacity-60 mb-1">
                         {payload[0].payload.date}
                       </p>
