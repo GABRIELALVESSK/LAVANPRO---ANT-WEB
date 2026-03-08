@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="pt-BR"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>LaVu - Sistema de Gestão Premium</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,typography,container-queries"></script>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&amp;family=Playfair+Display:ital,wght@0,600;1,600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script>
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        primary: "#7C3AED", 
+                        "background-light": "#F8FAFC",
+                        "background-dark": "#0F172A", 
+                        navy: {
+                            900: "#0F172A",
+                            950: "#020617",
+                        }
+                    },
+                    fontFamily: {
+                        display: ["Playfair Display", "serif"],
+                        sans: ["Inter", "sans-serif"],
+                    },
+                    borderRadius: {
+                        DEFAULT: "0.5rem",
+                    },
+                },
+            },
+        };
+    </script>
+<style type="text/tailwindcss">
+        .glass-effect {
+            backdrop-filter: blur(8px);
+            background: rgba(255, 255, 255, 0.02);
+        }
+        .transition-soft {
+            @apply transition-all duration-300 ease-in-out;
+        }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark font-sans text-slate-900 dark:text-slate-100 antialiased min-h-screen">
+<main class="flex min-h-screen">
+<div class="hidden lg:flex lg:w-1/2 relative overflow-hidden bg-navy-950">
+<img alt="Close-up of luxurious, neatly folded white towels emphasizing texture and pristine cleanliness" class="absolute inset-0 object-cover w-full h-full opacity-60 mix-blend-luminosity" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC40faZYIkrS3w9v-uGpSBaGbK8nOfDIOUJZUYOnOCAlRzPl5mWAJ5xTREC-t26mI6KR4xxVd73-28C5qWnztklG3u0pzNXDK0sRMeLG9nMnyTiXjaPd0_ZqOoghujw1qgdboboU0AnUPA8OkBkvq6I7eLWIyHeYw7feT3Ww-DIyzR0ZEh-uRBDukbXpWB-eysDrLxkLNKty0al8UwA6RC2mHFbfMNOLcsrn9OFG8VKkqEC4FWhz85rIA7MVfG4frKr4zyfhzlyvuaA"/>
+<div class="absolute inset-0 bg-gradient-to-t from-navy-950 via-transparent to-navy-950/40"></div>
+<div class="relative z-10 flex flex-col justify-between p-16 w-full">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-4xl">dry_cleaning</span>
+<span class="font-display text-3xl tracking-tight text-white italic">LavanPro</span>
+</div>
+<div class="max-w-md">
+<h2 class="font-display text-5xl text-white mb-6 leading-tight">Excelência em cada detalhe.</h2>
+<p class="text-slate-400 text-lg font-light leading-relaxed">
+                        Gerencie sua lavanderia com a sofisticação e precisão que seu negócio merece. Tecnologia de ponta para o cuidado têxtil.
+                    </p>
+</div>
+<div class="flex gap-8 text-xs tracking-widest uppercase text-slate-500 font-light">
+<span>© 2024 LaVu Systems</span>
+<span>Premium Care</span>
+</div>
+</div>
+</div>
+<div class="w-full lg:w-1/2 flex flex-col justify-center items-center p-8 sm:p-12 lg:p-24 bg-white dark:bg-navy-900">
+<div class="w-full max-w-md">
+<div class="lg:hidden flex justify-center mb-12">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-4xl">dry_cleaning</span>
+<span class="font-display text-3xl tracking-tight italic">LaVu</span>
+</div>
+</div>
+<div class="mb-10 text-center lg:text-left">
+<h1 class="text-3xl font-display mb-3 dark:text-white">Sistema de Gestão</h1>
+<p class="text-slate-500 dark:text-slate-400 font-light">Gestão inteligente para lavanderias de alto padrão.</p>
+</div>
+<div class="bg-slate-100 dark:bg-navy-950 p-1 rounded-full flex mb-10 border border-slate-200 dark:border-slate-800">
+<button class="flex-1 py-2 text-sm font-light rounded-full bg-white dark:bg-slate-800 shadow-sm text-slate-900 dark:text-white transition-soft">
+                        Entrar
+                    </button>
+<button class="flex-1 py-2 text-sm font-light rounded-full text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-soft">
+                        Cadastrar
+                    </button>
+</div>
+<form action="#" class="space-y-6">
+<div>
+<label class="block text-xs font-light uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-2 ml-1" for="email">
+                            E-mail Profissional
+                        </label>
+<input class="w-full px-4 py-3 bg-slate-50 dark:bg-navy-950 border border-slate-200 dark:border-slate-800 rounded-lg focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-soft dark:text-white placeholder-slate-400 dark:placeholder-slate-600 font-light" id="email" name="email" placeholder="seu@email.com" type="email"/>
+</div>
+<div>
+<div class="flex justify-between items-center mb-2">
+<label class="block text-xs font-light uppercase tracking-widest text-slate-400 dark:text-slate-500 ml-1" for="password">
+                                Senha
+                            </label>
+<a class="text-xs text-primary hover:underline font-light" href="#">Esqueceu a senha?</a>
+</div>
+<input class="w-full px-4 py-3 bg-slate-50 dark:bg-navy-950 border border-slate-200 dark:border-slate-800 rounded-lg focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-soft dark:text-white placeholder-slate-400 dark:placeholder-slate-600 font-light" id="password" name="password" placeholder="••••••••" type="password"/>
+</div>
+<div class="pt-2">
+<button class="w-full bg-primary hover:bg-primary/90 text-white font-semibold py-4 rounded-lg shadow-lg shadow-primary/20 transition-soft active:scale-[0.98] flex items-center justify-center gap-2" type="submit">
+                            Acessar Painel
+                            <span class="material-symbols-outlined text-sm">arrow_forward</span>
+</button>
+</div>
+</form>
+<div class="mt-12 text-center">
+<p class="text-xs text-slate-400 dark:text-slate-600 font-light leading-relaxed max-w-xs mx-auto">
+                        Para fins de demonstração, desative o "Confirm email" nas configurações de autenticação do seu ambiente.
+                    </p>
+</div>
+<div class="lg:hidden mt-16 text-center text-[10px] tracking-widest uppercase text-slate-400 font-light">
+                    © 2024 LaVu Premium Care
+                </div>
+</div>
+</div>
+</main>
+<button class="fixed bottom-6 right-6 p-3 rounded-full bg-white dark:bg-navy-800 shadow-xl border border-slate-200 dark:border-slate-700 transition-soft hover:scale-110 active:scale-95 group" onclick="document.documentElement.classList.toggle('dark')">
+<span class="material-symbols-outlined text-slate-600 dark:text-slate-300 group-hover:text-primary">contrast</span>
+</button>
+
+</body></html>

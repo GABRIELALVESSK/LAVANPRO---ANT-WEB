@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { Sidebar } from "@/components/sidebar";
-import { Header } from "@/components/header";
 import { Filters } from "@/components/filters";
 import { StatsCards } from "@/components/stats-cards";
 import { MainChart } from "@/components/main-chart";
@@ -21,7 +20,6 @@ export default function Page() {
     <div className="flex min-h-screen bg-brand-bg text-brand-text font-sans selection:bg-brand-primary/30 selection:text-white">
       <Sidebar />
       <div className="flex-1 flex flex-col h-screen overflow-hidden">
-        <Header />
         <main className="flex-1 overflow-y-auto bg-brand-bg">
           <Filters
             activeRange={activeRange}

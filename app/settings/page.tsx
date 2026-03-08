@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
 import { Sidebar } from "@/components/sidebar";
-import { Header } from "@/components/header";
 import { UserCircle, Store, Bell, Shield, Camera, LogIn, Edit, UploadCloud, Users, Plus, Trash2, Key } from "lucide-react";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";

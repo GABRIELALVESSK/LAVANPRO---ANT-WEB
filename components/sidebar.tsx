@@ -21,19 +21,31 @@ export function Sidebar() {
   const router = useRouter();
   const { user } = useAuth();
 
+  const isAdmin =
+    user?.user_metadata?.role === 'owner' ||
+    user?.user_metadata?.role === 'Gerente' ||
+    user?.user_metadata?.role === 'Gerente Geral' ||
+    user?.user_metadata?.role === 'Administrador' ||
+    user?.email === 'gabriel23900@gmail.com';
+
   const handleLogout = async () => {
     await supabase.auth.signOut();
     router.push("/login");
   };
 
-  const navItems = [
-    { href: "/dashboard", icon: LayoutDashboard, label: "Visão Geral" },
-    { href: "/reports", icon: BarChart3, label: "Relatórios" },
-    { href: "/orders", icon: ReceiptText, label: "Pedidos" },
-    { href: "/customers", icon: Users, label: "Clientes" },
-    { href: "/finance", icon: Wallet, label: "Financeiro" },
-    { href: "/settings", icon: Settings, label: "Configurações" },
-  ];
+  const navItems = isAdmin
+    ? [
+      { href: "/dashboard", icon: LayoutDashboard, label: "Visão Geral" },
+      { href: "/reports", icon: BarChart3, label: "Relatórios" },
+      { href: "/orders", icon: ReceiptText, label: "Pedidos" },
+      { href: "/customers", icon: Users, label: "Clientes" },
+      { href: "/finance", icon: Wallet, label: "Financeiro" },
+      { href: "/settings", icon: Settings, label: "Configurações" },
+    ]
+    : [
+      { href: "/orders", icon: ReceiptText, label: "Pedidos" },
+      { href: "/customers", icon: Users, label: "Clientes" },
+    ];
 
   return (
     <aside className="w-64 bg-brand-bg border-r border-brand-darkBorder flex flex-col shrink-0 min-h-screen">

@@ -1,0 +1,34 @@
+
+    body {
+      background-color: #050510;
+      color: #e2e8f0;
+      font-family: 'Inter', sans-serif;
+    }
+
+    /* Subtle gradient overlay for the hero section background */
+    .hero-bg {
+      background: radial-gradient(circle at 50% 0%, rgba(139, 92, 246, 0.15) 0%, rgba(5, 5, 16, 0) 70%);
+    }
+
+    /* Card hover effects */
+    .feature-card {
+      transition: all 0.3s ease;
+      border: 1px solid transparent;
+    }
+    .feature-card:hover {
+      transform: translateY(-5px);
+      border-color: #8b5cf6;
+      box-shadow: 0 10px 30px -10px rgba(139, 92, 246, 0.2);
+    }
+
+    /* Accordion transition */
+    .accordion-content {
+      transition: max-height 0.3s ease-out, opacity 0.3s ease;
+      max-height: 0;
+      overflow: hidden;
+      opacity: 0;
+    }
+    .accordion-content.active {
+      opacity: 1;
+    }
+  
