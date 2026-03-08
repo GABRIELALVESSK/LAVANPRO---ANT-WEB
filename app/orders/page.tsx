@@ -14,11 +14,19 @@ import {
     MoreVertical,
     Activity,
     History,
-    Timer
+    Timer,
+    X
 } from "lucide-react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
+import { useState } from "react";
 
 export default function OrdersPage() {
+    const [isNewOrderModalOpen, setIsNewOrderModalOpen] = useState(false);
+    const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
+    const [isMapExpanded, setIsMapExpanded] = useState(false);
+    const [activeList, setActiveList] = useState<string | null>(null);
+    const [selectedAction, setSelectedAction] = useState<any>(null);
+
     const stats = [
         { label: "Em Rota", value: "12", icon: Truck, color: "text-blue-500", bg: "bg-blue-500/10" },
         { label: "Prontos", value: "28", icon: CheckCircle2, color: "text-emerald-500", bg: "bg-emerald-500/10" },
@@ -33,9 +41,9 @@ export default function OrdersPage() {
     ];
 
     const alerts = [
-        { id: "#ORD-2849", type: "Atraso", desc: "Excedeu 4h do tempo de lavagem.", color: "text-rose-500" },
-        { id: "#ORD-2710", type: "Ausente", desc: "Cliente ausente (3ª tentativa).", color: "text-amber-500" },
-        { id: "#ORD-2855", type: "Validação", desc: "Requer validação de peça especial.", color: "text-blue-500" },
+        { id: "#ORD-2849", type: "Atraso", desc: "Excedeu 4h do tempo de lavagem.", color: "text-rose-500", fullDesc: "Motorista Ricardo Camargo preso no trânsito próximo à Av. Paulista. Previsão de chegada estendida em 40 minutos." },
+        { id: "#ORD-2710", type: "Ausente", desc: "Cliente ausente (3ª tentativa).", color: "text-amber-500", fullDesc: "O cliente não estava em casa na 3ª tentativa de entrega. Retornar amanhã ou entrar em contato." },
+        { id: "#ORD-2855", type: "Validação", desc: "Requer validação de peça especial.", color: "text-blue-500", fullDesc: "Vestido de seda recebido com mancha de vinho não declarada. Requer contato com cliente." },
     ];
 
     return (
@@ -63,10 +71,10 @@ export default function OrdersPage() {
                             </motion.div>
 
                             <div className="flex items-center gap-3">
-                                <button className="px-4 py-2 bg-brand-card border border-brand-darkBorder rounded-lg text-xs font-bold text-white hover:bg-brand-darkBorder transition-all flex items-center gap-2">
+                                <button onClick={() => setIsHistoryModalOpen(true)} className="px-4 py-2 bg-brand-card border border-brand-darkBorder rounded-lg text-xs font-bold text-white hover:bg-brand-darkBorder transition-all flex items-center gap-2">
                                     <History className="size-4" /> Ver Histórico
                                 </button>
-                                <button className="px-5 py-2 bg-brand-primary text-white rounded-lg text-xs font-bold hover:bg-brand-primaryHover transition-all shadow-lg shadow-brand-primary/20 flex items-center gap-2">
+                                <button onClick={() => setIsNewOrderModalOpen(true)} className="px-5 py-2 bg-brand-primary text-white rounded-lg text-xs font-bold hover:bg-brand-primaryHover transition-all shadow-lg shadow-brand-primary/20 flex items-center gap-2">
                                     Novo Pedido <ChevronRight className="size-4" />
                                 </button>
                             </div>
@@ -80,7 +88,8 @@ export default function OrdersPage() {
                                     initial={{ opacity: 0, y: 20 }}
                                     animate={{ opacity: 1, y: 0 }}
                                     transition={{ delay: idx * 0.1 }}
-                                    className="bg-brand-card p-6 rounded-2xl border border-brand-darkBorder hover:border-brand-primary/30 transition-all group relative overflow-hidden"
+                                    onClick={() => setActiveList(stat.label)}
+                                    className="bg-brand-card p-6 rounded-2xl border border-brand-darkBorder hover:border-brand-primary/30 transition-all cursor-pointer group relative overflow-hidden"
                                 >
                                     <div className={`absolute top-0 right-0 w-24 h-24 ${stat.bg} rounded-bl-full opacity-20 -mr-6 -mt-6 transition-transform group-hover:scale-110`} />
                                     <div className="flex items-center justify-between mb-4">
@@ -114,7 +123,7 @@ export default function OrdersPage() {
                                             <p className="text-xs text-brand-muted">Posicionamento GPS em tempo real</p>
                                         </div>
                                     </div>
-                                    <button className="text-xs font-bold text-brand-primary hover:underline">Expandir Mapa</button>
+                                    <button onClick={() => setIsMapExpanded(true)} className="text-xs font-bold text-brand-primary hover:underline">Expandir Mapa</button>
                                 </div>
 
                                 <div className="p-6 space-y-6">
@@ -133,7 +142,7 @@ export default function OrdersPage() {
                                                         </p>
                                                     </div>
                                                 </div>
-                                                <button className="p-2 text-brand-muted hover:text-white hover:bg-white/5 rounded-lg transition-colors">
+                                                <button onClick={() => setIsMapExpanded(true)} className="p-2 text-brand-muted hover:text-white hover:bg-white/5 rounded-lg transition-colors">
                                                     <MapPin className="size-4" />
                                                 </button>
                                             </div>
@@ -149,7 +158,7 @@ export default function OrdersPage() {
                                     ))}
 
                                     {/* Mock Map Background Container */}
-                                    <div className="mt-8 relative h-64 bg-brand-bg border border-brand-darkBorder rounded-xl overflow-hidden group">
+                                    <div onClick={() => setIsMapExpanded(true)} className="mt-8 relative h-64 bg-brand-bg border border-brand-darkBorder rounded-xl overflow-hidden group cursor-pointer">
                                         <div className="absolute inset-0 bg-[url('https://lh3.googleusercontent.com/aida-public/AG-M0yG0Lp7m1_yK-W4d-qJt7Rz4f8v_tA-m3q0o5PzY=s2048')] opacity-30 mix-blend-overlay grayscale group-hover:grayscale-0 transition-all duration-500" />
                                         <div className="absolute inset-0 bg-gradient-to-t from-brand-bg via-transparent to-transparent" />
 
@@ -187,7 +196,7 @@ export default function OrdersPage() {
                                     </div>
                                     <div className="divide-y divide-brand-darkBorder">
                                         {alerts.map((alert) => (
-                                            <div key={alert.id} className="p-6 hover:bg-white/5 transition-all cursor-pointer group">
+                                            <div key={alert.id} onClick={() => setSelectedAction({ type: 'Alerta', title: alert.type, desc: alert.fullDesc, id: alert.id })} className="p-6 hover:bg-white/5 transition-all cursor-pointer group">
                                                 <div className="flex items-center justify-between mb-2">
                                                     <span className="text-xs font-black text-brand-primary">{alert.id}</span>
                                                     <span className={`text-[10px] uppercase font-black px-2 py-0.5 rounded ${alert.color.replace('text', 'bg')}/10 ${alert.color}`}>
@@ -214,7 +223,7 @@ export default function OrdersPage() {
                                         <h3 className="text-lg font-bold text-white">Fila de Ações</h3>
                                     </div>
                                     <div className="p-6 space-y-4">
-                                        <div className="p-4 bg-brand-bg border border-brand-darkBorder rounded-xl flex items-center gap-4 group cursor-pointer hover:border-brand-primary transition-all">
+                                        <div onClick={() => setSelectedAction({ type: 'Ação', title: 'Faturamento Pendente', desc: 'Existem 8 pedidos que já foram entregues mas aguardam emissão de Nota Fiscal.', id: 'Ação-Faturamento' })} className="p-4 bg-brand-bg border border-brand-darkBorder rounded-xl flex items-center gap-4 group cursor-pointer hover:border-brand-primary transition-all">
                                             <div className="size-10 bg-emerald-500/10 text-emerald-500 rounded-lg flex items-center justify-center">
                                                 <CheckCircle2 className="size-5" />
                                             </div>
@@ -225,7 +234,7 @@ export default function OrdersPage() {
                                             <ArrowRight className="size-4 text-brand-muted group-hover:text-white" />
                                         </div>
 
-                                        <div className="p-4 bg-brand-bg border border-brand-darkBorder rounded-xl flex items-center gap-4 group cursor-pointer hover:border-brand-primary transition-all">
+                                        <div onClick={() => setSelectedAction({ type: 'Ação', title: 'Liberar para Rota', desc: 'A Rota Sul já foi parcialmente carregada. Deseja liberar o motorista?', id: 'Ação-Rota' })} className="p-4 bg-brand-bg border border-brand-darkBorder rounded-xl flex items-center gap-4 group cursor-pointer hover:border-brand-primary transition-all">
                                             <div className="size-10 bg-blue-500/10 text-blue-500 rounded-lg flex items-center justify-center">
                                                 <ArrowRight className="size-5" />
                                             </div>
@@ -243,6 +252,158 @@ export default function OrdersPage() {
                     </div>
                 </main>
             </div>
+
+            {/* Modals are rendered here conditionally using AnimatePresence for smooth transitions */}
+            <AnimatePresence>
+                {/* Modal: Novo Pedido */}
+                {isNewOrderModalOpen && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+                        <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="bg-brand-card w-full max-w-lg rounded-2xl border border-brand-darkBorder shadow-2xl overflow-hidden">
+                            <div className="p-6 border-b border-brand-darkBorder flex justify-between items-center bg-white/5">
+                                <h3 className="text-xl font-bold text-white flex items-center gap-2"><CheckCircle2 className="size-5 text-brand-primary" /> Novo Pedido</h3>
+                                <button onClick={() => setIsNewOrderModalOpen(false)} className="text-brand-muted hover:text-white transition-colors bg-brand-bg p-2 rounded-lg border border-brand-darkBorder"><X className="size-4" /></button>
+                            </div>
+                            <div className="p-6 space-y-5">
+                                <div className="space-y-2">
+                                    <label className="text-xs font-bold uppercase tracking-wider text-brand-muted">Cliente (Nome ou Telefone)</label>
+                                    <input type="text" placeholder="Ex: João da Silva..." className="w-full px-4 py-3 bg-brand-bg border border-brand-darkBorder rounded-xl focus:ring-2 focus:ring-brand-primary focus:border-transparent outline-none text-white text-sm transition-all" />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-xs font-bold uppercase tracking-wider text-brand-muted">Serviço</label>
+                                    <select className="w-full px-4 py-3 bg-brand-bg border border-brand-darkBorder rounded-xl focus:ring-2 focus:ring-brand-primary focus:border-transparent outline-none text-white text-sm transition-all appearance-none cursor-pointer">
+                                        <option>Lavagem Completa</option>
+                                        <option>Apenas Passar</option>
+                                        <option>Lavagem a Seco</option>
+                                    </select>
+                                </div>
+                                <div className="pt-2">
+                                    <button onClick={() => setIsNewOrderModalOpen(false)} className="w-full py-3.5 bg-brand-primary text-white rounded-xl font-bold hover:bg-brand-primaryHover transition-all shadow-lg shadow-brand-primary/20">Cadastrar Pedido</button>
+                                </div>
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+
+                {/* Modal: Histórico */}
+                {isHistoryModalOpen && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+                        <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="bg-brand-card w-full max-w-2xl rounded-2xl border border-brand-darkBorder shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
+                            <div className="p-6 border-b border-brand-darkBorder flex justify-between items-center bg-white/5">
+                                <h3 className="text-xl font-bold text-white flex items-center gap-2"><History className="size-5 text-brand-primary" /> Histórico de Pedidos</h3>
+                                <button onClick={() => setIsHistoryModalOpen(false)} className="text-brand-muted hover:text-white transition-colors bg-brand-bg p-2 rounded-lg border border-brand-darkBorder"><X className="size-4" /></button>
+                            </div>
+                            <div className="p-6 overflow-y-auto custom-scrollbar flex-1 space-y-3">
+                                {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
+                                    <div key={i} className="p-4 bg-brand-bg border border-brand-darkBorder rounded-xl flex justify-between items-center hover:border-brand-primary/50 transition-colors">
+                                        <div>
+                                            <p className="font-bold text-white text-sm">Pedido #28{50 - i}</p>
+                                            <p className="text-xs text-brand-muted mt-0.5">Concluído há {i} dias</p>
+                                        </div>
+                                        <div className="px-3 py-1 bg-emerald-500/10 text-emerald-500 font-bold text-xs rounded-lg border border-emerald-500/20">Finalizado</div>
+                                    </div>
+                                ))}
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+
+                {/* Modal: Expandir Mapa */}
+                {isMapExpanded && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 md:p-8 bg-black/80 backdrop-blur-md">
+                        <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="bg-brand-card w-full max-w-6xl h-full max-h-[90vh] rounded-2xl border border-brand-darkBorder shadow-2xl overflow-hidden flex flex-col">
+                            <div className="p-5 border-b border-brand-darkBorder flex justify-between items-center bg-brand-card/90 backdrop-blur z-10">
+                                <h3 className="text-xl font-bold text-white flex items-center gap-2"><Navigation className="size-5 text-brand-primary" /> Tracking em Tempo Real</h3>
+                                <button onClick={() => setIsMapExpanded(false)} className="text-brand-muted hover:text-white transition-colors bg-brand-bg p-2 rounded-lg border border-brand-darkBorder"><X className="size-4" /></button>
+                            </div>
+                            <div className="flex-1 relative bg-[url('https://lh3.googleusercontent.com/aida-public/AG-M0yG0Lp7m1_yK-W4d-qJt7Rz4f8v_tA-m3q0o5PzY=s2048')] bg-cover bg-center">
+                                <div className="absolute inset-0 bg-brand-bg/60 mix-blend-overlay"></div>
+                                {/* Mock Map Pins */}
+                                <div className="absolute top-1/4 left-1/3 group cursor-pointer">
+                                    <div className="p-3 bg-brand-primary text-white rounded-full shadow-lg shadow-brand-primary/50 animate-bounce relative z-10"><Truck className="size-6" /></div>
+                                    <div className="absolute inset-0 bg-brand-primary rounded-full animate-ping opacity-75"></div>
+                                    <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-brand-card border border-brand-darkBorder px-3 py-2 rounded-lg shadow-xl opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                                        <p className="text-xs font-bold text-white">Ricardo Camargo</p>
+                                    </div>
+                                </div>
+                                <div className="absolute top-1/2 left-1/2 group cursor-pointer">
+                                    <div className="p-3 bg-emerald-500 text-white rounded-full shadow-lg shadow-emerald-500/50 animate-bounce relative z-10"><Truck className="size-6" /></div>
+                                    <div className="absolute inset-0 bg-emerald-500 rounded-full animate-ping opacity-75"></div>
+                                    <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-brand-card border border-brand-darkBorder px-3 py-2 rounded-lg shadow-xl opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                                        <p className="text-xs font-bold text-white">André Machado</p>
+                                    </div>
+                                </div>
+                                <div className="absolute bottom-1/3 right-1/4 group cursor-pointer">
+                                    <div className="p-3 bg-blue-500 text-white rounded-full shadow-lg shadow-blue-500/50 animate-bounce relative z-10"><Truck className="size-6" /></div>
+                                    <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-brand-card border border-brand-darkBorder px-3 py-2 rounded-lg shadow-xl opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                                        <p className="text-xs font-bold text-white">Lucas Mendes</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+
+                {/* Modal: Lista de Pedidos (Cards clicked) */}
+                {activeList && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+                        <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="bg-brand-card w-full max-w-3xl rounded-2xl border border-brand-darkBorder shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
+                            <div className="p-6 border-b border-brand-darkBorder flex justify-between items-center bg-white/5">
+                                <h3 className="text-xl font-bold text-white flex items-center gap-2">Lista de Pedidos <span className="text-brand-primary px-2 py-0.5 bg-brand-primary/10 rounded-md text-sm">{activeList}</span></h3>
+                                <button onClick={() => setActiveList(null)} className="text-brand-muted hover:text-white transition-colors bg-brand-bg p-2 rounded-lg border border-brand-darkBorder"><X className="size-4" /></button>
+                            </div>
+                            <div className="p-6 overflow-y-auto custom-scrollbar flex-1 space-y-3">
+                                <p className="text-brand-muted text-sm mb-4 bg-brand-bg p-3 rounded-lg border border-brand-darkBorder">Exibindo os pedidos recentes para a categoria selecionada.</p>
+                                {[1, 2, 3, 4, 5].map(i => (
+                                    <div key={i} className="p-4 bg-brand-bg border border-brand-darkBorder rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-l-4 border-l-brand-primary hover:bg-white/5 transition-colors">
+                                        <div>
+                                            <p className="font-bold text-white text-base">Pedido #{Math.floor(Math.random() * 1000) + 2000}</p>
+                                            <p className="text-brand-muted text-xs mt-1">Cliente: Maria Oliveira • Valor: R$ 85,90</p>
+                                        </div>
+                                        <button onClick={() => setActiveList(null)} className="px-4 py-2 bg-brand-card border border-brand-darkBorder text-white text-xs font-bold rounded-lg hover:border-brand-primary transition-colors hover:-translate-y-0.5 active:translate-y-0">Fechar Visualização</button>
+                                    </div>
+                                ))}
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+
+                {/* Modal: Ação / Alerta Específico */}
+                {selectedAction && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+                        <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="bg-brand-card w-full max-w-md rounded-2xl border border-brand-darkBorder shadow-2xl overflow-hidden">
+                            <div className="p-6 border-b border-brand-darkBorder flex justify-between items-center bg-white/5">
+                                <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                                    {selectedAction.type === 'Alerta' ? <AlertCircle className="size-5 text-rose-500" /> : <Activity className="size-5 text-brand-primary" />}
+                                    Resolver {selectedAction.type}
+                                </h3>
+                                <button onClick={() => setSelectedAction(null)} className="text-brand-muted hover:text-white transition-colors bg-brand-bg p-2 rounded-lg border border-brand-darkBorder"><X className="size-4" /></button>
+                            </div>
+                            <div className="p-6 space-y-5">
+                                <div className="p-5 rounded-xl bg-brand-bg border border-brand-darkBorder shadow-inner">
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <span className={`px-2 py-1 text-[10px] uppercase font-black rounded-md ${selectedAction.type === 'Alerta' ? 'bg-rose-500/10 text-rose-500' : 'bg-brand-primary/10 text-brand-primary'}`}>
+                                            {selectedAction.title}
+                                        </span>
+                                        <h4 className="font-bold text-white text-sm">{selectedAction.id || 'Nova Ação'}</h4>
+                                    </div>
+                                    <p className="text-sm text-brand-muted font-medium leading-relaxed">{selectedAction.desc}</p>
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-xs font-bold uppercase tracking-wider text-brand-muted flex justify-between">
+                                        Ação de Tratamento
+                                        <span className="text-brand-primary">Obrigatório</span>
+                                    </label>
+                                    <textarea rows={3} placeholder="Descreva como o problema foi solucionado..." className="w-full px-4 py-3 bg-brand-bg border border-brand-darkBorder rounded-xl focus:ring-2 focus:ring-brand-primary focus:border-transparent outline-none text-white text-sm transition-all resize-none" />
+                                </div>
+                                <div className="flex gap-3 pt-2">
+                                    <button onClick={() => setSelectedAction(null)} className="flex-1 py-3 bg-transparent border border-brand-darkBorder text-white rounded-xl font-bold hover:bg-white/5 transition-all text-sm">Cancelar / Voltar</button>
+                                    <button onClick={() => setSelectedAction(null)} className="flex-1 py-3 bg-brand-primary text-white rounded-xl font-bold hover:bg-brand-primaryHover transition-all shadow-lg shadow-brand-primary/20 text-sm">Marcar Resolvido</button>
+                                </div>
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
 
             <style jsx global>{`
         .custom-scrollbar::-webkit-scrollbar {
