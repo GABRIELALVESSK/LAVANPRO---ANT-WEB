@@ -32,7 +32,12 @@ export default function SettingsPage() {
   const [isSavingAll, setIsSavingAll] = useState(false);
   const [toasts, setToasts] = useState<{ id: string; message: string; type: "success" | "error" | "info" }[]>([]);
   const { user, loading } = useAuth();
-  const isAdmin = user?.user_metadata?.role === 'owner' || user?.user_metadata?.role === 'Gerente';
+  const isAdmin =
+    user?.user_metadata?.role === 'owner' ||
+    user?.user_metadata?.role === 'Gerente' ||
+    user?.user_metadata?.role === 'Gerente Geral' ||
+    user?.user_metadata?.role === 'Administrador' ||
+    user?.email === 'gabriel23900@gmail.com';
 
   const showToast = (message: string, type: "success" | "error" | "info" = "success") => {
     const id = Math.random().toString(36).substring(2, 9);

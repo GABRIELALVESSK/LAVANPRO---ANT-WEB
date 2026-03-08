@@ -41,11 +41,11 @@ export default function LoginPage() {
                 // Verificar se este e-mail já foi pré-cadastrado por um gestor
                 const { data: invite } = await supabase
                     .from('collaborators')
-                    .select('owner_id')
+                    .select('owner_id, role')
                     .eq('email', email)
                     .maybeSingle();
 
-                const role = invite ? 'collaborator' : 'owner';
+                const userRole = invite ? invite.role : 'owner';
                 const ownerId = invite ? invite.owner_id : null;
 
                 const { data: authData, error: authError } = await supabase.auth.signUp({
@@ -54,7 +54,7 @@ export default function LoginPage() {
                     options: {
                         data: {
                             full_name: name,
-                            role: role,
+                            role: userRole,
                             owner_id: ownerId
                         }
                     }
