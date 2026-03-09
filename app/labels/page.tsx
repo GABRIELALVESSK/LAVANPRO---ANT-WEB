@@ -8,7 +8,7 @@ import {
     AlertCircle, CheckCheck, Clock
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useMemo, useEffect, useCallback, Suspense } from "react";
 import QRCode from "react-qr-code";
 import { useSearchParams } from "next/navigation";
 
@@ -180,6 +180,14 @@ function PrintModal({ label, order, onClose }: { label: ReusableLabel; order: Mo
 
 // ─── Main Component ────────────────────────────────────────────────────────────
 export default function ReusableLabelsPage() {
+    return (
+        <Suspense fallback={<div className="flex h-screen items-center justify-center bg-brand-bg text-brand-text">Carregando...</div>}>
+            <LabelsContent />
+        </Suspense>
+    );
+}
+
+function LabelsContent() {
     const [labels, setLabels] = useState<ReusableLabel[]>(() => {
         if (typeof window === "undefined") return INITIAL_LABELS;
         try {
