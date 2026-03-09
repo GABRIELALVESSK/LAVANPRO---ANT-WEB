@@ -121,10 +121,10 @@ export default function LoginPage() {
                     <div className="relative z-10 flex flex-col justify-between p-16 w-full">
                         <div className="flex items-center gap-2">
                             <span className="material-symbols-outlined text-primary text-4xl">dry_cleaning</span>
-                            <span className="font-display text-3xl tracking-tight text-white italic">LavanPro</span>
+                            <span className="font-display text-3xl tracking-tight text-brand-text italic">LavanPro</span>
                         </div>
                         <div className="max-w-md">
-                            <h2 className="font-display text-5xl text-white mb-6 leading-tight">Excelência em cada detalhe.</h2>
+                            <h2 className="font-display text-5xl text-brand-text mb-6 leading-tight">Excelência em cada detalhe.</h2>
                             <p className="text-slate-400 text-lg font-light leading-relaxed">
                                 Gerencie sua lavanderia com a sofisticação e precisão que seu negócio merece. Tecnologia de ponta para o cuidado têxtil.
                             </p>
@@ -144,7 +144,7 @@ export default function LoginPage() {
                             </div>
                         </div>
                         <div className="mb-10 text-center lg:text-left">
-                            <h1 className="text-3xl font-display mb-3 dark:text-white">
+                            <h1 className="text-3xl font-display mb-3 dark:text-brand-text">
                                 {mode === 'login' ? 'Sistema de Gestão' : 'Criar Conta'}
                             </h1>
                             <p className="text-slate-500 dark:text-slate-400 font-light">
@@ -158,8 +158,8 @@ export default function LoginPage() {
                             <button
                                 onClick={() => setMode('login')}
                                 className={`flex-1 py-2 text-sm font-light rounded-full transition-soft ${mode === 'login'
-                                    ? 'bg-white dark:bg-slate-800 shadow-sm text-slate-900 dark:text-white'
-                                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                                    ? 'bg-white dark:bg-slate-800 shadow-sm text-slate-900 dark:text-brand-text'
+                                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-brand-text'
                                     }`}
                             >
                                 Entrar
@@ -167,8 +167,8 @@ export default function LoginPage() {
                             <button
                                 onClick={() => setMode('register')}
                                 className={`flex-1 py-2 text-sm font-light rounded-full transition-soft ${mode === 'register'
-                                    ? 'bg-white dark:bg-slate-800 shadow-sm text-slate-900 dark:text-white'
-                                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                                    ? 'bg-white dark:bg-slate-800 shadow-sm text-slate-900 dark:text-brand-text'
+                                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-brand-text'
                                     }`}
                             >
                                 Cadastrar
@@ -182,7 +182,7 @@ export default function LoginPage() {
                                         Nome Completo
                                     </label>
                                     <input
-                                        className="w-full px-4 py-3 bg-slate-50 dark:bg-navy-950 border border-slate-200 dark:border-slate-800 rounded-lg focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-soft dark:text-white placeholder-slate-400 dark:placeholder-slate-600 font-light"
+                                        className="w-full px-4 py-3 bg-slate-50 dark:bg-navy-950 border border-slate-200 dark:border-slate-800 rounded-lg focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-soft dark:text-brand-text placeholder-slate-400 dark:placeholder-slate-600 font-light"
                                         id="name"
                                         name="name"
                                         placeholder="Como devemos te chamar?"
@@ -199,7 +199,7 @@ export default function LoginPage() {
                                     E-mail Profissional
                                 </label>
                                 <input
-                                    className="w-full px-4 py-3 bg-slate-50 dark:bg-navy-950 border border-slate-200 dark:border-slate-800 rounded-lg focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-soft dark:text-white placeholder-slate-400 dark:placeholder-slate-600 font-light"
+                                    className="w-full px-4 py-3 bg-slate-50 dark:bg-navy-950 border border-slate-200 dark:border-slate-800 rounded-lg focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-soft dark:text-brand-text placeholder-slate-400 dark:placeholder-slate-600 font-light"
                                     id="email"
                                     name="email"
                                     placeholder="seu@email.com"
@@ -219,7 +219,7 @@ export default function LoginPage() {
                                     )}
                                 </div>
                                 <input
-                                    className="w-full px-4 py-3 bg-slate-50 dark:bg-navy-950 border border-slate-200 dark:border-slate-800 rounded-lg focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-soft dark:text-white placeholder-slate-400 dark:placeholder-slate-600 font-light"
+                                    className="w-full px-4 py-3 bg-slate-50 dark:bg-navy-950 border border-slate-200 dark:border-slate-800 rounded-lg focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-soft dark:text-brand-text placeholder-slate-400 dark:placeholder-slate-600 font-light"
                                     id="password"
                                     name="password"
                                     placeholder="••••••••"
@@ -231,7 +231,7 @@ export default function LoginPage() {
                             </div>
                             <div className="pt-2">
                                 <button
-                                    className="w-full bg-primary hover:bg-primary/90 text-white font-semibold py-4 rounded-lg shadow-lg shadow-primary/20 transition-soft active:scale-[0.98] flex items-center justify-center gap-2 disabled:opacity-50"
+                                    className="w-full bg-primary hover:bg-primary/90 text-brand-text font-semibold py-4 rounded-lg shadow-lg shadow-primary/20 transition-soft active:scale-[0.98] flex items-center justify-center gap-2 disabled:opacity-50"
                                     type="submit"
                                     disabled={isLoading}
                                 >

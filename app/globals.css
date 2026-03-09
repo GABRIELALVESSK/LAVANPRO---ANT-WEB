@@ -3,13 +3,13 @@
 @theme {
   --font-sans: "Inter", sans-serif;
 
-  --color-brand-bg: #050510;
-  --color-brand-card: #1e1e2e;
-  --color-brand-primary: #8b5cf6;
-  --color-brand-primaryHover: #7c3aed;
-  --color-brand-text: #e2e8f0;
-  --color-brand-muted: #94a3b8;
-  --color-brand-darkBorder: #2d2d42;
+  --color-brand-bg: var(--theme-bg);
+  --color-brand-card: var(--theme-card);
+  --color-brand-primary: var(--theme-primary);
+  --color-brand-primaryHover: var(--theme-primary-hover);
+  --color-brand-text: var(--theme-text);
+  --color-brand-muted: var(--theme-muted);
+  --color-brand-darkBorder: var(--theme-border);
 
   /* Login page colors */
   --color-primary: #7C3AED;
@@ -17,6 +17,26 @@
   --color-background-dark: #0F172A;
   --color-navy-900: #0F172A;
   --color-navy-950: #020617;
+}
+
+:root {
+  --theme-bg: #f8fafc;
+  --theme-card: #ffffff;
+  --theme-primary: #8b5cf6;
+  --theme-primary-hover: #7c3aed;
+  --theme-text: #0f172a;
+  --theme-muted: #64748b;
+  --theme-border: #e2e8f0;
+}
+
+.dark {
+  --theme-bg: #050510;
+  --theme-card: #1e1e2e;
+  --theme-primary: #8b5cf6;
+  --theme-primary-hover: #7c3aed;
+  --theme-text: #e2e8f0;
+  --theme-muted: #94a3b8;
+  --theme-border: #2d2d42;
 }
 
 @layer base {

@@ -228,7 +228,7 @@ export default function SettingsPage() {
       <div className="flex-1 flex flex-col h-screen overflow-hidden">
         <header className="flex items-center justify-between px-8 py-4 border-b border-brand-darkBorder sticky top-0 bg-brand-bg/90 backdrop-blur-md z-20">
           <div>
-            <h1 className="text-2xl font-black text-white tracking-tight">Configurações</h1>
+            <h1 className="text-2xl font-black text-brand-text tracking-tight">Configurações</h1>
             <p className="text-sm text-brand-muted">Gerencie sua conta e preferências do sistema</p>
           </div>
           <div className="flex items-center gap-3">
@@ -259,7 +259,7 @@ export default function SettingsPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               <button
                 onClick={() => setActiveTab("account")}
-                className={`p-6 rounded-xl border-2 shadow-xl flex flex-col items-center text-center gap-3 transition-all ${activeTab === "account" ? "bg-brand-card border-brand-primary text-white" : "bg-brand-card border-brand-darkBorder text-brand-muted hover:border-brand-primary/50 hover:text-white"}`}
+                className={`p-6 rounded-xl border-2 shadow-xl flex flex-col items-center text-center gap-3 transition-all ${activeTab === "account" ? "bg-brand-card border-brand-primary text-brand-text" : "bg-brand-card border-brand-darkBorder text-brand-muted hover:border-brand-primary/50 hover:text-brand-text"}`}
               >
                 <UserCircle className={`${activeTab === "account" ? "text-brand-primary" : "text-brand-muted"} size-8`} />
                 <span className="text-sm font-bold">Minha Conta</span>
@@ -267,7 +267,7 @@ export default function SettingsPage() {
               {isAdmin && (
                 <button
                   onClick={() => setActiveTab("laundry")}
-                  className={`p-6 rounded-xl border-2 shadow-xl flex flex-col items-center text-center gap-3 transition-all ${activeTab === "laundry" ? "bg-brand-card border-brand-primary text-white" : "bg-brand-card border-brand-darkBorder text-brand-muted hover:border-brand-primary/50 hover:text-white"}`}
+                  className={`p-6 rounded-xl border-2 shadow-xl flex flex-col items-center text-center gap-3 transition-all ${activeTab === "laundry" ? "bg-brand-card border-brand-primary text-brand-text" : "bg-brand-card border-brand-darkBorder text-brand-muted hover:border-brand-primary/50 hover:text-brand-text"}`}
                 >
                   <Store className={`${activeTab === "laundry" ? "text-brand-primary" : "text-brand-muted"} size-8`} />
                   <span className="text-sm font-bold">Dados da Lavanderia</span>
@@ -275,7 +275,7 @@ export default function SettingsPage() {
               )}
               <button
                 onClick={() => setActiveTab("notifications")}
-                className={`p-6 rounded-xl border-2 shadow-xl flex flex-col items-center text-center gap-3 transition-all ${activeTab === "notifications" ? "bg-brand-card border-brand-primary text-white" : "bg-brand-card border-brand-darkBorder text-brand-muted hover:border-brand-primary/50 hover:text-white"}`}
+                className={`p-6 rounded-xl border-2 shadow-xl flex flex-col items-center text-center gap-3 transition-all ${activeTab === "notifications" ? "bg-brand-card border-brand-primary text-brand-text" : "bg-brand-card border-brand-darkBorder text-brand-muted hover:border-brand-primary/50 hover:text-brand-text"}`}
               >
                 <Bell className={`${activeTab === "notifications" ? "text-brand-primary" : "text-brand-muted"} size-8`} />
                 <span className="text-sm font-bold">Notificações</span>
@@ -283,7 +283,7 @@ export default function SettingsPage() {
               {isAdmin && (
                 <button
                   onClick={() => setActiveTab("users")}
-                  className={`p-6 rounded-xl border-2 shadow-xl flex flex-col items-center text-center gap-3 transition-all ${activeTab === "users" ? "bg-brand-card border-brand-primary text-white" : "bg-brand-card border-brand-darkBorder text-brand-muted hover:border-brand-primary/50 hover:text-white"}`}
+                  className={`p-6 rounded-xl border-2 shadow-xl flex flex-col items-center text-center gap-3 transition-all ${activeTab === "users" ? "bg-brand-card border-brand-primary text-brand-text" : "bg-brand-card border-brand-darkBorder text-brand-muted hover:border-brand-primary/50 hover:text-brand-text"}`}
                 >
                   <Users className={`${activeTab === "users" ? "text-brand-primary" : "text-brand-muted"} size-8`} />
                   <span className="text-sm font-bold">Usuários</span>
@@ -304,7 +304,7 @@ export default function SettingsPage() {
                         referrerPolicy="no-referrer"
                       />
                       <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                        <Camera className="text-white size-6" />
+                        <Camera className="text-brand-text size-6" />
                       </div>
                     </div>
                     <div>
@@ -316,7 +316,7 @@ export default function SettingsPage() {
                     <div className="space-y-2">
                       <label className="text-xs font-bold uppercase tracking-wider text-brand-muted">Nome Completo</label>
                       <input
-                        className="w-full px-4 py-2.5 bg-brand-bg border border-brand-darkBorder rounded-lg focus:ring-2 focus:ring-brand-primary transition-all outline-none text-sm text-white"
+                        className="w-full px-4 py-2.5 bg-brand-bg border border-brand-darkBorder rounded-lg focus:ring-2 focus:ring-brand-primary transition-all outline-none text-sm text-brand-text"
                         type="text"
                         value={profileForm.name}
                         onChange={(e) => setProfileForm({ ...profileForm, name: e.target.value })}
@@ -325,7 +325,7 @@ export default function SettingsPage() {
                     <div className="space-y-2">
                       <label className="text-xs font-bold uppercase tracking-wider text-brand-muted">E-mail Corporativo</label>
                       <input
-                        className="w-full px-4 py-2.5 bg-brand-bg border border-brand-darkBorder rounded-lg focus:ring-2 focus:ring-brand-primary transition-all outline-none text-sm text-white"
+                        className="w-full px-4 py-2.5 bg-brand-bg border border-brand-darkBorder rounded-lg focus:ring-2 focus:ring-brand-primary transition-all outline-none text-sm text-brand-text"
                         type="email"
                         value={profileForm.email}
                         onChange={(e) => setProfileForm({ ...profileForm, email: e.target.value })}
@@ -334,7 +334,7 @@ export default function SettingsPage() {
                     <div className="space-y-2">
                       <label className="text-xs font-bold uppercase tracking-wider text-brand-muted">Telefone</label>
                       <input
-                        className="w-full px-4 py-2.5 bg-brand-bg border border-brand-darkBorder rounded-lg focus:ring-2 focus:ring-brand-primary transition-all outline-none text-sm text-white"
+                        className="w-full px-4 py-2.5 bg-brand-bg border border-brand-darkBorder rounded-lg focus:ring-2 focus:ring-brand-primary transition-all outline-none text-sm text-brand-text"
                         type="text"
                         value={profileForm.phone}
                         onChange={(e) => setProfileForm({ ...profileForm, phone: e.target.value })}
@@ -343,7 +343,7 @@ export default function SettingsPage() {
                     <div className="space-y-2">
                       <label className="text-xs font-bold uppercase tracking-wider text-brand-muted">Cargo / Função</label>
                       <input
-                        className="w-full px-4 py-2.5 bg-brand-bg border border-brand-darkBorder rounded-lg focus:ring-2 focus:ring-brand-primary transition-all outline-none text-sm text-white"
+                        className="w-full px-4 py-2.5 bg-brand-bg border border-brand-darkBorder rounded-lg focus:ring-2 focus:ring-brand-primary transition-all outline-none text-sm text-brand-text"
                         type="text"
                         value={profileForm.role}
                         onChange={(e) => setProfileForm({ ...profileForm, role: e.target.value })}
@@ -410,7 +410,7 @@ export default function SettingsPage() {
                       <div className="space-y-6">
                         <div className="space-y-2">
                           <label className="text-xs font-bold uppercase tracking-wider text-brand-muted">Idioma do Painel</label>
-                          <select className="w-full bg-brand-bg border border-brand-darkBorder rounded-lg text-sm font-semibold focus:ring-brand-primary py-2.5 px-4 outline-none text-white">
+                          <select className="w-full bg-brand-bg border border-brand-darkBorder rounded-lg text-sm font-semibold focus:ring-brand-primary py-2.5 px-4 outline-none text-brand-text">
                             <option>Português (Brasil)</option>
                             <option>English (US)</option>
                             <option>Español</option>
@@ -418,7 +418,7 @@ export default function SettingsPage() {
                         </div>
                         <div className="space-y-2">
                           <label className="text-xs font-bold uppercase tracking-wider text-brand-muted">Moeda Padrão</label>
-                          <select className="w-full bg-brand-bg border border-brand-darkBorder rounded-lg text-sm font-semibold focus:ring-brand-primary py-2.5 px-4 outline-none text-white">
+                          <select className="w-full bg-brand-bg border border-brand-darkBorder rounded-lg text-sm font-semibold focus:ring-brand-primary py-2.5 px-4 outline-none text-brand-text">
                             <option>Real (BRL)</option>
                             <option>Dólar (USD)</option>
                             <option>Euro (EUR)</option>
@@ -430,7 +430,7 @@ export default function SettingsPage() {
                 </div>
 
                 <div className="bg-brand-card rounded-xl border border-brand-darkBorder shadow-xl overflow-hidden">
-                  <div className="p-6 border-b border-brand-darkBorder flex justify-between items-center text-white">
+                  <div className="p-6 border-b border-brand-darkBorder flex justify-between items-center text-brand-text">
                     <h4 className="text-lg font-bold">Histórico de Atividades</h4>
                     <button className="text-brand-primary text-sm font-bold hover:underline">Ver log completo</button>
                   </div>
@@ -492,7 +492,7 @@ export default function SettingsPage() {
                     <Store className="size-8" />
                   </div>
                   <div>
-                    <h4 className="text-lg font-bold text-white">Dados da Lavanderia</h4>
+                    <h4 className="text-lg font-bold text-brand-text">Dados da Lavanderia</h4>
                     <p className="text-sm text-brand-muted">Informações comerciais e de contato da sua unidade</p>
                   </div>
                 </div>
@@ -500,7 +500,7 @@ export default function SettingsPage() {
                   <div className="space-y-2">
                     <label className="text-xs font-bold uppercase tracking-wider text-brand-muted">Nome da Lavanderia</label>
                     <input
-                      className="w-full px-4 py-2.5 bg-brand-bg border border-brand-darkBorder rounded-lg focus:ring-2 focus:ring-brand-primary transition-all outline-none text-sm text-white"
+                      className="w-full px-4 py-2.5 bg-brand-bg border border-brand-darkBorder rounded-lg focus:ring-2 focus:ring-brand-primary transition-all outline-none text-sm text-brand-text"
                       type="text"
                       value={laundryForm.name}
                       onChange={(e) => setLaundryForm({ ...laundryForm, name: e.target.value })}
@@ -509,7 +509,7 @@ export default function SettingsPage() {
                   <div className="space-y-2">
                     <label className="text-xs font-bold uppercase tracking-wider text-brand-muted">CNPJ</label>
                     <input
-                      className="w-full px-4 py-2.5 bg-brand-bg border border-brand-darkBorder rounded-lg focus:ring-2 focus:ring-brand-primary transition-all outline-none text-sm text-white"
+                      className="w-full px-4 py-2.5 bg-brand-bg border border-brand-darkBorder rounded-lg focus:ring-2 focus:ring-brand-primary transition-all outline-none text-sm text-brand-text"
                       type="text"
                       value={laundryForm.cnpj}
                       onChange={(e) => setLaundryForm({ ...laundryForm, cnpj: e.target.value })}
@@ -518,7 +518,7 @@ export default function SettingsPage() {
                   <div className="space-y-2">
                     <label className="text-xs font-bold uppercase tracking-wider text-brand-muted">E-mail da Lavanderia</label>
                     <input
-                      className="w-full px-4 py-2.5 bg-brand-bg border border-brand-darkBorder rounded-lg focus:ring-2 focus:ring-brand-primary transition-all outline-none text-sm text-white"
+                      className="w-full px-4 py-2.5 bg-brand-bg border border-brand-darkBorder rounded-lg focus:ring-2 focus:ring-brand-primary transition-all outline-none text-sm text-brand-text"
                       type="email"
                       value={laundryForm.email}
                       onChange={(e) => setLaundryForm({ ...laundryForm, email: e.target.value })}
@@ -527,7 +527,7 @@ export default function SettingsPage() {
                   <div className="space-y-2">
                     <label className="text-xs font-bold uppercase tracking-wider text-brand-muted">Telefone da Lavanderia</label>
                     <input
-                      className="w-full px-4 py-2.5 bg-brand-bg border border-brand-darkBorder rounded-lg focus:ring-2 focus:ring-brand-primary transition-all outline-none text-sm text-white"
+                      className="w-full px-4 py-2.5 bg-brand-bg border border-brand-darkBorder rounded-lg focus:ring-2 focus:ring-brand-primary transition-all outline-none text-sm text-brand-text"
                       type="text"
                       value={laundryForm.phone}
                       onChange={(e) => setLaundryForm({ ...laundryForm, phone: e.target.value })}
@@ -536,7 +536,7 @@ export default function SettingsPage() {
                   <div className="space-y-2 md:col-span-2">
                     <label className="text-xs font-bold uppercase tracking-wider text-brand-muted">Endereço Completo</label>
                     <input
-                      className="w-full px-4 py-2.5 bg-brand-bg border border-brand-darkBorder rounded-lg focus:ring-2 focus:ring-brand-primary transition-all outline-none text-sm text-white"
+                      className="w-full px-4 py-2.5 bg-brand-bg border border-brand-darkBorder rounded-lg focus:ring-2 focus:ring-brand-primary transition-all outline-none text-sm text-brand-text"
                       type="text"
                       value={laundryForm.address}
                       onChange={(e) => setLaundryForm({ ...laundryForm, address: e.target.value })}
@@ -553,14 +553,14 @@ export default function SettingsPage() {
                     <Bell className="size-8" />
                   </div>
                   <div>
-                    <h4 className="text-lg font-bold text-white">Eventos de Notificação</h4>
+                    <h4 className="text-lg font-bold text-brand-text">Eventos de Notificação</h4>
                     <p className="text-sm text-brand-muted">Configure quais eventos disparam alertas para você e seus clientes</p>
                   </div>
                 </div>
                 <div className="space-y-6 max-w-2xl">
                   <div className="flex items-center justify-between p-4 border border-brand-darkBorder rounded-lg hover:bg-white/5 transition-colors">
                     <div>
-                      <p className="text-sm font-bold text-white">Pedido Criado</p>
+                      <p className="text-sm font-bold text-brand-text">Pedido Criado</p>
                       <p className="text-xs text-brand-muted">Notificar quando um novo pedido for registrado no sistema</p>
                     </div>
                     <label className="relative inline-flex items-center cursor-pointer">
@@ -575,7 +575,7 @@ export default function SettingsPage() {
                   </div>
                   <div className="flex items-center justify-between p-4 border border-brand-darkBorder rounded-lg hover:bg-white/5 transition-colors">
                     <div>
-                      <p className="text-sm font-bold text-white">Pedido Pronto para Retirada</p>
+                      <p className="text-sm font-bold text-brand-text">Pedido Pronto para Retirada</p>
                       <p className="text-xs text-brand-muted">Avisar o cliente e a equipe quando as peças estiverem limpas e passadas</p>
                     </div>
                     <label className="relative inline-flex items-center cursor-pointer">
@@ -590,7 +590,7 @@ export default function SettingsPage() {
                   </div>
                   <div className="flex items-center justify-between p-4 border border-brand-darkBorder rounded-lg hover:bg-white/5 transition-colors">
                     <div>
-                      <p className="text-sm font-bold text-white">Entrega Agendada</p>
+                      <p className="text-sm font-bold text-brand-text">Entrega Agendada</p>
                       <p className="text-xs text-brand-muted">Lembrete de entregas programadas para o dia atual</p>
                     </div>
                     <label className="relative inline-flex items-center cursor-pointer">
@@ -609,7 +609,7 @@ export default function SettingsPage() {
 
             {activeTab === "users" && isAdmin && (
               <div className="bg-brand-card rounded-xl border border-brand-darkBorder shadow-xl overflow-hidden">
-                <div className="p-6 border-b border-brand-darkBorder flex justify-between items-center text-white">
+                <div className="p-6 border-b border-brand-darkBorder flex justify-between items-center text-brand-text">
                   <div>
                     <h4 className="text-lg font-bold">Colaboradores</h4>
                     <p className="text-sm text-brand-muted">Gerencie o acesso da sua equipe ao sistema</p>
@@ -642,7 +642,7 @@ export default function SettingsPage() {
                                 <div className="size-8 rounded-full bg-brand-primary/20 text-brand-primary flex items-center justify-center font-bold text-xs uppercase">
                                   {collaborator.name?.substring(0, 2) || "U"}
                                 </div>
-                                <span className="text-sm font-semibold text-white">{collaborator.name}</span>
+                                <span className="text-sm font-semibold text-brand-text">{collaborator.name}</span>
                               </div>
                             </td>
                             <td className="px-6 py-4 text-sm text-brand-muted">{collaborator.email}</td>
@@ -688,8 +688,8 @@ export default function SettingsPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md">
           <div className="bg-brand-card rounded-2xl border border-brand-darkBorder shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
             <div className="p-6 border-b border-brand-darkBorder flex justify-between items-center">
-              <h3 className="text-xl font-bold text-white">Modificar Colaborador</h3>
-              <button onClick={handleCloseEditModal} className="text-brand-muted hover:text-white transition-colors">
+              <h3 className="text-xl font-bold text-brand-text">Modificar Colaborador</h3>
+              <button onClick={handleCloseEditModal} className="text-brand-muted hover:text-brand-text transition-colors">
                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-x"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
               </button>
             </div>
@@ -700,7 +700,7 @@ export default function SettingsPage() {
                   id="edit-name"
                   type="text"
                   defaultValue={selectedUser.name}
-                  className="w-full px-4 py-2.5 bg-brand-bg border border-brand-darkBorder rounded-lg focus:ring-2 focus:ring-brand-primary outline-none text-sm text-white"
+                  className="w-full px-4 py-2.5 bg-brand-bg border border-brand-darkBorder rounded-lg focus:ring-2 focus:ring-brand-primary outline-none text-sm text-brand-text"
                 />
               </div>
               <div className="space-y-2">
@@ -709,7 +709,7 @@ export default function SettingsPage() {
                   id="edit-email"
                   type="email"
                   defaultValue={selectedUser.email}
-                  className="w-full px-4 py-2.5 bg-brand-bg border border-brand-darkBorder rounded-lg focus:ring-2 focus:ring-brand-primary outline-none text-sm text-white"
+                  className="w-full px-4 py-2.5 bg-brand-bg border border-brand-darkBorder rounded-lg focus:ring-2 focus:ring-brand-primary outline-none text-sm text-brand-text"
                 />
               </div>
               <div className="space-y-2">
@@ -717,7 +717,7 @@ export default function SettingsPage() {
                 <select
                   id="edit-role"
                   defaultValue={selectedUser.role}
-                  className="w-full px-4 py-2.5 bg-brand-bg border border-brand-darkBorder rounded-lg focus:ring-2 focus:ring-brand-primary outline-none text-sm text-white"
+                  className="w-full px-4 py-2.5 bg-brand-bg border border-brand-darkBorder rounded-lg focus:ring-2 focus:ring-brand-primary outline-none text-sm text-brand-text"
                 >
                   <option value="Atendente">Atendente</option>
                   <option value="Gerente">Gerente</option>
@@ -730,7 +730,7 @@ export default function SettingsPage() {
                   id="edit-password"
                   type="password"
                   placeholder="Deixe em branco para não alterar"
-                  className="w-full px-4 py-2.5 bg-brand-bg border border-brand-darkBorder rounded-lg focus:ring-2 focus:ring-brand-primary outline-none text-sm text-white placeholder-brand-muted/50"
+                  className="w-full px-4 py-2.5 bg-brand-bg border border-brand-darkBorder rounded-lg focus:ring-2 focus:ring-brand-primary outline-none text-sm text-brand-text placeholder-brand-muted/50"
                 />
               </div>
             </div>
@@ -758,8 +758,8 @@ export default function SettingsPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md">
           <div className="bg-brand-card rounded-2xl border border-brand-darkBorder shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
             <div className="p-6 border-b border-brand-darkBorder flex justify-between items-center">
-              <h3 className="text-xl font-bold text-white">Novo Colaborador</h3>
-              <button onClick={handleCloseNewUserModal} className="text-brand-muted hover:text-white transition-colors">
+              <h3 className="text-xl font-bold text-brand-text">Novo Colaborador</h3>
+              <button onClick={handleCloseNewUserModal} className="text-brand-muted hover:text-brand-text transition-colors">
                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-x"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
               </button>
             </div>
@@ -771,7 +771,7 @@ export default function SettingsPage() {
                   placeholder="Nome do colaborador"
                   value={newUserForm.name}
                   onChange={(e) => setNewUserForm({ ...newUserForm, name: e.target.value })}
-                  className="w-full px-4 py-2.5 bg-brand-bg border border-brand-darkBorder rounded-lg focus:ring-2 focus:ring-brand-primary outline-none text-sm text-white placeholder-brand-muted/50"
+                  className="w-full px-4 py-2.5 bg-brand-bg border border-brand-darkBorder rounded-lg focus:ring-2 focus:ring-brand-primary outline-none text-sm text-brand-text placeholder-brand-muted/50"
                 />
               </div>
               <div className="space-y-2">
@@ -781,7 +781,7 @@ export default function SettingsPage() {
                   placeholder="email@exemplo.com"
                   value={newUserForm.email}
                   onChange={(e) => setNewUserForm({ ...newUserForm, email: e.target.value })}
-                  className="w-full px-4 py-2.5 bg-brand-bg border border-brand-darkBorder rounded-lg focus:ring-2 focus:ring-brand-primary outline-none text-sm text-white placeholder-brand-muted/50"
+                  className="w-full px-4 py-2.5 bg-brand-bg border border-brand-darkBorder rounded-lg focus:ring-2 focus:ring-brand-primary outline-none text-sm text-brand-text placeholder-brand-muted/50"
                 />
               </div>
               <div className="space-y-2">
@@ -789,7 +789,7 @@ export default function SettingsPage() {
                 <select
                   value={newUserForm.role}
                   onChange={(e) => setNewUserForm({ ...newUserForm, role: e.target.value })}
-                  className="w-full px-4 py-2.5 bg-brand-bg border border-brand-darkBorder rounded-lg focus:ring-2 focus:ring-brand-primary outline-none text-sm text-white"
+                  className="w-full px-4 py-2.5 bg-brand-bg border border-brand-darkBorder rounded-lg focus:ring-2 focus:ring-brand-primary outline-none text-sm text-brand-text"
                 >
                   <option value="Atendente">Atendente</option>
                   <option value="Gerente">Gerente</option>
@@ -803,7 +803,7 @@ export default function SettingsPage() {
                   placeholder="Crie uma senha temporária"
                   value={newUserForm.password}
                   onChange={(e) => setNewUserForm({ ...newUserForm, password: e.target.value })}
-                  className="w-full px-4 py-2.5 bg-brand-bg border border-brand-darkBorder rounded-lg focus:ring-2 focus:ring-brand-primary outline-none text-sm text-white placeholder-brand-muted/50"
+                  className="w-full px-4 py-2.5 bg-brand-bg border border-brand-darkBorder rounded-lg focus:ring-2 focus:ring-brand-primary outline-none text-sm text-brand-text placeholder-brand-muted/50"
                 />
               </div>
             </div>
@@ -832,16 +832,16 @@ export default function SettingsPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md">
           <div className="bg-brand-card rounded-2xl border border-brand-darkBorder shadow-2xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in duration-200">
             <div className="p-6 border-b border-brand-darkBorder flex justify-between items-center bg-red-500/10">
-              <h3 className="text-xl font-bold text-white flex items-center gap-2">
+              <h3 className="text-xl font-bold text-brand-text flex items-center gap-2">
                 <Trash2 className="size-5 text-red-500" /> Confirmar Exclusão
               </h3>
-              <button onClick={() => setIsDeleteModalOpen(false)} className="text-brand-muted hover:text-white transition-colors">
+              <button onClick={() => setIsDeleteModalOpen(false)} className="text-brand-muted hover:text-brand-text transition-colors">
                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-x"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
               </button>
             </div>
             <div className="p-6 space-y-4">
               <p className="text-sm text-brand-muted">
-                Deseja realmente excluir o colaborador <span className="text-white font-bold">{userToDelete?.name}</span>? Esta ação não pode ser desfeita.
+                Deseja realmente excluir o colaborador <span className="text-brand-text font-bold">{userToDelete?.name}</span>? Esta ação não pode ser desfeita.
               </p>
             </div>
             <div className="p-6 border-t border-brand-darkBorder flex justify-end gap-3 bg-brand-bg/50">
@@ -868,16 +868,16 @@ export default function SettingsPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md">
           <div className="bg-brand-card rounded-2xl border border-brand-darkBorder shadow-2xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in duration-200">
             <div className="p-6 border-b border-brand-darkBorder flex justify-between items-center bg-amber-500/10">
-              <h3 className="text-xl font-bold text-white flex items-center gap-2">
+              <h3 className="text-xl font-bold text-brand-text flex items-center gap-2">
                 <Key className="size-5 text-amber-500" /> Redefinir Senha
               </h3>
-              <button onClick={() => setIsResetPasswordModalOpen(false)} className="text-brand-muted hover:text-white transition-colors">
+              <button onClick={() => setIsResetPasswordModalOpen(false)} className="text-brand-muted hover:text-brand-text transition-colors">
                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-x"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
               </button>
             </div>
             <div className="p-6 space-y-4">
               <p className="text-sm text-brand-muted">
-                Deseja redefinir a senha para <span className="text-white font-bold">{resettingUserEmail}</span>?
+                Deseja redefinir a senha para <span className="text-brand-text font-bold">{resettingUserEmail}</span>?
               </p>
               <div className="space-y-2">
                 <label className="text-xs font-bold uppercase tracking-wider text-brand-muted">Nova Senha</label>
@@ -886,7 +886,7 @@ export default function SettingsPage() {
                   placeholder="Digite a nova senha"
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
-                  className="w-full px-4 py-2.5 bg-brand-bg border border-brand-darkBorder rounded-lg focus:ring-2 focus:ring-brand-primary outline-none text-sm text-white placeholder-brand-muted/50"
+                  className="w-full px-4 py-2.5 bg-brand-bg border border-brand-darkBorder rounded-lg focus:ring-2 focus:ring-brand-primary outline-none text-sm text-brand-text placeholder-brand-muted/50"
                 />
               </div>
             </div>
@@ -900,7 +900,7 @@ export default function SettingsPage() {
               <button
                 onClick={confirmResetPassword}
                 disabled={!newPassword}
-                className="px-4 py-2 text-sm font-bold text-white bg-amber-600 hover:bg-amber-700 rounded-lg transition-colors shadow-lg shadow-amber-600/20 disabled:opacity-50"
+                className="px-4 py-2 text-sm font-bold text-brand-text bg-amber-600 hover:bg-amber-700 rounded-lg transition-colors shadow-lg shadow-amber-600/20 disabled:opacity-50"
               >
                 Redefinir Senha
               </button>

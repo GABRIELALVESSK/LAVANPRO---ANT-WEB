@@ -9,79 +9,163 @@ import {
   Wallet,
   Settings,
   LogOut,
+  Sun,
+  Moon,
+  Monitor,
+  Package,
+  UserCog,
+  QrCode,
+  Bell,
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
+import { useTheme } from "next-themes";
+import { useEffect, useState } from "react";
 
 export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const { user } = useAuth();
+  const { theme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const isAdmin =
-    user?.user_metadata?.role === 'owner' ||
-    user?.user_metadata?.role === 'Gerente' ||
-    user?.user_metadata?.role === 'Gerente Geral' ||
-    user?.user_metadata?.role === 'Administrador' ||
-    user?.email === 'gabriel23900@gmail.com';
+    user?.user_metadata?.role === "owner" ||
+    user?.user_metadata?.role === "Gerente" ||
+    user?.user_metadata?.role === "Gerente Geral" ||
+    user?.user_metadata?.role === "Administrador" ||
+    user?.email === "gabriel23900@gmail.com";
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
     router.push("/login");
   };
 
-  const navItems = isAdmin
+  const adminNav = [
+    { href: "/dashboard", icon: LayoutDashboard, label: "Visão Geral" },
+    { href: "/reports", icon: BarChart3, label: "Relatórios" },
+    { href: "/orders", icon: ReceiptText, label: "Pedidos" },
+    { href: "/customers", icon: Users, label: "Clientes" },
+    { href: "/finance", icon: Wallet, label: "Financeiro" },
+  ];
+
+  const adminNavSecondary = [
+    { href: "/stock", icon: Package, label: "Estoque" },
+    { href: "/team", icon: UserCog, label: "Equipe" },
+    { href: "/labels", icon: QrCode, label: "Etiquetagem QR" },
+    { href: "/notifications", icon: Bell, label: "Notificações" },
+    { href: "/settings", icon: Settings, label: "Configurações" },
+  ];
+
+  const operatorNav = [
+    { href: "/orders", icon: ReceiptText, label: "Pedidos" },
+    { href: "/customers", icon: Users, label: "Clientes" },
+  ];
+
+  const navGroups = isAdmin
     ? [
-      { href: "/dashboard", icon: LayoutDashboard, label: "Visão Geral" },
-      { href: "/reports", icon: BarChart3, label: "Relatórios" },
-      { href: "/orders", icon: ReceiptText, label: "Pedidos" },
-      { href: "/customers", icon: Users, label: "Clientes" },
-      { href: "/finance", icon: Wallet, label: "Financeiro" },
-      { href: "/settings", icon: Settings, label: "Configurações" },
+      { label: "Principal", items: adminNav },
+      { label: "Operações", items: adminNavSecondary },
     ]
-    : [
-      { href: "/orders", icon: ReceiptText, label: "Pedidos" },
-      { href: "/customers", icon: Users, label: "Clientes" },
-    ];
+    : [{ label: "Menu", items: operatorNav }];
 
   return (
     <aside className="w-64 bg-brand-bg border-r border-brand-darkBorder flex flex-col shrink-0 min-h-screen">
-      <div className="p-6">
-        <div className="flex items-center gap-3 text-white mb-8">
-          <div className="size-8 bg-brand-primary rounded-lg flex items-center justify-center">
+      {/* Logo */}
+      <div className="p-6 pb-4">
+        <div className="flex items-center gap-3 text-brand-text mb-6">
+          <div className="size-9 bg-brand-primary rounded-xl flex items-center justify-center shadow-lg shadow-brand-primary/30">
             <WashingMachine className="size-5 text-white" />
           </div>
-          <h2 className="text-lg font-bold leading-tight tracking-tight">
-            Lavanderia Pro
-          </h2>
+          <div>
+            <h2 className="text-base font-bold leading-tight tracking-tight">Lavanderia Pro</h2>
+            <p className="text-[10px] text-brand-muted font-medium">Sistema de Gestão</p>
+          </div>
         </div>
-        <nav className="space-y-1">
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = pathname === item.href;
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 ${isActive
-                  ? "bg-brand-primary text-white shadow-[0_0_15px_rgba(139,92,246,0.3)]"
-                  : "text-brand-muted hover:text-white hover:bg-brand-card"
-                  }`}
-              >
-                <Icon className="size-5" />
-                <span className="text-sm font-medium">{item.label}</span>
-              </Link>
-            );
-          })}
+
+        {/* Nav Groups */}
+        <nav className="space-y-5">
+          {navGroups.map((group) => (
+            <div key={group.label}>
+              <p className="text-[9px] font-bold uppercase tracking-[0.15em] text-brand-muted mb-2 px-1">
+                {group.label}
+              </p>
+              <div className="space-y-0.5">
+                {group.items.map((item) => {
+                  const Icon = item.icon;
+                  const isActive = pathname === item.href;
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 ${isActive
+                          ? "bg-brand-primary text-white shadow-[0_4px_14px_rgba(139,92,246,0.35)]"
+                          : "text-brand-muted hover:text-brand-text hover:bg-brand-card"
+                        }`}
+                    >
+                      <Icon className="size-4 shrink-0" />
+                      <span className="text-sm font-medium">{item.label}</span>
+                      {isActive && (
+                        <span className="ml-auto size-1.5 rounded-full bg-white/60" />
+                      )}
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </nav>
       </div>
-      <div className="mt-auto p-6 border-t border-slate-800">
-        <div className="flex items-center justify-between group">
-          <div className="flex items-center gap-3">
-            <div className="size-10 rounded-full bg-primary/20 flex items-center justify-center overflow-hidden relative">
+
+      {/* Bottom */}
+      <div className="mt-auto p-5 border-t border-brand-darkBorder space-y-4">
+        {/* Theme toggle */}
+        {mounted && (
+          <div className="flex items-center justify-between bg-brand-card rounded-xl p-1 border border-brand-darkBorder">
+            <button
+              onClick={() => setTheme("light")}
+              className={`p-2 rounded-lg flex-1 flex justify-center transition-colors ${theme === "light"
+                  ? "bg-brand-bg text-brand-primary shadow-sm"
+                  : "text-brand-muted hover:text-brand-text"
+                }`}
+              title="Tema Claro"
+            >
+              <Sun className="size-4" />
+            </button>
+            <button
+              onClick={() => setTheme("system")}
+              className={`p-2 rounded-lg flex-1 flex justify-center transition-colors ${theme === "system"
+                  ? "bg-brand-bg text-brand-primary shadow-sm"
+                  : "text-brand-muted hover:text-brand-text"
+                }`}
+              title="Tema do Sistema"
+            >
+              <Monitor className="size-4" />
+            </button>
+            <button
+              onClick={() => setTheme("dark")}
+              className={`p-2 rounded-lg flex-1 flex justify-center transition-colors ${theme === "dark"
+                  ? "bg-brand-bg text-brand-primary shadow-sm"
+                  : "text-brand-muted hover:text-brand-text"
+                }`}
+              title="Tema Escuro"
+            >
+              <Moon className="size-4" />
+            </button>
+          </div>
+        )}
+
+        {/* User info */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="size-9 rounded-full bg-brand-primary/20 flex items-center justify-center overflow-hidden relative shrink-0">
               <Image
                 src="https://picsum.photos/seed/avatar/100/100"
                 alt="User avatar"
@@ -91,20 +175,20 @@ export function Sidebar() {
               />
             </div>
             <div className="overflow-hidden">
-              <p className="text-sm font-bold text-white truncate">
-                {user?.user_metadata?.full_name || user?.email?.split('@')[0] || "Usuário"}
+              <p className="text-sm font-bold text-brand-text truncate">
+                {user?.user_metadata?.full_name || user?.email?.split("@")[0] || "Usuário"}
               </p>
-              <p className="text-xs text-slate-400 truncate">
+              <p className="text-[11px] text-brand-muted truncate">
                 {user?.email || "carregando..."}
               </p>
             </div>
           </div>
           <button
             onClick={handleLogout}
-            className="p-2 text-slate-400 hover:text-rose-400 hover:bg-rose-400/10 rounded-lg transition-colors"
+            className="p-2 text-brand-muted hover:text-rose-400 hover:bg-rose-400/10 rounded-lg transition-colors shrink-0"
             title="Sair do sistema"
           >
-            <LogOut className="size-5" />
+            <LogOut className="size-4" />
           </button>
         </div>
       </div>

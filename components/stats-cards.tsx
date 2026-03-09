@@ -1,136 +1,203 @@
-import { TrendingUp, TrendingDown } from "lucide-react";
+"use client";
+import {
+  TrendingUp,
+  TrendingDown,
+  DollarSign,
+  ShoppingBag,
+  Receipt,
+  Truck,
+  Clock,
+  CheckCircle2,
+} from "lucide-react";
 
 interface StatsCardsProps {
   activeRange?: string;
   customDates?: { start: string; end: string };
 }
 
-export function StatsCards({ activeRange, customDates }: StatsCardsProps) {
-  // Mock data mapping for simulation
-  const mockData: Record<string, any> = {
-    'hoje': {
-      faturamento: 'R$ 845,00',
-      ticket: 'R$ 70,40',
-      pedidos: '12',
-      taxa: '98%',
-      trends: { fat: '+5.4%', ticket: '+1.2%', ped: '+8.3%', taxa: '+0.5%' }
-    },
-    '7d': {
-      faturamento: 'R$ 5.920,00',
-      ticket: 'R$ 82,10',
-      pedidos: '72',
-      taxa: '95%',
-      trends: { fat: '+10.2%', ticket: '+4.5%', ped: '+12.4%', taxa: '+1.1%' }
-    },
-    '30d': {
-      faturamento: 'R$ 24.450,00',
-      ticket: 'R$ 84,20',
-      pedidos: '286',
-      taxa: '94%',
-      trends: { fat: '+12.5%', ticket: '+5.2%', ped: '-2.4%', taxa: '+1.2%' }
-    },
-    'custom': {
-      faturamento: 'R$ 14.280,00',
-      ticket: 'R$ 82,90',
-      pedidos: '172',
-      taxa: '96%',
-      trends: { fat: '+8.4%', ticket: '+2.1%', ped: '+4.3%', taxa: '+1.5%' }
-    }
-  };
+const mockData: Record<string, any> = {
+  hoje: {
+    faturamento: "R$ 845",
+    faturamentoNum: 845,
+    ticket: "R$ 70,40",
+    pedidos: "12",
+    pedidosAbertos: "5",
+    taxaEntrega: "58%",
+    taxaRetirada: "42%",
+    trends: { fat: "+5.4%", ticket: "+1.2%", ped: "+8.3%", taxa: "+0.5%" },
+    pos: [true, true, true, true],
+  },
+  "7d": {
+    faturamento: "R$ 5.920",
+    faturamentoNum: 5920,
+    ticket: "R$ 82,10",
+    pedidos: "72",
+    pedidosAbertos: "18",
+    taxaEntrega: "62%",
+    taxaRetirada: "38%",
+    trends: { fat: "+10.2%", ticket: "+4.5%", ped: "+12.4%", taxa: "+1.1%" },
+    pos: [true, true, true, true],
+  },
+  "30d": {
+    faturamento: "R$ 24.450",
+    faturamentoNum: 24450,
+    ticket: "R$ 84,20",
+    pedidos: "286",
+    pedidosAbertos: "32",
+    taxaEntrega: "65%",
+    taxaRetirada: "35%",
+    trends: { fat: "+12.5%", ticket: "+5.2%", ped: "-2.4%", taxa: "+1.2%" },
+    pos: [true, true, false, true],
+  },
+  custom: {
+    faturamento: "R$ 14.280",
+    faturamentoNum: 14280,
+    ticket: "R$ 82,90",
+    pedidos: "172",
+    pedidosAbertos: "21",
+    taxaEntrega: "60%",
+    taxaRetirada: "40%",
+    trends: { fat: "+8.4%", ticket: "+2.1%", ped: "+4.3%", taxa: "+1.5%" },
+    pos: [true, true, true, true],
+  },
+};
 
-  const data = mockData[activeRange || '30d'] || mockData['30d'];
-
-  const getPeriodLabel = () => {
-    if (activeRange === 'hoje') return 'do Dia';
-    if (activeRange === 'custom' && customDates) {
-      return `de ${new Date(customDates.start).toLocaleDateString('pt-BR')} a ${new Date(customDates.end).toLocaleDateString('pt-BR')}`;
-    }
-    return `dos últimos ${activeRange?.replace('d', '')} dias`;
+function MiniSparkline({ color, up }: { color: string; up: boolean }) {
+  const paths = {
+    up: "M0 35 Q 20 28, 40 22 T 80 12 T 100 8",
+    down: "M0 10 Q 30 18, 60 28 T 100 35",
+    flat: "M0 20 Q 25 22, 50 18 T 100 20",
   };
+  return (
+    <svg className="w-full h-full" viewBox="0 0 100 40" preserveAspectRatio="none">
+      <path
+        d={up ? paths.up : paths.down}
+        fill="none"
+        stroke={color}
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        vectorEffect="non-scaling-stroke"
+      />
+    </svg>
+  );
+}
+
+interface StatCardProps {
+  icon: React.ReactNode;
+  iconBg: string;
+  label: string;
+  value: string;
+  trend: string;
+  isPositive: boolean;
+  sparkColor: string;
+  extra?: string;
+  extraLabel?: string;
+}
+
+function StatCard({
+  icon,
+  iconBg,
+  label,
+  value,
+  trend,
+  isPositive,
+  sparkColor,
+  extra,
+  extraLabel,
+}: StatCardProps) {
+  return (
+    <div className="bg-brand-card p-6 rounded-2xl border border-brand-darkBorder shadow-xl hover:border-brand-primary/30 hover:shadow-brand-primary/5 transition-all duration-300 group relative overflow-hidden">
+      {/* Glow accent */}
+      <div className="absolute top-0 right-0 w-32 h-32 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"
+        style={{ background: `radial-gradient(circle at top right, ${isPositive ? "rgba(16,185,129,0.06)" : "rgba(244,63,94,0.06)"} 0%, transparent 70%)` }} />
+
+      <div className="flex items-start justify-between mb-4">
+        <div className={`p-3 rounded-xl ${iconBg}`}>
+          {icon}
+        </div>
+        <span
+          className={`text-[10px] font-bold px-2.5 py-1 rounded-full flex items-center gap-1 ${isPositive
+              ? "bg-emerald-500/10 text-emerald-500"
+              : "bg-rose-500/10 text-rose-500"
+            }`}
+        >
+          {isPositive ? (
+            <TrendingUp className="size-3" />
+          ) : (
+            <TrendingDown className="size-3" />
+          )}
+          {trend}
+        </span>
+      </div>
+
+      <p className="text-xs font-bold text-brand-muted uppercase tracking-wider mb-1">{label}</p>
+      <h3 className="text-2xl font-black text-brand-text mb-1">{value}</h3>
+
+      {extra && (
+        <p className="text-[11px] text-brand-muted font-medium">
+          <span className="text-brand-text font-bold">{extra}</span>
+          {extraLabel && ` ${extraLabel}`}
+        </p>
+      )}
+
+      <div className="w-full h-10 mt-3">
+        <MiniSparkline color={sparkColor} up={isPositive} />
+      </div>
+    </div>
+  );
+}
+
+export function StatsCards({ activeRange, customDates: _customDates }: StatsCardsProps) {
+  const data = mockData[activeRange || "30d"] || mockData["30d"];
+
+  const cards: StatCardProps[] = [
+    {
+      icon: <DollarSign className="size-5 text-emerald-500" />,
+      iconBg: "bg-emerald-500/10",
+      label: "Faturamento do Período",
+      value: data.faturamento,
+      trend: data.trends.fat,
+      isPositive: data.pos[0],
+      sparkColor: "#10b981",
+    },
+    {
+      icon: <Receipt className="size-5 text-brand-primary" />,
+      iconBg: "bg-brand-primary/10",
+      label: "Ticket Médio",
+      value: data.ticket,
+      trend: data.trends.ticket,
+      isPositive: data.pos[1],
+      sparkColor: "#8b5cf6",
+    },
+    {
+      icon: <ShoppingBag className="size-5 text-blue-500" />,
+      iconBg: "bg-blue-500/10",
+      label: "Pedidos no Período",
+      value: data.pedidos,
+      trend: data.trends.ped,
+      isPositive: data.pos[2],
+      sparkColor: "#3b82f6",
+      extra: data.pedidosAbertos,
+      extraLabel: "em aberto",
+    },
+    {
+      icon: <Truck className="size-5 text-amber-500" />,
+      iconBg: "bg-amber-500/10",
+      label: "Taxa de Entrega",
+      value: data.taxaEntrega,
+      trend: data.trends.taxa,
+      isPositive: data.pos[3],
+      sparkColor: "#f59e0b",
+      extra: data.taxaRetirada,
+      extraLabel: "retirada no balcão",
+    },
+  ];
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-      {/* Card 1 */}
-      <div className="bg-brand-card p-6 rounded-xl border border-brand-darkBorder shadow-xl hover:border-brand-primary active:scale-95 transition-all">
-        <div className="flex justify-between items-start mb-4">
-          <div>
-            <p className="text-xs font-bold text-brand-muted uppercase tracking-wider">
-              Faturamento {getPeriodLabel()}
-            </p>
-            <h3 className="text-2xl font-black mt-1 text-white">{data.faturamento}</h3>
-          </div>
-          <span className={`text-[10px] font-bold px-2 py-1 ${data.trends.fat.startsWith('+') ? 'bg-emerald-900/30 text-emerald-400' : 'bg-rose-900/30 text-rose-400'} rounded-full flex items-center gap-1`}>
-            {data.trends.fat.startsWith('+') ? <TrendingUp className="size-3" /> : <TrendingDown className="size-3" />} {data.trends.fat}
-          </span>
-        </div>
-        <div className="w-full h-12 mt-2 overflow-hidden flex items-end">
-          <div className="w-full h-full bg-gradient-to-t from-emerald-500/10 to-transparent relative">
-            <svg className="w-full h-full" viewBox="0 0 100 40" preserveAspectRatio="none">
-              <path d="M0 35 Q 20 10, 40 25 T 80 15 T 100 20" fill="none" stroke="#10b981" strokeWidth="2.5" strokeLinecap="round" vectorEffect="non-scaling-stroke"></path>
-            </svg>
-          </div>
-        </div>
-      </div>
-
-      {/* Card 2 */}
-      <div className="bg-brand-card p-6 rounded-xl border border-brand-darkBorder shadow-xl hover:border-brand-primary active:scale-95 transition-all">
-        <div className="flex justify-between items-start mb-4">
-          <div>
-            <p className="text-sm font-medium text-brand-muted">Ticket Médio</p>
-            <h3 className="text-2xl font-bold mt-1 text-white">{data.ticket}</h3>
-          </div>
-          <span className="text-[10px] font-bold px-2 py-1 bg-emerald-900/30 text-emerald-400 rounded-full flex items-center gap-1">
-            <TrendingUp className="size-3" /> {data.trends.ticket}
-          </span>
-        </div>
-        <div className="w-full h-12 mt-2 overflow-hidden flex items-end">
-          <div className="w-full h-full bg-gradient-to-t from-brand-primary/10 to-transparent relative">
-            <svg className="w-full h-full" viewBox="0 0 100 40" preserveAspectRatio="none">
-              <path d="M0 20 Q 25 25, 50 15 T 100 10" fill="none" stroke="var(--color-primary)" strokeWidth="2.5" strokeLinecap="round" vectorEffect="non-scaling-stroke"></path>
-            </svg>
-          </div>
-        </div>
-      </div>
-
-      {/* Card 3 */}
-      <div className="bg-brand-card p-6 rounded-xl border border-brand-darkBorder shadow-xl hover:border-brand-primary active:scale-95 transition-all">
-        <div className="flex justify-between items-start mb-4">
-          <div>
-            <p className="text-sm font-medium text-brand-muted">Pedidios no Período</p>
-            <h3 className="text-2xl font-bold mt-1 text-white">{data.pedidos}</h3>
-          </div>
-          <span className={`text-[10px] font-bold px-2 py-1 ${data.trends.ped.startsWith('+') ? 'bg-emerald-900/30 text-emerald-400' : 'bg-rose-900/30 text-rose-400'} rounded-full flex items-center gap-1`}>
-            {data.trends.ped.startsWith('+') ? <TrendingUp className="size-3" /> : <TrendingDown className="size-3" />} {data.trends.ped}
-          </span>
-        </div>
-        <div className="w-full h-12 mt-2 overflow-hidden flex items-end">
-          <div className="w-full h-full bg-gradient-to-t from-rose-500/10 to-transparent relative">
-            <svg className="w-full h-full" viewBox="0 0 100 40" preserveAspectRatio="none">
-              <path d="M0 10 Q 30 20, 60 35 T 100 30" fill="none" stroke="#f43f5e" strokeWidth="2.5" strokeLinecap="round" vectorEffect="non-scaling-stroke"></path>
-            </svg>
-          </div>
-        </div>
-      </div>
-
-      {/* Card 4 */}
-      <div className="bg-brand-card p-6 rounded-xl border border-brand-darkBorder shadow-xl hover:border-brand-primary active:scale-95 transition-all">
-        <div className="flex justify-between items-start mb-4">
-          <div>
-            <p className="text-sm font-medium text-brand-muted">Taxa de Retirada</p>
-            <h3 className="text-2xl font-bold mt-1 text-white">{data.taxa}</h3>
-          </div>
-          <span className="text-[10px] font-bold px-2 py-1 bg-emerald-900/30 text-emerald-400 rounded-full flex items-center gap-1">
-            <TrendingUp className="size-3" /> {data.trends.taxa}
-          </span>
-        </div>
-        <div className="w-full h-12 mt-2 overflow-hidden flex items-end">
-          <div className="w-full h-full bg-gradient-to-t from-emerald-500/10 to-transparent relative">
-            <svg className="w-full h-full" viewBox="0 0 100 40" preserveAspectRatio="none">
-              <path d="M0 30 Q 50 10, 100 5" fill="none" stroke="#10b981" strokeWidth="2.5" strokeLinecap="round" vectorEffect="non-scaling-stroke"></path>
-            </svg>
-          </div>
-        </div>
-      </div>
+    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">
+      {cards.map((card, i) => (
+        <StatCard key={i} {...card} />
+      ))}
     </div>
   );
 }
