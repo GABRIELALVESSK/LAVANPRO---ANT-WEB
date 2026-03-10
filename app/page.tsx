@@ -25,24 +25,74 @@ export default function LandingPage() {
             </div>
 
             <nav className="hidden md:flex space-x-8">
-              <a className="text-brand-muted hover:text-white transition-colors text-sm font-medium" href="" >Funcionalidades</a>
-              <a className="text-brand-muted hover:text-white transition-colors text-sm font-medium" href="" >Preços</a>
-              <a className="text-brand-muted hover:text-white transition-colors text-sm font-medium" href="" >Sobre</a>
-              <a className="text-brand-muted hover:text-white transition-colors text-sm font-medium" href="" >FAQ</a>
+              <Link className="text-brand-muted hover:text-white transition-colors text-sm font-medium" href="#funcionalidades" >Funcionalidades</Link>
+              <Link className="text-brand-muted hover:text-white transition-colors text-sm font-medium" href="#precos" >Preços</Link>
+              <Link className="text-brand-muted hover:text-white transition-colors text-sm font-medium" href="#sobre" >Sobre</Link>
+              <Link className="text-brand-muted hover:text-white transition-colors text-sm font-medium" href="#faq" >FAQ</Link>
             </nav>
 
             <div className="hidden md:flex items-center">
-              <a className="text-white bg-brand-primary hover:bg-brand-primaryHover px-5 py-2.5 rounded-full text-sm font-medium transition-colors shadow-[0_0_15px_rgba(139,92,246,0.5)]" href="" >
+              <Link className="text-white bg-brand-primary hover:bg-brand-primaryHover px-5 py-2.5 rounded-full text-sm font-medium transition-colors shadow-[0_0_15px_rgba(139,92,246,0.5)]" href="/login" >
                 Entrar
-              </a>
+              </Link>
             </div>
 
             <div className="md:hidden flex items-center">
-              <button className="text-brand-muted hover:text-white focus:outline-none" >
-                <i className="fa-solid fa-bars text-xl"></i>
+              <button
+                className="text-brand-muted hover:text-white focus:outline-none transition-colors"
+                onClick={() => setIsMenuOpen(!isMenuOpen)}
+                aria-label="Toggle menu"
+              >
+                <i className={`fa-solid ${isMenuOpen ? "fa-xmark" : "fa-bars"} text-xl`}></i>
               </button>
             </div>
           </div>
+        </div>
+
+        {/* Mobile Navigation */}
+        <div
+          className={`md:hidden overflow-hidden transition-all duration-300 ease-in-out ${isMenuOpen ? "max-h-96 opacity-100 border-b border-brand-darkBorder" : "max-h-0 opacity-0"}`}
+          style={{ backgroundColor: "rgba(10, 10, 20, 0.95)", backdropFilter: "blur(12px)" }}
+        >
+          <nav className="px-4 py-6 space-y-4">
+            <Link
+              className="block text-brand-muted hover:text-white transition-colors text-base font-medium"
+              href="#funcionalidades"
+              onClick={() => setIsMenuOpen(false)}
+            >
+              Funcionalidades
+            </Link>
+            <Link
+              className="block text-brand-muted hover:text-white transition-colors text-base font-medium"
+              href="#precos"
+              onClick={() => setIsMenuOpen(false)}
+            >
+              Preços
+            </Link>
+            <Link
+              className="block text-brand-muted hover:text-white transition-colors text-base font-medium"
+              href="#sobre"
+              onClick={() => setIsMenuOpen(false)}
+            >
+              Sobre
+            </Link>
+            <Link
+              className="block text-brand-muted hover:text-white transition-colors text-base font-medium"
+              href="#faq"
+              onClick={() => setIsMenuOpen(false)}
+            >
+              FAQ
+            </Link>
+            <div className="pt-2">
+              <Link
+                className="block w-full text-center text-white bg-brand-primary hover:bg-brand-primaryHover py-3 rounded-full text-sm font-medium transition-colors shadow-[0_0_15px_rgba(139,92,246,0.3)]"
+                href="/login"
+                onClick={() => setIsMenuOpen(false)}
+              >
+                Entrar
+              </Link>
+            </div>
+          </nav>
         </div>
       </header>
 
@@ -63,12 +113,12 @@ export default function LandingPage() {
                 Abandone o papel e automatize seu controle de caixa, estoque e agenda. O LavanPro centraliza tudo para você focar em crescer.
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start mb-8">
-                <a className="inline-flex justify-center items-center px-8 py-4 border border-transparent text-base font-bold rounded-lg text-white bg-brand-primary hover:bg-brand-primaryHover shadow-[0_0_20px_rgba(139,92,246,0.4)] transition-all transform hover:scale-105 !bg-[#7c3aed]" href="" >
+                <Link className="inline-flex justify-center items-center px-8 py-4 border border-transparent text-base font-bold rounded-lg text-white bg-brand-primary hover:bg-brand-primaryHover shadow-[0_0_20px_rgba(139,92,246,0.4)] transition-all transform hover:scale-105 !bg-[#7c3aed]" href="/login" >
                   Testar Grátis por 7 Dias
-                </a>
-                <a className="inline-flex justify-center items-center px-8 py-4 border border-white/50 text-base font-bold rounded-lg text-white bg-transparent hover:bg-brand-card transition-all" href="" >
+                </Link>
+                <Link className="inline-flex justify-center items-center px-8 py-4 border border-white/50 text-base font-bold rounded-lg text-white bg-transparent hover:bg-brand-card transition-all" href="/login" >
                   <i className="fa-solid fa-play mr-2 text-xs"></i> Ver Demonstração
-                </a>
+                </Link>
               </div>
               <div className="flex items-center justify-center lg:justify-start gap-4 text-sm text-brand-muted">
                 <div className="flex text-yellow-400">
@@ -259,8 +309,9 @@ export default function LandingPage() {
                 <li className="flex items-center" ><i className="fa-solid fa-check text-brand-primary mr-3"></i> Controle de caixa</li>
                 <li className="flex items-center" ><i className="fa-solid fa-check text-brand-primary mr-3"></i> Suporte via email</li>
               </ul>
-              <a className="block w-full py-3 px-4 bg-transparent border text-white text-center font-medium rounded-lg hover:bg-brand-darkBorder transition-colors border-gray-600" href="" >
-                Começar Básico</a>
+              <Link className="block w-full py-3 px-4 bg-transparent border text-white text-center font-medium rounded-lg hover:bg-brand-darkBorder transition-colors border-gray-600" href="/login" >
+                Começar Básico
+              </Link>
             </div>
 
             <div className="bg-brand-card border-2 rounded-2xl p-8 flex flex-col relative transform md:-translate-y-4 shadow-[0_0_30px_rgba(139,92,246,0.15)] border-purple-500 bg-brand-card/80 shadow-purple-500/20">
@@ -279,9 +330,9 @@ export default function LandingPage() {
                 <li className="flex items-center" ><i className="fa-solid fa-check text-brand-primary mr-3"></i> Controle de rotas</li>
                 <li className="flex items-center" ><i className="fa-solid fa-check text-brand-primary mr-3"></i> Suporte WhatsApp</li>
               </ul>
-              <a className="block w-full py-3 px-4 bg-brand-primary text-white text-center font-bold rounded-lg hover:bg-brand-primaryHover transition-colors shadow-lg !bg-[#7c3aed]" href="" >
+              <Link className="block w-full py-3 px-4 bg-brand-primary text-white text-center font-bold rounded-lg hover:bg-brand-primaryHover transition-colors shadow-lg !bg-[#7c3aed]" href="/login" >
                 Aproveitar Oferta
-              </a>
+              </Link>
             </div>
 
             <div className="bg-brand-card border border-brand-darkBorder rounded-2xl p-8 flex flex-col hover:border-brand-muted transition-colors">
@@ -298,9 +349,9 @@ export default function LandingPage() {
                 <li className="flex items-center" ><i className="fa-solid fa-check text-brand-primary mr-3"></i> API Aberta</li>
                 <li className="flex items-center" ><i className="fa-solid fa-check text-brand-primary mr-3"></i> Gerente de contas</li>
               </ul>
-              <a className="block w-full py-3 px-4 bg-transparent border text-white text-center font-medium rounded-lg hover:bg-brand-darkBorder transition-colors border-gray-600" href="" >
+              <Link className="block w-full py-3 px-4 bg-transparent border text-white text-center font-medium rounded-lg hover:bg-brand-darkBorder transition-colors border-gray-600" href="/login" >
                 Enterprise Opções
-              </a>
+              </Link>
             </div>
           </div>
           <div className="mt-8 text-center">
@@ -448,24 +499,24 @@ export default function LandingPage() {
             <div>
               <h4 className="text-white font-semibold mb-4" >Empresa</h4>
               <ul className="space-y-2 text-sm text-brand-muted">
-                <li className="" ><a className="hover:text-brand-primary transition-colors" href="" >Sobre Nós</a></li>
-                <li className="" ><a className="hover:text-brand-primary transition-colors" href="" >Carreiras</a></li>
-                <li className="" ><a className="hover:text-brand-primary transition-colors" href="" >Blog</a></li>
+                <li className="" ><Link className="hover:text-brand-primary transition-colors" href="#" >Sobre Nós</Link></li>
+                <li className="" ><Link className="hover:text-brand-primary transition-colors" href="#" >Carreiras</Link></li>
+                <li className="" ><Link className="hover:text-brand-primary transition-colors" href="#" >Blog</Link></li>
               </ul>
             </div>
             <div>
               <h4 className="text-white font-semibold mb-4" >Social</h4>
               <div className="flex space-x-4">
-                <a className="w-8 h-8 rounded-full bg-brand-card flex items-center justify-center text-brand-muted hover:text-white hover:bg-brand-primary transition-all" href="" >
+                <a className="w-8 h-8 rounded-full bg-brand-card flex items-center justify-center text-brand-muted hover:text-white hover:bg-brand-primary transition-all" href="#" >
                   <i className="fa-brands fa-twitter"></i>
                 </a>
-                <a className="w-8 h-8 rounded-full bg-brand-card flex items-center justify-center text-brand-muted hover:text-white hover:bg-brand-primary transition-all" href="" >
+                <a className="w-8 h-8 rounded-full bg-brand-card flex items-center justify-center text-brand-muted hover:text-white hover:bg-brand-primary transition-all" href="#" >
                   <i className="fa-brands fa-facebook-f"></i>
                 </a>
-                <a className="w-8 h-8 rounded-full bg-brand-card flex items-center justify-center text-brand-muted hover:text-white hover:bg-brand-primary transition-all" href="" >
+                <a className="w-8 h-8 rounded-full bg-brand-card flex items-center justify-center text-brand-muted hover:text-white hover:bg-brand-primary transition-all" href="#" >
                   <i className="fa-brands fa-instagram"></i>
                 </a>
-                <a className="w-8 h-8 rounded-full bg-brand-card flex items-center justify-center text-brand-muted hover:text-white hover:bg-brand-primary transition-all" href="" >
+                <a className="w-8 h-8 rounded-full bg-brand-card flex items-center justify-center text-brand-muted hover:text-white hover:bg-brand-primary transition-all" href="#" >
                   <i className="fa-brands fa-youtube"></i>
                 </a>
               </div>
@@ -473,8 +524,8 @@ export default function LandingPage() {
           </div>
           <div className="border-t border-brand-darkBorder pt-8 flex flex-col md:flex-row justify-between items-center gap-4 text-xs text-brand-muted">
             <div className="flex gap-6">
-              <a className="hover:text-white" href="" >Termos de Serviço</a>
-              <a className="hover:text-white" href="" >Política de Privacidade</a>
+              <Link className="hover:text-white" href="#" >Termos de Serviço</Link>
+              <Link className="hover:text-white" href="#" >Política de Privacidade</Link>
             </div>
             <div className="" >© 2024 All Rights Reserved by LavanPro</div>
           </div>
