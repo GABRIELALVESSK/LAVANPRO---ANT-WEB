@@ -18,7 +18,6 @@ const DEFAULT_MATRIX: PermissionMatrix = {
     Estoquista: { orders: false, customers: false, finance: false, stock: true, reports: false, team: false, settings: false, labels: false },
 };
 
-// Map routes → permission keys
 const ROUTE_PERMISSION_MAP: Record<string, PermissionKey> = {
     "/orders": "orders",
     "/customers": "customers",
@@ -30,31 +29,71 @@ const ROUTE_PERMISSION_MAP: Record<string, PermissionKey> = {
     "/labels": "labels",
 };
 
-// Routes that are always accessible to authenticated users
 const ALWAYS_ALLOWED_ROUTES = ["/dashboard"];
-
-// Owner email — always full access regardless of staff table
 const OWNER_EMAIL = "gabriel23900@gmail.com";
 
-/**
- * Normalise roles from the staff table to match our RoleName union.
- * Handles variants like 'Operador de Máquinas', 'Motorista', etc.
- */
-function normaliseRole(role: string | null | undefined): RoleName | "owner" {
+function normaliseRole(role: string | null | undefined): RoleName {
     if (!role) return "Atendente";
-    if (role === "Administrador") return "Administrador";
-    if (role === "Gerente" || role === "Gerente Geral") return "Gerente";
-    if (role === "Estoquista" || role === "Operador de Máquinas" || role === "Motorista") return "Estoquista";
-    if (role === "Atendente") return "Atendente";
-    return "Atendente"; // safe default
+    const r = role.trim();
+    if (r === "Administrador") return "Administrador";
+    if (r === "Gerente" || r === "Gerente Geral") return "Gerente";
+    if (r === "Estoquista" || r === "Operador de Máquinas" || r === "Motorista") return "Estoquista";
+    if (r === "Atendente") return "Atendente";
+    return "Atendente";
 }
 
 /**
- * Hook that:
- * 1. Reads the user's current role from the `staff` table (source of truth set by admin)
- * 2. Reads the permission matrix from `app_settings` in Supabase
- * 3. Provides real-time permission checks based on current role + matrix
+ * Resolve the current user's role from the staff table.
+ * Strategy:
+ *   1. Try by user_id (UUID) — most reliable after first login
+ *   2. Fall back to email match (ilike, case-insensitive) + auto-link user_id
+ *   3. Default to "Atendente" if nothing found
  */
+async function resolveStaffRole(userId: string, email: string): Promise<RoleName> {
+    // ── Step 1: query by user_id (fast & reliable) ──────────────────────────
+    const { data: byId, error: idErr } = await supabase
+        .from("staff")
+        .select("id, role, user_id")
+        .eq("user_id", userId)
+        .maybeSingle();
+
+    if (idErr) console.error("[usePermissions] Query by user_id error:", idErr);
+
+    if (byId?.role) {
+        console.log("[usePermissions] Role resolved via user_id:", byId.role);
+        return normaliseRole(byId.role);
+    }
+
+    // ── Step 2: fall back to email match + auto-link ─────────────────────────
+    const { data: byEmail, error: emailErr } = await supabase
+        .from("staff")
+        .select("id, role, user_id, email")
+        .ilike("email", email)
+        .maybeSingle();
+
+    if (emailErr) console.error("[usePermissions] Query by email error:", emailErr);
+
+    if (byEmail?.role) {
+        console.log("[usePermissions] Role resolved via email:", byEmail.role, "| staff email:", byEmail.email);
+
+        // Auto-link: store user_id so next lookup is instant
+        if (!byEmail.user_id) {
+            const { error: linkErr } = await supabase
+                .from("staff")
+                .update({ user_id: userId })
+                .eq("id", byEmail.id);
+            if (linkErr) console.warn("[usePermissions] Could not auto-link user_id:", linkErr);
+            else console.log("[usePermissions] Auto-linked user_id to staff record.");
+        }
+
+        return normaliseRole(byEmail.role);
+    }
+
+    // ── Step 3: not found ────────────────────────────────────────────────────
+    console.warn("[usePermissions] No staff record found for:", email, "(user_id:", userId + ")");
+    return "Atendente"; // safest default — do NOT fall back to stale auth metadata
+}
+
 export function usePermissions() {
     const { user, loading: authLoading } = useAuth();
 
@@ -63,7 +102,8 @@ export function usePermissions() {
     const [dataLoaded, setDataLoaded] = useState(false);
 
     useEffect(() => {
-        if (authLoading) return; // wait for auth
+        if (authLoading) return;
+
         if (!user) {
             setDataLoaded(true);
             return;
@@ -73,57 +113,42 @@ export function usePermissions() {
 
         async function loadAll() {
             try {
-                // 1. Fetch role from `staff` table by user email — this is what the admin edits
-                const isOwner = user!.email === OWNER_EMAIL;
+                // ── Determine role ────────────────────────────────────────────
+                const isOwner = user!.email?.toLowerCase() === OWNER_EMAIL.toLowerCase();
 
-                if (!isOwner) {
-                    const { data: staffData } = await supabase
-                        .from("staff")
-                        .select("role")
-                        .eq("email", user!.email)
-                        .single();
-
-                    if (!cancelled) {
-                        if (staffData?.role) {
-                            setStaffRole(normaliseRole(staffData.role));
-                        } else {
-                            // Fallback to auth metadata if not found in staff table
-                            const metaRole = user!.user_metadata?.role;
-                            setStaffRole(normaliseRole(metaRole));
-                        }
-                    }
-                } else {
+                if (isOwner) {
                     if (!cancelled) setStaffRole("owner");
+                } else {
+                    const role = await resolveStaffRole(user!.id, user!.email ?? "");
+                    if (!cancelled) setStaffRole(role);
                 }
 
-                // 2. Fetch permission matrix from app_settings
+                // ── Load permission matrix from Supabase ──────────────────────
                 const { data: settingsData, error: settingsError } = await supabase
                     .from("app_settings")
                     .select("value")
                     .eq("key", "permissions_matrix")
-                    .single();
+                    .maybeSingle();
 
                 if (!cancelled) {
-                    if (!settingsError && settingsData?.value) {
+                    if (settingsError) console.error("[usePermissions] Error loading matrix:", settingsError);
+
+                    if (settingsData?.value) {
                         const parsed = settingsData.value as PermissionMatrix;
                         setMatrix(parsed);
                         localStorage.setItem("lavanpro_permissions", JSON.stringify(parsed));
+                        console.log("[usePermissions] Permission matrix loaded from Supabase.");
                     } else {
-                        // Fallback to localStorage
                         const saved = localStorage.getItem("lavanpro_permissions");
                         if (saved) {
                             try { setMatrix(JSON.parse(saved)); } catch { /* ignore */ }
+                            console.log("[usePermissions] Using cached matrix from localStorage.");
                         }
                     }
                 }
-            } catch {
-                // On any error, try localStorage for the matrix
-                if (!cancelled) {
-                    const saved = localStorage.getItem("lavanpro_permissions");
-                    if (saved) {
-                        try { setMatrix(JSON.parse(saved)); } catch { /* ignore */ }
-                    }
-                }
+            } catch (err) {
+                console.error("[usePermissions] Unexpected error:", err);
+                if (!cancelled && staffRole === null) setStaffRole("Atendente");
             } finally {
                 if (!cancelled) setDataLoaded(true);
             }
@@ -131,15 +156,14 @@ export function usePermissions() {
 
         loadAll();
         return () => { cancelled = true; };
-    }, [user, authLoading]);
+
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [user?.id, authLoading]);
 
     const userRole = staffRole;
     const isOwner = userRole === "owner";
     const isAdmin = isOwner || userRole === "Administrador" || userRole === "Gerente";
 
-    /**
-     * Check if the current user has access to a specific permission module.
-     */
     const hasPermission = (permission: PermissionKey): boolean => {
         if (!dataLoaded || !user) return false;
         if (isOwner) return true;
@@ -149,30 +173,20 @@ export function usePermissions() {
         return rolePerms[permission] ?? false;
     };
 
-    /**
-     * Check if the current user has access to a specific route.
-     */
     const canAccessRoute = (route: string): boolean => {
         if (!dataLoaded || !user) return false;
         if (isOwner) return true;
         if (ALWAYS_ALLOWED_ROUTES.includes(route)) return true;
-
         const permKey = ROUTE_PERMISSION_MAP[route];
         if (!permKey) return true;
         return hasPermission(permKey);
     };
 
-    /**
-     * Get all accessible routes for the current user (for sidebar filtering).
-     */
     const getAccessibleRoutes = (): string[] => {
         if (isOwner) return [...ALWAYS_ALLOWED_ROUTES, ...Object.keys(ROUTE_PERMISSION_MAP)];
-
         const routes = [...ALWAYS_ALLOWED_ROUTES];
         for (const [route, perm] of Object.entries(ROUTE_PERMISSION_MAP)) {
-            if (hasPermission(perm)) {
-                routes.push(route);
-            }
+            if (hasPermission(perm)) routes.push(route);
         }
         return routes;
     };
