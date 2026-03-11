@@ -4,6 +4,7 @@ import { AccessGuard } from "@/components/access-guard";
 
 import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/lib/supabase";
 import { Sidebar } from "@/components/sidebar";
 import { SettingsSidebar, SettingsMobileNav } from "@/components/settings/settings-sidebar";
 import { CompanyDataTab } from "@/components/settings/company-data-tab";
@@ -22,7 +23,6 @@ import type { SystemParamsData } from "@/components/settings/system-params-tab";
 
 // Plan tier configuration
 type PlanTier = "free" | "pro" | "enterprise";
-const currentPlan: PlanTier = "free"; // Will come from Supabase in the future
 
 const DEFAULT_OPENING_HOURS: Record<string, { open: string; close: string; active: boolean }> = {
   mon: { open: "08:00", close: "18:00", active: true },
@@ -40,12 +40,33 @@ export default function SettingsPage() {
   const [toasts, setToasts] = useState<{ id: string; message: string; type: "success" | "error" | "info" }[]>([]);
   const { user, loading } = useAuth();
 
+  const [currentPlan, setCurrentPlan] = useState<PlanTier>("free");
+  const [planStatus, setPlanStatus] = useState<string>("trialing");
+  const [trialEndsAt, setTrialEndsAt] = useState<Date | null>(null);
+
   const isAdmin =
     user?.user_metadata?.role === "owner" ||
     user?.user_metadata?.role === "Gerente" ||
     user?.user_metadata?.role === "Gerente Geral" ||
     user?.user_metadata?.role === "Administrador" ||
     user?.email === "gabriel23900@gmail.com";
+
+  // Fetch plan from Supabase
+  useEffect(() => {
+    if (user) {
+      const fetchPlan = async () => {
+        const { data, error } = await supabase.rpc('get_my_subscription');
+        if (data && data.length > 0) {
+          const sub = data[0];
+          setCurrentPlan(sub.plan as PlanTier);
+          setPlanStatus(sub.status);
+          setTrialEndsAt(sub.trial_end ? new Date(sub.trial_end) : null);
+        }
+      };
+      // For now we don't block the page load while fetching
+      fetchPlan();
+    }
+  }, [user]);
 
   // Form states
   const [companyForm, setCompanyForm] = useState<CompanyFormData>({
