@@ -37,13 +37,12 @@ export function UsersTab({ user, showToast }: UsersTabProps) {
         if (!user) return;
         setIsLoadingUsers(true);
         const { data, error } = await supabase
-            .from("collaborators")
+            .from("staff")
             .select("*")
-            .eq("owner_id", user.id)
             .order("created_at", { ascending: false });
 
         if (data) setCollaborators(data);
-        if (error) console.error("Error fetching collaborators:", error);
+        if (error) console.error("Error fetching staff:", error);
         setIsLoadingUsers(false);
     };
 
@@ -53,12 +52,14 @@ export function UsersTab({ user, showToast }: UsersTabProps) {
             return;
         }
         setIsSavingUser(true);
-        const { error } = await supabase.from("collaborators").insert([
+        const { error } = await supabase.from("staff").insert([
             {
                 name: newUserForm.name,
                 email: newUserForm.email,
                 role: newUserForm.role,
-                owner_id: user?.id,
+                active: true,
+                has_system_access: true,
+                unit: "Matriz Centro" // default for now, editable in Team page
             },
         ]);
         if (error) {
@@ -76,7 +77,7 @@ export function UsersTab({ user, showToast }: UsersTabProps) {
         if (!selectedUser) return;
         setIsSavingUser(true);
         const { error } = await supabase
-            .from("collaborators")
+            .from("staff")
             .update({
                 name: (document.getElementById("edit-name") as HTMLInputElement).value,
                 email: (document.getElementById("edit-email") as HTMLInputElement).value,
@@ -98,7 +99,7 @@ export function UsersTab({ user, showToast }: UsersTabProps) {
     const handleDeleteUser = async () => {
         if (!userToDelete) return;
         setIsDeletingUserId(userToDelete.id);
-        const { error } = await supabase.from("collaborators").delete().eq("id", userToDelete.id);
+        const { error } = await supabase.from("staff").delete().eq("id", userToDelete.id);
         if (error) {
             showToast("Erro ao excluir colaborador: " + error.message, "error");
         } else {
@@ -238,8 +239,8 @@ export function UsersTab({ user, showToast }: UsersTabProps) {
                                                         setIsDeleteModalOpen(true);
                                                     }}
                                                     className={`p-2 rounded-lg transition-colors ${isDeletingUserId === collaborator.id
-                                                            ? "text-slate-500 cursor-not-allowed"
-                                                            : "text-brand-muted hover:text-red-500 hover:bg-red-500/10"
+                                                        ? "text-slate-500 cursor-not-allowed"
+                                                        : "text-brand-muted hover:text-red-500 hover:bg-red-500/10"
                                                         }`}
                                                     title="Excluir"
                                                     disabled={isDeletingUserId === collaborator.id}
