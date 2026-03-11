@@ -2,6 +2,7 @@
 
 import { Sidebar } from "@/components/sidebar";
 import { AccessGuard } from "@/components/access-guard";
+import { PlanGuard } from "@/components/plan-guard";
 import {
     Users, Search, Plus, X, Phone, Mail, MapPin,
     CheckCircle2, Edit3, Trash2, Calendar, Shield,
@@ -374,191 +375,193 @@ export default function TeamPage() {
         <AccessGuard permission="team">
             <div className="flex h-screen bg-brand-bg text-brand-text font-sans">
                 <Sidebar />
-                <div className="flex-1 flex flex-col overflow-hidden">
-                    <main className="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar">
-                        <div className="max-w-[1600px] mx-auto space-y-6">
+                <PlanGuard moduleName="Equipe" requiredPlan="pro">
+                    <div className="flex-1 flex flex-col overflow-hidden">
+                        <main className="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar">
+                            <div className="max-w-[1600px] mx-auto space-y-6">
 
-                            {/* Header */}
-                            <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                                <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}>
-                                    <h1 className="text-3xl font-black text-brand-text tracking-tight">Gestão de Equipe</h1>
-                                    <p className="text-brand-muted text-sm font-medium mt-1">Colaboradores, permissões de acesso e controle operacional</p>
-                                </motion.div>
-                                <button
-                                    onClick={openNew}
-                                    className="px-5 py-2.5 bg-brand-primary text-white rounded-xl text-sm font-bold hover:bg-brand-primaryHover transition-all shadow-lg shadow-brand-primary/20 flex items-center gap-2 self-start md:self-auto"
-                                >
-                                    <Plus className="size-4" /> Novo Colaborador
-                                </button>
-                            </header>
+                                {/* Header */}
+                                <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                    <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}>
+                                        <h1 className="text-3xl font-black text-brand-text tracking-tight">Gestão de Equipe</h1>
+                                        <p className="text-brand-muted text-sm font-medium mt-1">Colaboradores, permissões de acesso e controle operacional</p>
+                                    </motion.div>
+                                    <button
+                                        onClick={openNew}
+                                        className="px-5 py-2.5 bg-brand-primary text-white rounded-xl text-sm font-bold hover:bg-brand-primaryHover transition-all shadow-lg shadow-brand-primary/20 flex items-center gap-2 self-start md:self-auto"
+                                    >
+                                        <Plus className="size-4" /> Novo Colaborador
+                                    </button>
+                                </header>
 
-                            {/* Stats Cards */}
-                            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.0 }}
-                                    className="bg-brand-card p-5 rounded-2xl border border-brand-darkBorder flex items-center gap-4">
-                                    <div className="p-3 bg-brand-primary/10 text-brand-primary rounded-xl shrink-0"><Users className="size-5" /></div>
-                                    <div>
-                                        <p className="text-2xl font-black text-brand-text">{loading ? "—" : stats.total}</p>
-                                        <p className="text-xs text-brand-muted font-bold uppercase tracking-wider">Total Equipe</p>
-                                    </div>
-                                </motion.div>
-                                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
-                                    className="bg-brand-card p-5 rounded-2xl border border-brand-darkBorder flex items-center gap-4">
-                                    <div className="p-3 bg-emerald-500/10 text-emerald-500 rounded-xl shrink-0"><CheckCircle2 className="size-5" /></div>
-                                    <div>
-                                        <p className="text-2xl font-black text-brand-text">{loading ? "—" : stats.active}</p>
-                                        <p className="text-xs text-brand-muted font-bold uppercase tracking-wider">Ativos</p>
-                                    </div>
-                                </motion.div>
-                                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
-                                    className="bg-brand-card p-5 rounded-2xl border border-brand-darkBorder flex items-center gap-4">
-                                    <div className="p-3 bg-amber-500/10 text-amber-500 rounded-xl shrink-0"><Shield className="size-5" /></div>
-                                    <div>
-                                        <p className="text-2xl font-black text-brand-text">{loading ? "—" : stats.admins}</p>
-                                        <p className="text-xs text-brand-muted font-bold uppercase tracking-wider">Administradores</p>
-                                    </div>
-                                </motion.div>
-                                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}
-                                    className="bg-brand-card p-5 rounded-2xl border border-brand-darkBorder flex items-center gap-4">
-                                    <div className="p-3 bg-blue-500/10 text-blue-500 rounded-xl shrink-0"><TrendingUp className="size-5" /></div>
-                                    <div className="truncate w-full pr-2">
-                                        <p className="text-sm font-black text-brand-text truncate">{loading ? "—" : (stats.mostProductive?.name || "—")}</p>
-                                        <p className="text-xs text-brand-muted font-bold uppercase tracking-wider truncate cursor-help"
-                                            title={`${stats.mostProductive?.processed_orders || 0} pedidos processados`}>
-                                            Top Produtividade
-                                        </p>
-                                    </div>
-                                </motion.div>
-                            </div>
-
-                            {/* Filters */}
-                            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }}
-                                className="bg-brand-card border border-brand-darkBorder rounded-2xl p-4 flex flex-wrap gap-3 items-center">
-                                {/* Status pills */}
-                                <div className="flex bg-brand-bg p-1 rounded-xl border border-brand-darkBorder relative w-full sm:w-auto overflow-x-auto custom-scrollbar">
-                                    {(["Todos", "Ativo", "Inativo"] as const).map(s => (
-                                        <button key={s} onClick={() => setFilterStatus(s)}
-                                            className={`flex-1 sm:flex-none px-4 py-2 text-xs font-bold rounded-lg transition-all relative z-10 whitespace-nowrap ${filterStatus === s ? "text-white" : "text-brand-muted hover:text-brand-text"}`}>
-                                            {filterStatus === s && <motion.div layoutId="teamStatus" className="absolute inset-0 bg-brand-primary rounded-lg -z-10 shadow-sm" />}
-                                            {s}
-                                        </button>
-                                    ))}
+                                {/* Stats Cards */}
+                                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                                    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.0 }}
+                                        className="bg-brand-card p-5 rounded-2xl border border-brand-darkBorder flex items-center gap-4">
+                                        <div className="p-3 bg-brand-primary/10 text-brand-primary rounded-xl shrink-0"><Users className="size-5" /></div>
+                                        <div>
+                                            <p className="text-2xl font-black text-brand-text">{loading ? "—" : stats.total}</p>
+                                            <p className="text-xs text-brand-muted font-bold uppercase tracking-wider">Total Equipe</p>
+                                        </div>
+                                    </motion.div>
+                                    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
+                                        className="bg-brand-card p-5 rounded-2xl border border-brand-darkBorder flex items-center gap-4">
+                                        <div className="p-3 bg-emerald-500/10 text-emerald-500 rounded-xl shrink-0"><CheckCircle2 className="size-5" /></div>
+                                        <div>
+                                            <p className="text-2xl font-black text-brand-text">{loading ? "—" : stats.active}</p>
+                                            <p className="text-xs text-brand-muted font-bold uppercase tracking-wider">Ativos</p>
+                                        </div>
+                                    </motion.div>
+                                    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
+                                        className="bg-brand-card p-5 rounded-2xl border border-brand-darkBorder flex items-center gap-4">
+                                        <div className="p-3 bg-amber-500/10 text-amber-500 rounded-xl shrink-0"><Shield className="size-5" /></div>
+                                        <div>
+                                            <p className="text-2xl font-black text-brand-text">{loading ? "—" : stats.admins}</p>
+                                            <p className="text-xs text-brand-muted font-bold uppercase tracking-wider">Administradores</p>
+                                        </div>
+                                    </motion.div>
+                                    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}
+                                        className="bg-brand-card p-5 rounded-2xl border border-brand-darkBorder flex items-center gap-4">
+                                        <div className="p-3 bg-blue-500/10 text-blue-500 rounded-xl shrink-0"><TrendingUp className="size-5" /></div>
+                                        <div className="truncate w-full pr-2">
+                                            <p className="text-sm font-black text-brand-text truncate">{loading ? "—" : (stats.mostProductive?.name || "—")}</p>
+                                            <p className="text-xs text-brand-muted font-bold uppercase tracking-wider truncate cursor-help"
+                                                title={`${stats.mostProductive?.processed_orders || 0} pedidos processados`}>
+                                                Top Produtividade
+                                            </p>
+                                        </div>
+                                    </motion.div>
                                 </div>
 
-                                {/* Role filter */}
-                                <div className="relative">
-                                    <Settings className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-brand-muted" />
-                                    <select value={filterRole} onChange={e => setFilterRole(e.target.value)}
-                                        className="pl-9 pr-8 py-2.5 bg-brand-card border border-brand-darkBorder rounded-xl text-xs font-bold text-brand-text appearance-none hover:border-brand-primary/50 transition-colors">
-                                        <option>Todos</option>
-                                        {ROLES.map(r => <option key={r}>{r}</option>)}
-                                    </select>
-                                </div>
-
-                                {/* Unit filter */}
-                                <div className="relative">
-                                    <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-brand-muted" />
-                                    <select value={filterUnit} onChange={e => setFilterUnit(e.target.value)}
-                                        className="pl-9 pr-8 py-2.5 bg-brand-card border border-brand-darkBorder rounded-xl text-xs font-bold text-brand-text appearance-none hover:border-brand-primary/50 transition-colors">
-                                        <option>Todas</option>
-                                        {UNITS.map(u => <option key={u}>{u}</option>)}
-                                    </select>
-                                </div>
-
-                                {/* Search */}
-                                <div className="flex-1 min-w-[200px] relative ml-auto">
-                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-brand-muted" />
-                                    <input type="text" placeholder="Buscar colaborador..."
-                                        value={search} onChange={e => setSearch(e.target.value)}
-                                        className="w-full pl-10 pr-4 py-2.5 bg-brand-card border border-brand-darkBorder rounded-xl text-sm text-brand-text placeholder:text-brand-muted focus:outline-none focus:ring-2 focus:ring-brand-primary" />
-                                </div>
-                            </motion.div>
-
-                            {/* Staff Grid */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                                {loading ? (
-                                    Array.from({ length: 6 }).map((_, i) => <CardSkeleton key={i} />)
-                                ) : (
-                                    <AnimatePresence>
-                                        {filteredStaff.length === 0 && (
-                                            <div className="col-span-1 md:col-span-2 xl:col-span-3 text-center py-16 text-brand-muted text-sm border border-brand-darkBorder rounded-2xl bg-brand-card">
-                                                Nenhum colaborador encontrado com estes filtros.
-                                            </div>
-                                        )}
-                                        {filteredStaff.map((staff, idx) => (
-                                            <motion.div key={staff.id}
-                                                initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
-                                                exit={{ opacity: 0, scale: 0.95 }} transition={{ delay: idx * 0.04 }}
-                                                className={`bg-brand-card border ${staff.active ? "border-brand-darkBorder" : "border-rose-500/20 bg-rose-500/5"} rounded-2xl p-5 hover:border-brand-primary/40 transition-all group flex flex-col gap-4 relative overflow-hidden`}
-                                            >
-                                                {!staff.active && <div className="absolute inset-0 bg-brand-bg/50 backdrop-blur-[1px] -z-10 pointer-events-none" />}
-
-                                                {/* Top row: avatar + name + actions */}
-                                                <div className="flex items-start justify-between gap-3">
-                                                    <div className="flex items-center gap-3">
-                                                        <div className="relative">
-                                                            <div className={`size-12 rounded-full flex items-center justify-center font-black text-lg border ${avatarColors(staff.role)}`}>
-                                                                {staff.name.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase()}
-                                                            </div>
-                                                            {staff.has_system_access && (
-                                                                <div className="absolute -bottom-1 -right-1 size-4 bg-emerald-500 border-2 border-brand-card rounded-full" title="Tem acesso ao sistema" />
-                                                            )}
-                                                        </div>
-                                                        <div>
-                                                            <p className="font-bold text-brand-text text-sm group-hover:text-brand-primary transition-colors flex items-center gap-1.5 line-clamp-1">{staff.name}</p>
-                                                            <span className={`inline-flex items-center text-[10px] font-bold px-2 py-0.5 rounded-full border mt-1 ${roleBadge(staff.role)}`}>
-                                                                {staff.role}
-                                                            </span>
-                                                        </div>
-                                                    </div>
-                                                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                        <button onClick={() => handleToggleActive(staff)}
-                                                            className={`p-1.5 bg-brand-bg rounded-lg border border-brand-darkBorder transition-all ${staff.active ? "text-emerald-500 hover:border-emerald-500/30" : "text-rose-500 hover:border-rose-500/30"}`}
-                                                            title={staff.active ? "Desativar" : "Ativar"}>
-                                                            {staff.active ? <ToggleRight className="size-3.5" /> : <ToggleLeft className="size-3.5" />}
-                                                        </button>
-                                                        <button onClick={() => openEdit(staff)} className="p-1.5 bg-brand-bg rounded-lg text-brand-muted hover:text-brand-primary hover:border-brand-primary/30 border border-brand-darkBorder transition-all"><Edit3 className="size-3.5" /></button>
-                                                        <button onClick={() => setDeleteConfirmId(staff.id)} className="p-1.5 bg-brand-bg rounded-lg text-brand-muted hover:text-rose-500 hover:border-rose-500/30 border border-brand-darkBorder transition-all"><Trash2 className="size-3.5" /></button>
-                                                    </div>
-                                                </div>
-
-                                                {/* Contact info */}
-                                                <div className="space-y-2 text-xs text-brand-muted">
-                                                    <div className="flex items-center gap-2"><Mail className="size-3.5 shrink-0" /> <span className="line-clamp-1">{staff.email || "—"}</span></div>
-                                                    <div className="flex items-center gap-2"><Phone className="size-3.5 shrink-0" /> <span>{staff.phone || "—"}</span></div>
-                                                    <div className="flex items-center gap-2"><MapPin className="size-3.5 shrink-0" /> <span className="font-semibold text-brand-text">{staff.unit}</span></div>
-                                                </div>
-
-                                                <div className="h-px bg-brand-darkBorder my-1" />
-
-                                                {/* Bottom row: productivity + status */}
-                                                <div className="flex items-end justify-between mt-auto">
-                                                    <div className="flex-1 mr-4" title="Pedidos Processados">
-                                                        <p className="text-[10px] uppercase font-bold text-brand-muted">Produtividade</p>
-                                                        <p className="text-sm font-black text-brand-primary flex items-center gap-1">
-                                                            <TrendingUp className="size-3.5" /> {staff.processed_orders}
-                                                            <span className="text-[10px] font-semibold text-brand-muted ml-0.5">OS</span>
-                                                        </p>
-                                                        <ProductivityBar value={staff.processed_orders} max={maxOrders} />
-                                                    </div>
-                                                    <div className="text-right shrink-0">
-                                                        <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border ${staff.active ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20" : "bg-rose-500/10 text-rose-500 border-rose-500/20"}`}>
-                                                            {staff.active ? "ATIVO" : "INATIVO"}
-                                                        </span>
-                                                        <p className="text-[9px] text-brand-muted mt-1 uppercase flex items-center gap-1 justify-end">
-                                                            <Calendar className="size-3" />
-                                                            {staff.join_date ? new Date(staff.join_date).toLocaleDateString("pt-BR", { month: "short", year: "numeric" }) : "—"}
-                                                        </p>
-                                                    </div>
-                                                </div>
-                                            </motion.div>
+                                {/* Filters */}
+                                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }}
+                                    className="bg-brand-card border border-brand-darkBorder rounded-2xl p-4 flex flex-wrap gap-3 items-center">
+                                    {/* Status pills */}
+                                    <div className="flex bg-brand-bg p-1 rounded-xl border border-brand-darkBorder relative w-full sm:w-auto overflow-x-auto custom-scrollbar">
+                                        {(["Todos", "Ativo", "Inativo"] as const).map(s => (
+                                            <button key={s} onClick={() => setFilterStatus(s)}
+                                                className={`flex-1 sm:flex-none px-4 py-2 text-xs font-bold rounded-lg transition-all relative z-10 whitespace-nowrap ${filterStatus === s ? "text-white" : "text-brand-muted hover:text-brand-text"}`}>
+                                                {filterStatus === s && <motion.div layoutId="teamStatus" className="absolute inset-0 bg-brand-primary rounded-lg -z-10 shadow-sm" />}
+                                                {s}
+                                            </button>
                                         ))}
-                                    </AnimatePresence>
-                                )}
+                                    </div>
+
+                                    {/* Role filter */}
+                                    <div className="relative">
+                                        <Settings className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-brand-muted" />
+                                        <select value={filterRole} onChange={e => setFilterRole(e.target.value)}
+                                            className="pl-9 pr-8 py-2.5 bg-brand-card border border-brand-darkBorder rounded-xl text-xs font-bold text-brand-text appearance-none hover:border-brand-primary/50 transition-colors">
+                                            <option>Todos</option>
+                                            {ROLES.map(r => <option key={r}>{r}</option>)}
+                                        </select>
+                                    </div>
+
+                                    {/* Unit filter */}
+                                    <div className="relative">
+                                        <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-brand-muted" />
+                                        <select value={filterUnit} onChange={e => setFilterUnit(e.target.value)}
+                                            className="pl-9 pr-8 py-2.5 bg-brand-card border border-brand-darkBorder rounded-xl text-xs font-bold text-brand-text appearance-none hover:border-brand-primary/50 transition-colors">
+                                            <option>Todas</option>
+                                            {UNITS.map(u => <option key={u}>{u}</option>)}
+                                        </select>
+                                    </div>
+
+                                    {/* Search */}
+                                    <div className="flex-1 min-w-[200px] relative ml-auto">
+                                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-brand-muted" />
+                                        <input type="text" placeholder="Buscar colaborador..."
+                                            value={search} onChange={e => setSearch(e.target.value)}
+                                            className="w-full pl-10 pr-4 py-2.5 bg-brand-card border border-brand-darkBorder rounded-xl text-sm text-brand-text placeholder:text-brand-muted focus:outline-none focus:ring-2 focus:ring-brand-primary" />
+                                    </div>
+                                </motion.div>
+
+                                {/* Staff Grid */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                                    {loading ? (
+                                        Array.from({ length: 6 }).map((_, i) => <CardSkeleton key={i} />)
+                                    ) : (
+                                        <AnimatePresence>
+                                            {filteredStaff.length === 0 && (
+                                                <div className="col-span-1 md:col-span-2 xl:col-span-3 text-center py-16 text-brand-muted text-sm border border-brand-darkBorder rounded-2xl bg-brand-card">
+                                                    Nenhum colaborador encontrado com estes filtros.
+                                                </div>
+                                            )}
+                                            {filteredStaff.map((staff, idx) => (
+                                                <motion.div key={staff.id}
+                                                    initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
+                                                    exit={{ opacity: 0, scale: 0.95 }} transition={{ delay: idx * 0.04 }}
+                                                    className={`bg-brand-card border ${staff.active ? "border-brand-darkBorder" : "border-rose-500/20 bg-rose-500/5"} rounded-2xl p-5 hover:border-brand-primary/40 transition-all group flex flex-col gap-4 relative overflow-hidden`}
+                                                >
+                                                    {!staff.active && <div className="absolute inset-0 bg-brand-bg/50 backdrop-blur-[1px] -z-10 pointer-events-none" />}
+
+                                                    {/* Top row: avatar + name + actions */}
+                                                    <div className="flex items-start justify-between gap-3">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="relative">
+                                                                <div className={`size-12 rounded-full flex items-center justify-center font-black text-lg border ${avatarColors(staff.role)}`}>
+                                                                    {staff.name.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase()}
+                                                                </div>
+                                                                {staff.has_system_access && (
+                                                                    <div className="absolute -bottom-1 -right-1 size-4 bg-emerald-500 border-2 border-brand-card rounded-full" title="Tem acesso ao sistema" />
+                                                                )}
+                                                            </div>
+                                                            <div>
+                                                                <p className="font-bold text-brand-text text-sm group-hover:text-brand-primary transition-colors flex items-center gap-1.5 line-clamp-1">{staff.name}</p>
+                                                                <span className={`inline-flex items-center text-[10px] font-bold px-2 py-0.5 rounded-full border mt-1 ${roleBadge(staff.role)}`}>
+                                                                    {staff.role}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                            <button onClick={() => handleToggleActive(staff)}
+                                                                className={`p-1.5 bg-brand-bg rounded-lg border border-brand-darkBorder transition-all ${staff.active ? "text-emerald-500 hover:border-emerald-500/30" : "text-rose-500 hover:border-rose-500/30"}`}
+                                                                title={staff.active ? "Desativar" : "Ativar"}>
+                                                                {staff.active ? <ToggleRight className="size-3.5" /> : <ToggleLeft className="size-3.5" />}
+                                                            </button>
+                                                            <button onClick={() => openEdit(staff)} className="p-1.5 bg-brand-bg rounded-lg text-brand-muted hover:text-brand-primary hover:border-brand-primary/30 border border-brand-darkBorder transition-all"><Edit3 className="size-3.5" /></button>
+                                                            <button onClick={() => setDeleteConfirmId(staff.id)} className="p-1.5 bg-brand-bg rounded-lg text-brand-muted hover:text-rose-500 hover:border-rose-500/30 border border-brand-darkBorder transition-all"><Trash2 className="size-3.5" /></button>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Contact info */}
+                                                    <div className="space-y-2 text-xs text-brand-muted">
+                                                        <div className="flex items-center gap-2"><Mail className="size-3.5 shrink-0" /> <span className="line-clamp-1">{staff.email || "—"}</span></div>
+                                                        <div className="flex items-center gap-2"><Phone className="size-3.5 shrink-0" /> <span>{staff.phone || "—"}</span></div>
+                                                        <div className="flex items-center gap-2"><MapPin className="size-3.5 shrink-0" /> <span className="font-semibold text-brand-text">{staff.unit}</span></div>
+                                                    </div>
+
+                                                    <div className="h-px bg-brand-darkBorder my-1" />
+
+                                                    {/* Bottom row: productivity + status */}
+                                                    <div className="flex items-end justify-between mt-auto">
+                                                        <div className="flex-1 mr-4" title="Pedidos Processados">
+                                                            <p className="text-[10px] uppercase font-bold text-brand-muted">Produtividade</p>
+                                                            <p className="text-sm font-black text-brand-primary flex items-center gap-1">
+                                                                <TrendingUp className="size-3.5" /> {staff.processed_orders}
+                                                                <span className="text-[10px] font-semibold text-brand-muted ml-0.5">OS</span>
+                                                            </p>
+                                                            <ProductivityBar value={staff.processed_orders} max={maxOrders} />
+                                                        </div>
+                                                        <div className="text-right shrink-0">
+                                                            <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border ${staff.active ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20" : "bg-rose-500/10 text-rose-500 border-rose-500/20"}`}>
+                                                                {staff.active ? "ATIVO" : "INATIVO"}
+                                                            </span>
+                                                            <p className="text-[9px] text-brand-muted mt-1 uppercase flex items-center gap-1 justify-end">
+                                                                <Calendar className="size-3" />
+                                                                {staff.join_date ? new Date(staff.join_date).toLocaleDateString("pt-BR", { month: "short", year: "numeric" }) : "—"}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                </motion.div>
+                                            ))}
+                                        </AnimatePresence>
+                                    )}
+                                </div>
                             </div>
-                        </div>
-                    </main>
-                </div>
+                        </main>
+                    </div>
+                </PlanGuard>
 
                 {/* ── Modals ── */}
                 <AnimatePresence>

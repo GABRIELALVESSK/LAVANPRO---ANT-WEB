@@ -31,7 +31,7 @@ interface FeatureModule {
 
 const FEATURES: FeatureModule[] = [
     { key: "orders", label: "Pedidos", description: "Criação, edição e rastreamento de pedidos de lavanderia", icon: ReceiptText, iconColor: "text-blue-500 bg-blue-500/10", requiredPlan: "free" },
-    { key: "qr_codes", label: "Etiquetagem QR", description: "Geração e vinculação de QR codes às peças e pedidos", icon: QrCode, iconColor: "text-violet-500 bg-violet-500/10", requiredPlan: "free" },
+    { key: "qr_codes", label: "Etiquetagem QR", description: "Geração e vinculação de QR codes às peças e pedidos", icon: QrCode, iconColor: "text-violet-500 bg-violet-500/10", requiredPlan: "pro" },
     { key: "customers", label: "Clientes", description: "Cadastro e gerenciamento da base de clientes", icon: UserCog, iconColor: "text-emerald-500 bg-emerald-500/10", requiredPlan: "free" },
     { key: "finance", label: "Financeiro", description: "Controle de receitas, despesas e fluxo de caixa", icon: Wallet, iconColor: "text-green-500 bg-green-500/10", requiredPlan: "pro" },
     { key: "reports", label: "Relatórios", description: "Relatórios gerenciais avançados e exportação de dados", icon: BarChart3, iconColor: "text-amber-500 bg-amber-500/10", requiredPlan: "pro" },

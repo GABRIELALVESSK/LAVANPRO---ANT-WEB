@@ -2,6 +2,7 @@
 
 import { Sidebar } from "@/components/sidebar";
 import { AccessGuard } from "@/components/access-guard";
+import { PlanGuard } from "@/components/plan-guard";
 import {
     QrCode, Search, Printer, Tag, History,
     CheckCircle2, ChevronRight, SearchCode,
@@ -394,258 +395,260 @@ function LabelsContent() {
         <AccessGuard permission="labels">
             <div className="flex h-screen bg-brand-bg text-brand-text font-sans">
                 <Sidebar />
-                <div className="flex-1 flex flex-col overflow-hidden">
-                    <main className="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar">
-                        <div className="max-w-[1600px] mx-auto space-y-6">
+                <PlanGuard moduleName="Etiquetagem QR" requiredPlan="pro">
+                    <div className="flex-1 flex flex-col overflow-hidden">
+                        <main className="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar">
+                            <div className="max-w-[1600px] mx-auto space-y-6">
 
-                            {/* Header */}
-                            <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                                <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}>
-                                    <h1 className="text-3xl font-black text-brand-text tracking-tight">Etiquetagem QR</h1>
-                                    <p className="text-brand-muted text-sm font-medium mt-1">Etiquetas físicas reutilizáveis — vínculo dinâmico com pedidos.</p>
-                                </motion.div>
-                                <div className="flex items-center gap-3">
-                                    <div className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 px-3 py-2 rounded-xl text-xs font-bold">
-                                        <CheckCheck className="size-3.5" /> {availableCount} Disponível
-                                    </div>
-                                    <div className="flex items-center gap-2 bg-brand-primary/10 border border-brand-primary/20 text-brand-primary px-3 py-2 rounded-xl text-xs font-bold">
-                                        <Link2 className="size-3.5" /> {assignedCount} Em Uso
-                                    </div>
-                                    <div className="flex bg-amber-500/10 border border-amber-500/20 text-amber-400 px-3 py-2 rounded-xl text-xs font-bold items-center gap-2">
-                                        <Cpu className="size-3.5" /> Scan Ativo
-                                    </div>
-                                </div>
-                            </header>
-
-                            {/* Stats strip */}
-                            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-                                className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                {[
-                                    { label: "Total de Etiquetas", value: labels.length, icon: Tag, color: "text-brand-primary" },
-                                    { label: "Disponíveis", value: availableCount, icon: CheckCircle2, color: "text-emerald-400" },
-                                    { label: "Em Uso", value: assignedCount, icon: Link2, color: "text-brand-primary" },
-                                    { label: "Ciclos Históricos", value: history.filter(h => h.releasedAt).length, icon: History, color: "text-amber-400" },
-                                ].map(s => (
-                                    <div key={s.label} className="bg-brand-card border border-brand-darkBorder rounded-2xl p-4 flex items-center gap-4">
-                                        <div className={`p-2 bg-white/5 rounded-xl ${s.color}`}><s.icon className="size-5" /></div>
-                                        <div>
-                                            <p className="text-2xl font-black text-brand-text">{s.value}</p>
-                                            <p className="text-xs text-brand-muted font-medium">{s.label}</p>
+                                {/* Header */}
+                                <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                    <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}>
+                                        <h1 className="text-3xl font-black text-brand-text tracking-tight">Etiquetagem QR</h1>
+                                        <p className="text-brand-muted text-sm font-medium mt-1">Etiquetas físicas reutilizáveis — vínculo dinâmico com pedidos.</p>
+                                    </motion.div>
+                                    <div className="flex items-center gap-3">
+                                        <div className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 px-3 py-2 rounded-xl text-xs font-bold">
+                                            <CheckCheck className="size-3.5" /> {availableCount} Disponível
+                                        </div>
+                                        <div className="flex items-center gap-2 bg-brand-primary/10 border border-brand-primary/20 text-brand-primary px-3 py-2 rounded-xl text-xs font-bold">
+                                            <Link2 className="size-3.5" /> {assignedCount} Em Uso
+                                        </div>
+                                        <div className="flex bg-amber-500/10 border border-amber-500/20 text-amber-400 px-3 py-2 rounded-xl text-xs font-bold items-center gap-2">
+                                            <Cpu className="size-3.5" /> Scan Ativo
                                         </div>
                                     </div>
-                                ))}
-                            </motion.div>
+                                </header>
 
-                            {/* Main Grid */}
-                            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6" style={{ minHeight: "520px" }}>
-
-                                {/* Left: Label stock */}
-                                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-                                    className="lg:col-span-7 bg-brand-card rounded-2xl border border-brand-darkBorder flex flex-col overflow-hidden">
-                                    <div className="p-4 border-b border-brand-darkBorder bg-white/5 space-y-3">
-                                        <h2 className="font-bold text-sm tracking-wide uppercase text-brand-muted flex items-center gap-2">
-                                            <Tag className="size-4" /> Estoque de Etiquetas Físicas
-                                        </h2>
-                                        <div className="flex gap-2">
-                                            <div className="relative flex-1">
-                                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-brand-muted" />
-                                                <input type="text" placeholder="Buscar TAG-001, número..."
-                                                    value={search} onChange={e => setSearch(e.target.value)}
-                                                    className="w-full pl-9 pr-3 py-2 bg-brand-bg border border-brand-darkBorder rounded-xl text-sm text-brand-text placeholder:text-brand-muted focus:outline-none focus:ring-2 focus:ring-brand-primary" />
+                                {/* Stats strip */}
+                                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+                                    className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                    {[
+                                        { label: "Total de Etiquetas", value: labels.length, icon: Tag, color: "text-brand-primary" },
+                                        { label: "Disponíveis", value: availableCount, icon: CheckCircle2, color: "text-emerald-400" },
+                                        { label: "Em Uso", value: assignedCount, icon: Link2, color: "text-brand-primary" },
+                                        { label: "Ciclos Históricos", value: history.filter(h => h.releasedAt).length, icon: History, color: "text-amber-400" },
+                                    ].map(s => (
+                                        <div key={s.label} className="bg-brand-card border border-brand-darkBorder rounded-2xl p-4 flex items-center gap-4">
+                                            <div className={`p-2 bg-white/5 rounded-xl ${s.color}`}><s.icon className="size-5" /></div>
+                                            <div>
+                                                <p className="text-2xl font-black text-brand-text">{s.value}</p>
+                                                <p className="text-xs text-brand-muted font-medium">{s.label}</p>
                                             </div>
-                                            {(["all", "available", "assigned"] as const).map(f => (
-                                                <button key={f} onClick={() => setFilterStatus(f)}
-                                                    className={`px-3 py-2 rounded-xl text-xs font-bold border transition-colors ${filterStatus === f ? "bg-brand-primary text-white border-brand-primary" : "border-brand-darkBorder text-brand-muted hover:text-brand-text bg-transparent"}`}>
-                                                    {f === "all" ? "Todas" : f === "available" ? "Livre" : "Em Uso"}
-                                                </button>
-                                            ))}
                                         </div>
-                                    </div>
-                                    <div className="flex-1 overflow-y-auto custom-scrollbar p-4">
-                                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-                                            <AnimatePresence>
-                                                {filteredLabels.length === 0 && (
-                                                    <div className="col-span-full text-center py-16 text-brand-muted text-sm flex flex-col items-center gap-2">
-                                                        <PackageX className="size-8 opacity-20" />
-                                                        <p>Nenhuma etiqueta encontrada.</p>
-                                                    </div>
-                                                )}
-                                                {filteredLabels.map(label => {
-                                                    const ord = getOrderForLabel(label);
-                                                    const isSelected = selectedLabelState?.id === label.id;
-                                                    const isAvail = label.status === "available";
-                                                    return (
-                                                        <motion.button key={label.id}
-                                                            onClick={() => setSelectedLabel(label)}
-                                                            initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }}
-                                                            className={`relative rounded-2xl border p-3 flex flex-col items-center gap-2 transition-all group text-left 
+                                    ))}
+                                </motion.div>
+
+                                {/* Main Grid */}
+                                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6" style={{ minHeight: "520px" }}>
+
+                                    {/* Left: Label stock */}
+                                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                                        className="lg:col-span-7 bg-brand-card rounded-2xl border border-brand-darkBorder flex flex-col overflow-hidden">
+                                        <div className="p-4 border-b border-brand-darkBorder bg-white/5 space-y-3">
+                                            <h2 className="font-bold text-sm tracking-wide uppercase text-brand-muted flex items-center gap-2">
+                                                <Tag className="size-4" /> Estoque de Etiquetas Físicas
+                                            </h2>
+                                            <div className="flex gap-2">
+                                                <div className="relative flex-1">
+                                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-brand-muted" />
+                                                    <input type="text" placeholder="Buscar TAG-001, número..."
+                                                        value={search} onChange={e => setSearch(e.target.value)}
+                                                        className="w-full pl-9 pr-3 py-2 bg-brand-bg border border-brand-darkBorder rounded-xl text-sm text-brand-text placeholder:text-brand-muted focus:outline-none focus:ring-2 focus:ring-brand-primary" />
+                                                </div>
+                                                {(["all", "available", "assigned"] as const).map(f => (
+                                                    <button key={f} onClick={() => setFilterStatus(f)}
+                                                        className={`px-3 py-2 rounded-xl text-xs font-bold border transition-colors ${filterStatus === f ? "bg-brand-primary text-white border-brand-primary" : "border-brand-darkBorder text-brand-muted hover:text-brand-text bg-transparent"}`}>
+                                                        {f === "all" ? "Todas" : f === "available" ? "Livre" : "Em Uso"}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                        <div className="flex-1 overflow-y-auto custom-scrollbar p-4">
+                                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                                                <AnimatePresence>
+                                                    {filteredLabels.length === 0 && (
+                                                        <div className="col-span-full text-center py-16 text-brand-muted text-sm flex flex-col items-center gap-2">
+                                                            <PackageX className="size-8 opacity-20" />
+                                                            <p>Nenhuma etiqueta encontrada.</p>
+                                                        </div>
+                                                    )}
+                                                    {filteredLabels.map(label => {
+                                                        const ord = getOrderForLabel(label);
+                                                        const isSelected = selectedLabelState?.id === label.id;
+                                                        const isAvail = label.status === "available";
+                                                        return (
+                                                            <motion.button key={label.id}
+                                                                onClick={() => setSelectedLabel(label)}
+                                                                initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }}
+                                                                className={`relative rounded-2xl border p-3 flex flex-col items-center gap-2 transition-all group text-left 
                                                             ${isSelected ? "border-brand-primary bg-brand-primary/10 shadow-[0_0_20px_rgba(139,92,246,0.15)]" : "border-brand-darkBorder bg-brand-bg hover:border-brand-primary/40 hover:bg-white/3"}`}>
-                                                            {/* Status pill */}
-                                                            <div className={`absolute top-2 right-2 size-2.5 rounded-full ${isAvail ? "bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.6)]" : "bg-brand-primary shadow-[0_0_6px_rgba(139,92,246,0.6)]"}`} />
-                                                            {/* Tag Number */}
-                                                            <div className={`size-14 rounded-xl flex items-center justify-center font-black text-3xl leading-none ${isAvail ? "bg-emerald-500/10 text-emerald-400" : "bg-brand-primary/10 text-brand-primary"}`}>
-                                                                {label.displayNumber}
-                                                            </div>
-                                                            {/* QR */}
-                                                            <div className="bg-white p-1.5 rounded-lg">
-                                                                <QRCode value={label.code} size={56} />
-                                                            </div>
-                                                            <p className="text-[10px] font-black tracking-widest text-brand-muted">{label.code}</p>
-                                                            {ord && (
-                                                                <p className="text-[9px] font-bold text-brand-primary bg-brand-primary/10 rounded-md px-2 py-0.5 truncate max-w-full">{ord.id}</p>
-                                                            )}
-                                                            {isAvail && <p className="text-[9px] font-bold text-emerald-400 bg-emerald-500/10 rounded-md px-2 py-0.5">Disponível</p>}
-                                                            {/* Print button */}
-                                                            <button onClick={e => { e.stopPropagation(); setPrintLabel(label); }}
-                                                                className="text-[9px] font-bold text-brand-muted hover:text-brand-primary flex items-center gap-1 mt-auto opacity-0 group-hover:opacity-100 transition-opacity">
-                                                                <Printer className="size-3" /> Imprimir
-                                                            </button>
-                                                        </motion.button>
-                                                    );
-                                                })}
-                                            </AnimatePresence>
-                                        </div>
-                                    </div>
-                                </motion.div>
-
-                                {/* Right: Label detail panel */}
-                                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.1 }}
-                                    className="lg:col-span-5 bg-brand-card rounded-2xl border border-brand-darkBorder flex flex-col overflow-hidden">
-                                    {!selectedLabelState ? (
-                                        <div className="flex-1 flex flex-col items-center justify-center text-brand-muted space-y-4 p-8 text-center">
-                                            <div className="size-20 bg-brand-bg rounded-full flex items-center justify-center border border-brand-darkBorder">
-                                                <QrCode className="size-8 text-brand-primary opacity-50" />
+                                                                {/* Status pill */}
+                                                                <div className={`absolute top-2 right-2 size-2.5 rounded-full ${isAvail ? "bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.6)]" : "bg-brand-primary shadow-[0_0_6px_rgba(139,92,246,0.6)]"}`} />
+                                                                {/* Tag Number */}
+                                                                <div className={`size-14 rounded-xl flex items-center justify-center font-black text-3xl leading-none ${isAvail ? "bg-emerald-500/10 text-emerald-400" : "bg-brand-primary/10 text-brand-primary"}`}>
+                                                                    {label.displayNumber}
+                                                                </div>
+                                                                {/* QR */}
+                                                                <div className="bg-white p-1.5 rounded-lg">
+                                                                    <QRCode value={label.code} size={56} />
+                                                                </div>
+                                                                <p className="text-[10px] font-black tracking-widest text-brand-muted">{label.code}</p>
+                                                                {ord && (
+                                                                    <p className="text-[9px] font-bold text-brand-primary bg-brand-primary/10 rounded-md px-2 py-0.5 truncate max-w-full">{ord.id}</p>
+                                                                )}
+                                                                {isAvail && <p className="text-[9px] font-bold text-emerald-400 bg-emerald-500/10 rounded-md px-2 py-0.5">Disponível</p>}
+                                                                {/* Print button */}
+                                                                <button onClick={e => { e.stopPropagation(); setPrintLabel(label); }}
+                                                                    className="text-[9px] font-bold text-brand-muted hover:text-brand-primary flex items-center gap-1 mt-auto opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                    <Printer className="size-3" /> Imprimir
+                                                                </button>
+                                                            </motion.button>
+                                                        );
+                                                    })}
+                                                </AnimatePresence>
                                             </div>
-                                            <p className="text-sm font-medium">Selecione uma etiqueta à esquerda para ver seus detalhes.</p>
-                                            <p className="text-xs opacity-50">Ou aponte o scanner físico para uma etiqueta TAG.</p>
                                         </div>
-                                    ) : (
-                                        <div className="flex flex-col h-full overflow-y-auto custom-scrollbar">
-                                            {/* Detail header */}
-                                            <div className="p-5 border-b border-brand-darkBorder bg-white/5">
-                                                <div className="flex items-center gap-4">
-                                                    <div className={`size-16 rounded-2xl flex items-center justify-center font-black text-4xl shrink-0 ${selectedLabelState.status === "available" ? "bg-emerald-500/10 text-emerald-400" : "bg-brand-primary/10 text-brand-primary"}`}>
-                                                        {selectedLabelState.displayNumber}
-                                                    </div>
-                                                    <div className="flex-1 min-w-0">
-                                                        <h2 className="font-black text-xl text-brand-text">{selectedLabelState.code}</h2>
-                                                        <div className={`inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full border mt-1 ${selectedLabelState.status === "available" ? "text-emerald-400 bg-emerald-500/10 border-emerald-500/20" : "text-brand-primary bg-brand-primary/10 border-brand-primary/20"}`}>
-                                                            {selectedLabelState.status === "available" ? <><CheckCircle2 className="size-3" /> Disponível</> : <><Link2 className="size-3" /> Em Uso</>}
+                                    </motion.div>
+
+                                    {/* Right: Label detail panel */}
+                                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.1 }}
+                                        className="lg:col-span-5 bg-brand-card rounded-2xl border border-brand-darkBorder flex flex-col overflow-hidden">
+                                        {!selectedLabelState ? (
+                                            <div className="flex-1 flex flex-col items-center justify-center text-brand-muted space-y-4 p-8 text-center">
+                                                <div className="size-20 bg-brand-bg rounded-full flex items-center justify-center border border-brand-darkBorder">
+                                                    <QrCode className="size-8 text-brand-primary opacity-50" />
+                                                </div>
+                                                <p className="text-sm font-medium">Selecione uma etiqueta à esquerda para ver seus detalhes.</p>
+                                                <p className="text-xs opacity-50">Ou aponte o scanner físico para uma etiqueta TAG.</p>
+                                            </div>
+                                        ) : (
+                                            <div className="flex flex-col h-full overflow-y-auto custom-scrollbar">
+                                                {/* Detail header */}
+                                                <div className="p-5 border-b border-brand-darkBorder bg-white/5">
+                                                    <div className="flex items-center gap-4">
+                                                        <div className={`size-16 rounded-2xl flex items-center justify-center font-black text-4xl shrink-0 ${selectedLabelState.status === "available" ? "bg-emerald-500/10 text-emerald-400" : "bg-brand-primary/10 text-brand-primary"}`}>
+                                                            {selectedLabelState.displayNumber}
+                                                        </div>
+                                                        <div className="flex-1 min-w-0">
+                                                            <h2 className="font-black text-xl text-brand-text">{selectedLabelState.code}</h2>
+                                                            <div className={`inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full border mt-1 ${selectedLabelState.status === "available" ? "text-emerald-400 bg-emerald-500/10 border-emerald-500/20" : "text-brand-primary bg-brand-primary/10 border-brand-primary/20"}`}>
+                                                                {selectedLabelState.status === "available" ? <><CheckCircle2 className="size-3" /> Disponível</> : <><Link2 className="size-3" /> Em Uso</>}
+                                                            </div>
+                                                        </div>
+                                                        <div className="bg-white p-1.5 rounded-xl shrink-0">
+                                                            <QRCode value={selectedLabelState.code} size={64} />
                                                         </div>
                                                     </div>
-                                                    <div className="bg-white p-1.5 rounded-xl shrink-0">
-                                                        <QRCode value={selectedLabelState.code} size={64} />
-                                                    </div>
                                                 </div>
-                                            </div>
 
-                                            <div className="p-5 space-y-5 flex-1">
-                                                {/* If assigned — show order detail */}
-                                                {selectedLabelState.status === "assigned" && selectedOrder ? (
-                                                    <div className="space-y-4">
-                                                        <div className="bg-brand-bg border border-brand-darkBorder rounded-2xl p-4 space-y-3">
-                                                            <div className="flex items-center justify-between">
-                                                                <h3 className="font-bold text-sm text-brand-text flex items-center gap-2">
-                                                                    <SearchCode className="size-4 text-brand-primary" /> Pedido Vinculado
-                                                                </h3>
-                                                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${getStatusColor(selectedOrder.status)}`}>{selectedOrder.status}</span>
+                                                <div className="p-5 space-y-5 flex-1">
+                                                    {/* If assigned — show order detail */}
+                                                    {selectedLabelState.status === "assigned" && selectedOrder ? (
+                                                        <div className="space-y-4">
+                                                            <div className="bg-brand-bg border border-brand-darkBorder rounded-2xl p-4 space-y-3">
+                                                                <div className="flex items-center justify-between">
+                                                                    <h3 className="font-bold text-sm text-brand-text flex items-center gap-2">
+                                                                        <SearchCode className="size-4 text-brand-primary" /> Pedido Vinculado
+                                                                    </h3>
+                                                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${getStatusColor(selectedOrder.status)}`}>{selectedOrder.status}</span>
+                                                                </div>
+                                                                <div className="space-y-1 text-sm">
+                                                                    <p className="font-black text-brand-primary text-base">{selectedOrder.id}</p>
+                                                                    <p className="flex items-center gap-2 text-brand-muted"><User className="size-3.5" /> {selectedOrder.clientName}</p>
+                                                                    <p className="text-xs text-brand-muted">{selectedOrder.clientPhone}</p>
+                                                                </div>
+                                                                <div className="border-t border-brand-darkBorder pt-3">
+                                                                    <p className="text-[10px] font-bold uppercase tracking-wider text-brand-muted mb-2">Itens do Pedido</p>
+                                                                    <div className="space-y-1.5">
+                                                                        {selectedOrder.items.map((item, i) => (
+                                                                            <div key={i} className="flex items-center justify-between text-xs">
+                                                                                <span className="text-brand-muted">{item.name}</span>
+                                                                                <span className="font-bold text-brand-text bg-brand-card border border-brand-darkBorder px-2 py-0.5 rounded-lg">x{item.qty}</span>
+                                                                            </div>
+                                                                        ))}
+                                                                    </div>
+                                                                </div>
                                                             </div>
-                                                            <div className="space-y-1 text-sm">
-                                                                <p className="font-black text-brand-primary text-base">{selectedOrder.id}</p>
-                                                                <p className="flex items-center gap-2 text-brand-muted"><User className="size-3.5" /> {selectedOrder.clientName}</p>
-                                                                <p className="text-xs text-brand-muted">{selectedOrder.clientPhone}</p>
-                                                            </div>
-                                                            <div className="border-t border-brand-darkBorder pt-3">
-                                                                <p className="text-[10px] font-bold uppercase tracking-wider text-brand-muted mb-2">Itens do Pedido</p>
-                                                                <div className="space-y-1.5">
-                                                                    {selectedOrder.items.map((item, i) => (
-                                                                        <div key={i} className="flex items-center justify-between text-xs">
-                                                                            <span className="text-brand-muted">{item.name}</span>
-                                                                            <span className="font-bold text-brand-text bg-brand-card border border-brand-darkBorder px-2 py-0.5 rounded-lg">x{item.qty}</span>
-                                                                        </div>
+
+                                                            {/* Stage advancement */}
+                                                            <div>
+                                                                <p className="text-xs font-bold uppercase tracking-wider text-brand-muted mb-2">Avançar Etapa Operacional</p>
+                                                                <div className="flex flex-wrap gap-2">
+                                                                    {PRODUCTION_STAGES.filter(s => s !== selectedOrder.status).map(stage => (
+                                                                        <button key={stage}
+                                                                            onClick={() => handleStageAdvancement(selectedLabelState, selectedOrder, stage)}
+                                                                            className="px-3 py-1.5 border border-brand-darkBorder rounded-lg text-xs font-bold text-brand-muted hover:text-brand-text hover:border-brand-primary bg-brand-bg hover:bg-brand-primary/10 transition-colors">
+                                                                            {stage}
+                                                                        </button>
                                                                     ))}
                                                                 </div>
                                                             </div>
-                                                        </div>
 
-                                                        {/* Stage advancement */}
+                                                            {/* Release button */}
+                                                            <button onClick={() => releaseLabel(selectedLabelState)}
+                                                                className="w-full py-3 bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded-xl text-sm font-bold hover:bg-rose-500/20 transition-colors flex items-center justify-center gap-2">
+                                                                <Unlink2 className="size-4" /> Liberar Etiqueta (Concluir / Desassociar Pedido)
+                                                            </button>
+                                                        </div>
+                                                    ) : (
+                                                        /* If available — show link form */
+                                                        <div className="space-y-4">
+                                                            <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-2xl p-4 text-center">
+                                                                <CheckCircle2 className="size-8 text-emerald-400 mx-auto mb-2" />
+                                                                <p className="font-bold text-emerald-400 text-sm">Etiqueta Disponível</p>
+                                                                <p className="text-xs text-brand-muted mt-1">Pronta para ser vinculada a um novo pedido.</p>
+                                                            </div>
+                                                            <div className="space-y-2">
+                                                                <label className="text-xs font-bold uppercase tracking-wider text-brand-muted">Vincular a um Pedido</label>
+                                                                <div className="relative">
+                                                                    <input
+                                                                        list="orders-datalist"
+                                                                        value={linkOrderId}
+                                                                        onChange={e => setLinkOrderId(e.target.value.trim().toUpperCase())}
+                                                                        placeholder="Ex: ORD-2856, ORD-5792..."
+                                                                        className="w-full px-3 py-2.5 bg-brand-bg border border-brand-darkBorder rounded-xl text-sm text-brand-text placeholder:text-brand-muted focus:outline-none focus:ring-2 focus:ring-brand-primary"
+                                                                    />
+                                                                    <datalist id="orders-datalist">
+                                                                        {globalOrders.filter(o => !labels.some(l => l.currentOrderId === o.id)).map(o => (
+                                                                            <option key={o.id} value={o.id}>{o.id} — {o.clientName}</option>
+                                                                        ))}
+                                                                    </datalist>
+                                                                </div>
+                                                                <button onClick={() => linkOrderId && assignLabel(selectedLabelState, linkOrderId)} disabled={!linkOrderId}
+                                                                    className="w-full py-3 bg-brand-primary text-white rounded-xl text-sm font-bold hover:opacity-90 transition-all flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed">
+                                                                    <Link2 className="size-4" /> Vincular Etiqueta {selectedLabelState.code}
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    )}
+
+                                                    {/* History */}
+                                                    {labelHistory(selectedLabelState).length > 0 && (
                                                         <div>
-                                                            <p className="text-xs font-bold uppercase tracking-wider text-brand-muted mb-2">Avançar Etapa Operacional</p>
-                                                            <div className="flex flex-wrap gap-2">
-                                                                {PRODUCTION_STAGES.filter(s => s !== selectedOrder.status).map(stage => (
-                                                                    <button key={stage}
-                                                                        onClick={() => handleStageAdvancement(selectedLabelState, selectedOrder, stage)}
-                                                                        className="px-3 py-1.5 border border-brand-darkBorder rounded-lg text-xs font-bold text-brand-muted hover:text-brand-text hover:border-brand-primary bg-brand-bg hover:bg-brand-primary/10 transition-colors">
-                                                                        {stage}
-                                                                    </button>
+                                                            <p className="text-xs font-bold uppercase tracking-wider text-brand-muted mb-2 flex items-center gap-1.5"><History className="size-3.5" /> Histórico de Usos</p>
+                                                            <div className="space-y-2">
+                                                                {labelHistory(selectedLabelState).slice().reverse().map((h, i) => (
+                                                                    <div key={i} className="flex items-center gap-3 text-xs bg-brand-bg border border-brand-darkBorder rounded-xl p-3">
+                                                                        <div className={`size-2 rounded-full shrink-0 ${h.releasedAt ? "bg-brand-muted" : "bg-emerald-400"}`} />
+                                                                        <div className="flex-1 min-w-0">
+                                                                            <p className="font-bold text-brand-text">{h.orderId}</p>
+                                                                            <p className="text-brand-muted text-[10px]">{formatDate(h.assignedAt)} {h.releasedAt ? `→ ${formatDate(h.releasedAt)}` : "(em uso)"}</p>
+                                                                        </div>
+                                                                        {!h.releasedAt && <span className="text-[9px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-full font-bold">Atual</span>}
+                                                                    </div>
                                                                 ))}
                                                             </div>
                                                         </div>
-
-                                                        {/* Release button */}
-                                                        <button onClick={() => releaseLabel(selectedLabelState)}
-                                                            className="w-full py-3 bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded-xl text-sm font-bold hover:bg-rose-500/20 transition-colors flex items-center justify-center gap-2">
-                                                            <Unlink2 className="size-4" /> Liberar Etiqueta (Concluir / Desassociar Pedido)
-                                                        </button>
-                                                    </div>
-                                                ) : (
-                                                    /* If available — show link form */
-                                                    <div className="space-y-4">
-                                                        <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-2xl p-4 text-center">
-                                                            <CheckCircle2 className="size-8 text-emerald-400 mx-auto mb-2" />
-                                                            <p className="font-bold text-emerald-400 text-sm">Etiqueta Disponível</p>
-                                                            <p className="text-xs text-brand-muted mt-1">Pronta para ser vinculada a um novo pedido.</p>
-                                                        </div>
-                                                        <div className="space-y-2">
-                                                            <label className="text-xs font-bold uppercase tracking-wider text-brand-muted">Vincular a um Pedido</label>
-                                                            <div className="relative">
-                                                                <input
-                                                                    list="orders-datalist"
-                                                                    value={linkOrderId}
-                                                                    onChange={e => setLinkOrderId(e.target.value.trim().toUpperCase())}
-                                                                    placeholder="Ex: ORD-2856, ORD-5792..."
-                                                                    className="w-full px-3 py-2.5 bg-brand-bg border border-brand-darkBorder rounded-xl text-sm text-brand-text placeholder:text-brand-muted focus:outline-none focus:ring-2 focus:ring-brand-primary"
-                                                                />
-                                                                <datalist id="orders-datalist">
-                                                                    {globalOrders.filter(o => !labels.some(l => l.currentOrderId === o.id)).map(o => (
-                                                                        <option key={o.id} value={o.id}>{o.id} — {o.clientName}</option>
-                                                                    ))}
-                                                                </datalist>
-                                                            </div>
-                                                            <button onClick={() => linkOrderId && assignLabel(selectedLabelState, linkOrderId)} disabled={!linkOrderId}
-                                                                className="w-full py-3 bg-brand-primary text-white rounded-xl text-sm font-bold hover:opacity-90 transition-all flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed">
-                                                                <Link2 className="size-4" /> Vincular Etiqueta {selectedLabelState.code}
-                                                            </button>
-                                                        </div>
-                                                    </div>
-                                                )}
-
-                                                {/* History */}
-                                                {labelHistory(selectedLabelState).length > 0 && (
-                                                    <div>
-                                                        <p className="text-xs font-bold uppercase tracking-wider text-brand-muted mb-2 flex items-center gap-1.5"><History className="size-3.5" /> Histórico de Usos</p>
-                                                        <div className="space-y-2">
-                                                            {labelHistory(selectedLabelState).slice().reverse().map((h, i) => (
-                                                                <div key={i} className="flex items-center gap-3 text-xs bg-brand-bg border border-brand-darkBorder rounded-xl p-3">
-                                                                    <div className={`size-2 rounded-full shrink-0 ${h.releasedAt ? "bg-brand-muted" : "bg-emerald-400"}`} />
-                                                                    <div className="flex-1 min-w-0">
-                                                                        <p className="font-bold text-brand-text">{h.orderId}</p>
-                                                                        <p className="text-brand-muted text-[10px]">{formatDate(h.assignedAt)} {h.releasedAt ? `→ ${formatDate(h.releasedAt)}` : "(em uso)"}</p>
-                                                                    </div>
-                                                                    {!h.releasedAt && <span className="text-[9px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-full font-bold">Atual</span>}
-                                                                </div>
-                                                            ))}
-                                                        </div>
-                                                    </div>
-                                                )}
+                                                    )}
+                                                </div>
                                             </div>
-                                        </div>
-                                    )}
-                                </motion.div>
+                                        )}
+                                    </motion.div>
+                                </div>
                             </div>
-                        </div>
-                    </main>
-                </div>
+                        </main>
+                    </div>
+                </PlanGuard>
 
                 {/* Print Modal */}
                 <AnimatePresence>

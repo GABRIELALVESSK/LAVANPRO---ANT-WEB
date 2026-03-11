@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
-import { Users, Plus, Edit, Trash2, Key, Search } from "lucide-react";
+import { useSubscription } from "@/hooks/useSubscription";
+import { Users, Plus, Edit, Trash2, Key, Search, Lock, AlertTriangle } from "lucide-react";
 import { User } from "@supabase/supabase-js";
 
 interface UsersTabProps {
@@ -11,6 +12,7 @@ interface UsersTabProps {
 }
 
 export function UsersTab({ user, showToast }: UsersTabProps) {
+    const { isStarter, isPro, isEnterprise } = useSubscription();
     const [collaborators, setCollaborators] = useState<any[]>([]);
     const [isLoadingUsers, setIsLoadingUsers] = useState(false);
     const [isSavingUser, setIsSavingUser] = useState(false);
@@ -22,6 +24,7 @@ export function UsersTab({ user, showToast }: UsersTabProps) {
     const [isNewUserModalOpen, setIsNewUserModalOpen] = useState(false);
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [isResetPasswordModalOpen, setIsResetPasswordModalOpen] = useState(false);
+    const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
 
     const [selectedUser, setSelectedUser] = useState<any>(null);
     const [userToDelete, setUserToDelete] = useState<any>(null);
@@ -137,7 +140,15 @@ export function UsersTab({ user, showToast }: UsersTabProps) {
                     </div>
                 </div>
                 <button
-                    onClick={() => setIsNewUserModalOpen(true)}
+                    onClick={() => {
+                        const limit = isEnterprise ? Infinity : (isPro ? 5 : 1);
+                        // Filter active or all collaborators? Typically all collaborators count.
+                        if (collaborators.length >= limit) {
+                            setIsUpgradeModalOpen(true);
+                        } else {
+                            setIsNewUserModalOpen(true);
+                        }
+                    }}
                     className="flex items-center gap-2 px-5 py-2.5 bg-brand-primary text-white rounded-xl text-sm font-bold hover:bg-brand-primaryHover transition-all shadow-lg shadow-brand-primary/20"
                 >
                     <Plus className="size-4" />
@@ -396,6 +407,37 @@ export function UsersTab({ user, showToast }: UsersTabProps) {
                         <div className="p-6 border-t border-brand-darkBorder flex justify-end gap-3 bg-brand-bg/50">
                             <button onClick={() => setIsResetPasswordModalOpen(false)} className="px-4 py-2 text-sm font-bold text-brand-muted hover:bg-brand-card rounded-lg transition-colors border border-brand-darkBorder">Cancelar</button>
                             <button onClick={confirmResetPassword} disabled={!newPassword} className="px-4 py-2 text-sm font-bold text-brand-text bg-amber-600 hover:bg-amber-700 rounded-lg transition-colors shadow-lg shadow-amber-600/20 disabled:opacity-50">Redefinir Senha</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Upgrade Limit Modal */}
+            {isUpgradeModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md">
+                    <div className="bg-brand-card rounded-2xl border border-brand-darkBorder shadow-2xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in duration-200">
+                        <div className="p-6 border-b border-brand-darkBorder flex justify-between items-center bg-amber-500/10">
+                            <h3 className="text-xl font-bold text-brand-text flex items-center gap-2">
+                                <Lock className="size-5 text-amber-500" /> Limite Atingido
+                            </h3>
+                            <button onClick={() => setIsUpgradeModalOpen(false)} className="text-brand-muted hover:text-brand-text transition-colors">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
+                            </button>
+                        </div>
+                        <div className="p-6 space-y-4">
+                            <div className="mx-auto size-16 bg-amber-500/10 rounded-full flex items-center justify-center">
+                                <AlertTriangle className="size-8 text-amber-500" />
+                            </div>
+                            <p className="text-sm text-brand-muted text-center font-medium">
+                                Você atingiu o limite de colaboradores para o seu plano atual.
+                            </p>
+                            <p className="text-xs text-brand-muted/70 text-center">
+                                {isStarter ? "O plano Starter inclui até 1 usuário. Faça o upgrade para expandir sua equipe." : "O plano Pro inclui até 5 usuários. Faça o upgrade para o Enterprise para equipe ilimitada."}
+                            </p>
+                        </div>
+                        <div className="p-6 border-t border-brand-darkBorder flex flex-col gap-3 bg-brand-bg/50">
+                            {/* In a real app we would navigate to a billing page or trigger the PlansModal here */}
+                            <button onClick={() => setIsUpgradeModalOpen(false)} className="w-full py-2.5 bg-brand-primary text-white rounded-xl font-bold text-sm shadow-lg shadow-brand-primary/20 hover:bg-brand-primaryHover transition-all">Entendi</button>
                         </div>
                     </div>
                 </div>

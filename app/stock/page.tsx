@@ -2,6 +2,7 @@
 
 import { Sidebar } from "@/components/sidebar";
 import { AccessGuard } from "@/components/access-guard";
+import { PlanGuard } from "@/components/plan-guard";
 import {
     Package, AlertTriangle, TrendingUp, TrendingDown, Plus, Search,
     Archive, Edit3, Trash2, X, CheckCircle2, MoreVertical,
@@ -341,238 +342,240 @@ export default function StockPage() {
         <AccessGuard permission="stock">
             <div className="flex h-screen bg-brand-bg text-brand-text font-sans">
                 <Sidebar />
-                <div className="flex-1 flex flex-col overflow-hidden">
-                    <main className="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar">
-                        <div className="max-w-[1600px] mx-auto space-y-6">
+                <PlanGuard moduleName="Estoque" requiredPlan="enterprise">
+                    <div className="flex-1 flex flex-col overflow-hidden">
+                        <main className="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar">
+                            <div className="max-w-[1600px] mx-auto space-y-6">
 
-                            {/* Header */}
-                            <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                                <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}>
-                                    <h1 className="text-3xl font-black text-brand-text tracking-tight">Estoque & Insumos</h1>
-                                    <p className="text-brand-muted text-sm font-medium mt-1">Controle de entradas, saídas e custos operacionais</p>
-                                </motion.div>
-                                <div className="flex items-center gap-3 self-start md:self-auto">
-                                    <button
-                                        onClick={() => openNewMovement()}
-                                        className="px-4 py-2.5 bg-brand-card border border-brand-darkBorder text-brand-text rounded-xl text-sm font-bold hover:bg-white/5 transition-all flex items-center gap-2"
-                                    >
-                                        <Archive className="size-4" /> Registrar Movimentação
-                                    </button>
-                                    <button
-                                        onClick={() => { setProductForm(blankProduct()); setEditingProductId(null); setIsProductModalOpen(true); }}
-                                        className="px-5 py-2.5 bg-brand-primary text-white rounded-xl text-sm font-bold hover:bg-brand-primaryHover transition-all shadow-lg shadow-brand-primary/20 flex items-center gap-2"
-                                    >
-                                        <Plus className="size-4" /> Novo Produto
-                                    </button>
-                                </div>
-                            </header>
+                                {/* Header */}
+                                <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                    <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}>
+                                        <h1 className="text-3xl font-black text-brand-text tracking-tight">Estoque & Insumos</h1>
+                                        <p className="text-brand-muted text-sm font-medium mt-1">Controle de entradas, saídas e custos operacionais</p>
+                                    </motion.div>
+                                    <div className="flex items-center gap-3 self-start md:self-auto">
+                                        <button
+                                            onClick={() => openNewMovement()}
+                                            className="px-4 py-2.5 bg-brand-card border border-brand-darkBorder text-brand-text rounded-xl text-sm font-bold hover:bg-white/5 transition-all flex items-center gap-2"
+                                        >
+                                            <Archive className="size-4" /> Registrar Movimentação
+                                        </button>
+                                        <button
+                                            onClick={() => { setProductForm(blankProduct()); setEditingProductId(null); setIsProductModalOpen(true); }}
+                                            className="px-5 py-2.5 bg-brand-primary text-white rounded-xl text-sm font-bold hover:bg-brand-primaryHover transition-all shadow-lg shadow-brand-primary/20 flex items-center gap-2"
+                                        >
+                                            <Plus className="size-4" /> Novo Produto
+                                        </button>
+                                    </div>
+                                </header>
 
-                            {/* Stats Cards */}
-                            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.0 }} className="bg-brand-card p-5 rounded-2xl border border-brand-darkBorder flex items-center gap-4">
-                                    <div className="p-3 bg-brand-primary/10 text-brand-primary rounded-xl shrink-0"><Package className="size-5" /></div>
-                                    <div>
-                                        <p className="text-2xl font-black text-brand-text">{stats.totalItems}</p>
-                                        <p className="text-xs text-brand-muted font-bold uppercase tracking-wider">Produtos Cadastrados</p>
-                                    </div>
-                                </motion.div>
-                                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="bg-brand-card p-5 rounded-2xl border border-brand-darkBorder flex items-center gap-4">
-                                    <div className="p-3 bg-emerald-500/10 text-emerald-500 rounded-xl shrink-0"><Coins className="size-5" /></div>
-                                    <div>
-                                        <p className="text-2xl font-black text-emerald-500">{formatCurrency(stats.totalValue)}</p>
-                                        <p className="text-xs text-brand-muted font-bold uppercase tracking-wider">Valor em Estoque</p>
-                                    </div>
-                                </motion.div>
-                                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className={`bg-brand-card p-5 rounded-2xl border flex items-center gap-4 ${stats.lowStockAlerts > 0 ? "border-amber-500/50 bg-amber-500/5 relative overflow-hidden" : "border-brand-darkBorder"}`}>
-                                    {stats.lowStockAlerts > 0 && <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-bl from-amber-500/20 to-transparent pointer-events-none" />}
-                                    <div className={`p-3 rounded-xl shrink-0 ${stats.lowStockAlerts > 0 ? "bg-amber-500 text-white" : "bg-amber-500/10 text-amber-500"}`}><AlertTriangle className="size-5" /></div>
-                                    <div>
-                                        <p className={`text-2xl font-black ${stats.lowStockAlerts > 0 ? "text-amber-500" : "text-brand-text"}`}>{stats.lowStockAlerts}</p>
-                                        <p className="text-xs text-brand-muted font-bold uppercase tracking-wider">Estoque Baixo</p>
-                                    </div>
-                                </motion.div>
-                                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="bg-brand-card p-5 rounded-2xl border border-brand-darkBorder flex items-center gap-4">
-                                    <div className="p-3 bg-rose-500/10 text-rose-500 rounded-xl shrink-0"><TrendingDown className="size-5" /></div>
-                                    <div>
-                                        <p className="text-2xl font-black text-rose-500">{formatCurrency(stats.totalConsumption)}</p>
-                                        <p className="text-xs text-brand-muted font-bold uppercase tracking-wider">Consumo Período</p>
-                                    </div>
-                                </motion.div>
-                            </div>
-
-                            {/* Filters & Tabs */}
-                            <div className="flex flex-wrap items-center gap-3 bg-brand-card p-3 rounded-2xl border border-brand-darkBorder">
-                                <div className="flex bg-brand-bg p-1 rounded-xl border border-brand-darkBorder relative w-full sm:w-auto">
-                                    <button onClick={() => setActiveTab("ESTOQUE")} className={`flex-1 sm:flex-none px-6 py-2.5 text-xs font-bold rounded-lg transition-all relative z-10 ${activeTab === "ESTOQUE" ? "text-white" : "text-brand-muted hover:text-brand-text"}`}>
-                                        {activeTab === "ESTOQUE" && <motion.div layoutId="stockTab" className="absolute inset-0 bg-brand-primary rounded-lg -z-10 shadow-sm" />}
-                                        Estoque Atual
-                                    </button>
-                                    <button onClick={() => setActiveTab("MOVIMENTACOES")} className={`flex-1 sm:flex-none px-6 py-2.5 text-xs font-bold rounded-lg transition-all relative z-10 ${activeTab === "MOVIMENTACOES" ? "text-white" : "text-brand-muted hover:text-brand-text"}`}>
-                                        {activeTab === "MOVIMENTACOES" && <motion.div layoutId="stockTab" className="absolute inset-0 bg-brand-primary rounded-lg -z-10 shadow-sm" />}
-                                        Movimentações
-                                    </button>
+                                {/* Stats Cards */}
+                                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                                    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.0 }} className="bg-brand-card p-5 rounded-2xl border border-brand-darkBorder flex items-center gap-4">
+                                        <div className="p-3 bg-brand-primary/10 text-brand-primary rounded-xl shrink-0"><Package className="size-5" /></div>
+                                        <div>
+                                            <p className="text-2xl font-black text-brand-text">{stats.totalItems}</p>
+                                            <p className="text-xs text-brand-muted font-bold uppercase tracking-wider">Produtos Cadastrados</p>
+                                        </div>
+                                    </motion.div>
+                                    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="bg-brand-card p-5 rounded-2xl border border-brand-darkBorder flex items-center gap-4">
+                                        <div className="p-3 bg-emerald-500/10 text-emerald-500 rounded-xl shrink-0"><Coins className="size-5" /></div>
+                                        <div>
+                                            <p className="text-2xl font-black text-emerald-500">{formatCurrency(stats.totalValue)}</p>
+                                            <p className="text-xs text-brand-muted font-bold uppercase tracking-wider">Valor em Estoque</p>
+                                        </div>
+                                    </motion.div>
+                                    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className={`bg-brand-card p-5 rounded-2xl border flex items-center gap-4 ${stats.lowStockAlerts > 0 ? "border-amber-500/50 bg-amber-500/5 relative overflow-hidden" : "border-brand-darkBorder"}`}>
+                                        {stats.lowStockAlerts > 0 && <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-bl from-amber-500/20 to-transparent pointer-events-none" />}
+                                        <div className={`p-3 rounded-xl shrink-0 ${stats.lowStockAlerts > 0 ? "bg-amber-500 text-white" : "bg-amber-500/10 text-amber-500"}`}><AlertTriangle className="size-5" /></div>
+                                        <div>
+                                            <p className={`text-2xl font-black ${stats.lowStockAlerts > 0 ? "text-amber-500" : "text-brand-text"}`}>{stats.lowStockAlerts}</p>
+                                            <p className="text-xs text-brand-muted font-bold uppercase tracking-wider">Estoque Baixo</p>
+                                        </div>
+                                    </motion.div>
+                                    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="bg-brand-card p-5 rounded-2xl border border-brand-darkBorder flex items-center gap-4">
+                                        <div className="p-3 bg-rose-500/10 text-rose-500 rounded-xl shrink-0"><TrendingDown className="size-5" /></div>
+                                        <div>
+                                            <p className="text-2xl font-black text-rose-500">{formatCurrency(stats.totalConsumption)}</p>
+                                            <p className="text-xs text-brand-muted font-bold uppercase tracking-wider">Consumo Período</p>
+                                        </div>
+                                    </motion.div>
                                 </div>
 
-                                <div className="h-8 w-px bg-brand-darkBorder hidden md:block mx-1"></div>
-
-                                {activeTab === "ESTOQUE" && (
-                                    <div className="relative">
-                                        <Tag className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-brand-muted pointer-events-none" />
-                                        <select value={filterCategory} onChange={e => setFilterCategory(e.target.value)}
-                                            className="pl-9 pr-8 py-2.5 bg-brand-bg border border-brand-darkBorder rounded-xl text-xs font-bold text-brand-text appearance-none focus:outline-none focus:ring-2 focus:ring-brand-primary cursor-pointer hover:border-brand-primary/50 transition-colors">
-                                            <option value="Todos">Todas Categorias</option>
-                                            {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-                                        </select>
+                                {/* Filters & Tabs */}
+                                <div className="flex flex-wrap items-center gap-3 bg-brand-card p-3 rounded-2xl border border-brand-darkBorder">
+                                    <div className="flex bg-brand-bg p-1 rounded-xl border border-brand-darkBorder relative w-full sm:w-auto">
+                                        <button onClick={() => setActiveTab("ESTOQUE")} className={`flex-1 sm:flex-none px-6 py-2.5 text-xs font-bold rounded-lg transition-all relative z-10 ${activeTab === "ESTOQUE" ? "text-white" : "text-brand-muted hover:text-brand-text"}`}>
+                                            {activeTab === "ESTOQUE" && <motion.div layoutId="stockTab" className="absolute inset-0 bg-brand-primary rounded-lg -z-10 shadow-sm" />}
+                                            Estoque Atual
+                                        </button>
+                                        <button onClick={() => setActiveTab("MOVIMENTACOES")} className={`flex-1 sm:flex-none px-6 py-2.5 text-xs font-bold rounded-lg transition-all relative z-10 ${activeTab === "MOVIMENTACOES" ? "text-white" : "text-brand-muted hover:text-brand-text"}`}>
+                                            {activeTab === "MOVIMENTACOES" && <motion.div layoutId="stockTab" className="absolute inset-0 bg-brand-primary rounded-lg -z-10 shadow-sm" />}
+                                            Movimentações
+                                        </button>
                                     </div>
-                                )}
 
-                                <div className="flex-1 min-w-[200px] relative ml-auto">
-                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-brand-muted" />
-                                    <input type="text" placeholder={`Buscar em ${activeTab === "ESTOQUE" ? "produtos" : "movimentações"}...`}
-                                        value={search} onChange={e => setSearch(e.target.value)}
-                                        className="w-full pl-10 pr-4 py-2.5 bg-brand-bg border border-brand-darkBorder rounded-xl text-sm text-brand-text placeholder:text-brand-muted focus:outline-none focus:ring-2 focus:ring-brand-primary transition-all" />
+                                    <div className="h-8 w-px bg-brand-darkBorder hidden md:block mx-1"></div>
+
+                                    {activeTab === "ESTOQUE" && (
+                                        <div className="relative">
+                                            <Tag className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-brand-muted pointer-events-none" />
+                                            <select value={filterCategory} onChange={e => setFilterCategory(e.target.value)}
+                                                className="pl-9 pr-8 py-2.5 bg-brand-bg border border-brand-darkBorder rounded-xl text-xs font-bold text-brand-text appearance-none focus:outline-none focus:ring-2 focus:ring-brand-primary cursor-pointer hover:border-brand-primary/50 transition-colors">
+                                                <option value="Todos">Todas Categorias</option>
+                                                {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                                            </select>
+                                        </div>
+                                    )}
+
+                                    <div className="flex-1 min-w-[200px] relative ml-auto">
+                                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-brand-muted" />
+                                        <input type="text" placeholder={`Buscar em ${activeTab === "ESTOQUE" ? "produtos" : "movimentações"}...`}
+                                            value={search} onChange={e => setSearch(e.target.value)}
+                                            className="w-full pl-10 pr-4 py-2.5 bg-brand-bg border border-brand-darkBorder rounded-xl text-sm text-brand-text placeholder:text-brand-muted focus:outline-none focus:ring-2 focus:ring-brand-primary transition-all" />
+                                    </div>
+                                </div>
+
+                                {/* MAIN CONTENT AREA */}
+                                <div className="bg-brand-card border border-brand-darkBorder rounded-2xl overflow-hidden">
+
+                                    {/* TAB: ESTOQUE */}
+                                    {activeTab === "ESTOQUE" && (
+                                        <div className="overflow-x-auto custom-scrollbar">
+                                            <table className="w-full text-left border-collapse">
+                                                <thead>
+                                                    <tr className="border-b border-brand-darkBorder bg-white/5 text-[10px] font-bold text-brand-muted uppercase tracking-wider">
+                                                        <th className="px-6 py-4 font-bold">Produto / Categoria</th>
+                                                        <th className="px-6 py-4 font-bold text-center">Unidade</th>
+                                                        <th className="px-6 py-4 font-bold text-center">Mín.</th>
+                                                        <th className="px-6 py-4 font-bold text-center">Estoque Atual</th>
+                                                        <th className="px-6 py-4 font-bold text-right">Custo Un.</th>
+                                                        <th className="px-6 py-4 font-bold text-right">Valor Total</th>
+                                                        <th className="px-6 py-4 font-bold text-center">Status</th>
+                                                        <th className="px-6 py-4 font-bold text-right">Ação</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-brand-darkBorder">
+                                                    <AnimatePresence>
+                                                        {filteredProducts.map(p => {
+                                                            const isLow = p.currentStock <= p.minStock;
+                                                            return (
+                                                                <motion.tr key={p.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="hover:bg-white/5 transition-colors group">
+                                                                    <td className="px-6 py-4">
+                                                                        <p className="text-sm font-bold text-brand-text truncate max-w-[250px]" title={p.name}>{p.name}</p>
+                                                                        <p className="text-[10px] text-brand-muted mt-0.5">{p.id} · {p.category}</p>
+                                                                    </td>
+                                                                    <td className="px-6 py-4 text-center">
+                                                                        <span className="text-xs font-medium text-brand-muted px-2 py-1 bg-brand-bg rounded-lg border border-brand-darkBorder">{p.unit}</span>
+                                                                    </td>
+                                                                    <td className="px-6 py-4 text-center">
+                                                                        <p className="text-sm font-semibold text-brand-muted">{p.minStock}</p>
+                                                                    </td>
+                                                                    <td className="px-6 py-4 text-center">
+                                                                        <p className={`text-lg font-black ${isLow ? "text-amber-500" : "text-brand-text"}`}>{p.currentStock}</p>
+                                                                    </td>
+                                                                    <td className="px-6 py-4 text-right">
+                                                                        <p className="text-sm font-semibold text-brand-muted">{formatCurrency(p.unitCost)}</p>
+                                                                    </td>
+                                                                    <td className="px-6 py-4 text-right">
+                                                                        <p className="text-sm font-bold text-brand-text">{formatCurrency(p.currentStock * p.unitCost)}</p>
+                                                                    </td>
+                                                                    <td className="px-6 py-4 text-center">
+                                                                        {isLow ? (
+                                                                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-500 text-[10px] uppercase font-bold">
+                                                                                <AlertCircle className="size-3" /> Baixo
+                                                                            </span>
+                                                                        ) : (
+                                                                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 text-[10px] uppercase font-bold">
+                                                                                <CheckCircle2 className="size-3" /> Normal
+                                                                            </span>
+                                                                        )}
+                                                                    </td>
+                                                                    <td className="px-6 py-4 whitespace-nowrap text-right h-full align-middle">
+                                                                        <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                            <button onClick={() => openNewMovement(p.id)} title="Ajuste Rápido (IN/OUT)" className="p-2 bg-brand-bg border border-brand-darkBorder hover:border-brand-primary/50 rounded-lg text-brand-muted hover:text-brand-primary transition-all">
+                                                                                <Archive className="size-4" />
+                                                                            </button>
+                                                                            <button onClick={() => openEditProduct(p)} title="Editar Produto" className="p-2 bg-brand-bg border border-brand-darkBorder hover:border-brand-primary/50 rounded-lg text-brand-muted hover:text-brand-text transition-all">
+                                                                                <Edit3 className="size-4" />
+                                                                            </button>
+                                                                        </div>
+                                                                    </td>
+                                                                </motion.tr>
+                                                            );
+                                                        })}
+                                                        {filteredProducts.length === 0 && (
+                                                            <tr><td colSpan={8} className="px-6 py-12 text-center text-sm text-brand-muted">Nenhum produto encontrado.</td></tr>
+                                                        )}
+                                                    </AnimatePresence>
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    )}
+
+                                    {/* TAB: MOVIMENTACOES */}
+                                    {activeTab === "MOVIMENTACOES" && (
+                                        <div className="overflow-x-auto custom-scrollbar">
+                                            <table className="w-full text-left border-collapse">
+                                                <thead>
+                                                    <tr className="border-b border-brand-darkBorder bg-white/5 text-[10px] font-bold text-brand-muted uppercase tracking-wider">
+                                                        <th className="px-6 py-4 font-bold w-12 text-center">Tipo</th>
+                                                        <th className="px-6 py-4 font-bold">Data</th>
+                                                        <th className="px-6 py-4 font-bold">Produto</th>
+                                                        <th className="px-6 py-4 font-bold text-center">Qtd</th>
+                                                        <th className="px-6 py-4 font-bold text-right">Custo Total</th>
+                                                        <th className="px-6 py-4 font-bold">Motivo / Operação</th>
+                                                        <th className="px-6 py-4 font-bold">Usuário</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-brand-darkBorder">
+                                                    <AnimatePresence>
+                                                        {filteredMovements.length === 0 && (
+                                                            <tr><td colSpan={7} className="px-6 py-12 text-center text-sm text-brand-muted">Nenhuma movimentação no período.</td></tr>
+                                                        )}
+                                                        {filteredMovements.map(m => {
+                                                            const p = products.find(prod => prod.id === m.productId);
+                                                            return (
+                                                                <motion.tr key={m.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="hover:bg-white/5 transition-colors">
+                                                                    <td className="px-6 py-4">
+                                                                        <div className={`size-8 rounded-full flex items-center justify-center shrink-0 border ${m.type === "ENTRADA" ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20" : "bg-rose-500/10 text-rose-500 border-rose-500/20"}`} title={m.type}>
+                                                                            {m.type === "ENTRADA" ? <ArrowUpRight className="size-4" /> : <ArrowDownRight className="size-4" />}
+                                                                        </div>
+                                                                    </td>
+                                                                    <td className="px-6 py-4 text-sm font-semibold text-brand-text whitespace-nowrap">{formatDate(m.date)}</td>
+                                                                    <td className="px-6 py-4">
+                                                                        <p className="text-sm font-bold text-brand-text">{p ? p.name : "Desconhecido"}</p>
+                                                                        <p className="text-[10px] text-brand-muted">{m.productId}</p>
+                                                                    </td>
+                                                                    <td className="px-6 py-4 text-center">
+                                                                        <p className={`text-sm font-black ${m.type === "ENTRADA" ? "text-emerald-500" : "text-rose-500"}`}>
+                                                                            {m.type === "ENTRADA" ? "+" : "-"}{m.quantity}
+                                                                        </p>
+                                                                        <p className="text-[10px] text-brand-muted">{p ? p.unit.split(" ")[0] : ""}</p>
+                                                                    </td>
+                                                                    <td className="px-6 py-4 text-right">
+                                                                        <p className="text-sm font-bold text-brand-text">{formatCurrency(m.quantity * m.unitCost)}</p>
+                                                                    </td>
+                                                                    <td className="px-6 py-4">
+                                                                        <p className="text-sm text-brand-text line-clamp-1">{m.reason}</p>
+                                                                    </td>
+                                                                    <td className="px-6 py-4 text-xs font-semibold text-brand-muted whitespace-nowrap">
+                                                                        {m.user}
+                                                                    </td>
+                                                                </motion.tr>
+                                                            );
+                                                        })}
+                                                    </AnimatePresence>
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    )}
+
                                 </div>
                             </div>
-
-                            {/* MAIN CONTENT AREA */}
-                            <div className="bg-brand-card border border-brand-darkBorder rounded-2xl overflow-hidden">
-
-                                {/* TAB: ESTOQUE */}
-                                {activeTab === "ESTOQUE" && (
-                                    <div className="overflow-x-auto custom-scrollbar">
-                                        <table className="w-full text-left border-collapse">
-                                            <thead>
-                                                <tr className="border-b border-brand-darkBorder bg-white/5 text-[10px] font-bold text-brand-muted uppercase tracking-wider">
-                                                    <th className="px-6 py-4 font-bold">Produto / Categoria</th>
-                                                    <th className="px-6 py-4 font-bold text-center">Unidade</th>
-                                                    <th className="px-6 py-4 font-bold text-center">Mín.</th>
-                                                    <th className="px-6 py-4 font-bold text-center">Estoque Atual</th>
-                                                    <th className="px-6 py-4 font-bold text-right">Custo Un.</th>
-                                                    <th className="px-6 py-4 font-bold text-right">Valor Total</th>
-                                                    <th className="px-6 py-4 font-bold text-center">Status</th>
-                                                    <th className="px-6 py-4 font-bold text-right">Ação</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody className="divide-y divide-brand-darkBorder">
-                                                <AnimatePresence>
-                                                    {filteredProducts.map(p => {
-                                                        const isLow = p.currentStock <= p.minStock;
-                                                        return (
-                                                            <motion.tr key={p.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="hover:bg-white/5 transition-colors group">
-                                                                <td className="px-6 py-4">
-                                                                    <p className="text-sm font-bold text-brand-text truncate max-w-[250px]" title={p.name}>{p.name}</p>
-                                                                    <p className="text-[10px] text-brand-muted mt-0.5">{p.id} · {p.category}</p>
-                                                                </td>
-                                                                <td className="px-6 py-4 text-center">
-                                                                    <span className="text-xs font-medium text-brand-muted px-2 py-1 bg-brand-bg rounded-lg border border-brand-darkBorder">{p.unit}</span>
-                                                                </td>
-                                                                <td className="px-6 py-4 text-center">
-                                                                    <p className="text-sm font-semibold text-brand-muted">{p.minStock}</p>
-                                                                </td>
-                                                                <td className="px-6 py-4 text-center">
-                                                                    <p className={`text-lg font-black ${isLow ? "text-amber-500" : "text-brand-text"}`}>{p.currentStock}</p>
-                                                                </td>
-                                                                <td className="px-6 py-4 text-right">
-                                                                    <p className="text-sm font-semibold text-brand-muted">{formatCurrency(p.unitCost)}</p>
-                                                                </td>
-                                                                <td className="px-6 py-4 text-right">
-                                                                    <p className="text-sm font-bold text-brand-text">{formatCurrency(p.currentStock * p.unitCost)}</p>
-                                                                </td>
-                                                                <td className="px-6 py-4 text-center">
-                                                                    {isLow ? (
-                                                                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-500 text-[10px] uppercase font-bold">
-                                                                            <AlertCircle className="size-3" /> Baixo
-                                                                        </span>
-                                                                    ) : (
-                                                                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 text-[10px] uppercase font-bold">
-                                                                            <CheckCircle2 className="size-3" /> Normal
-                                                                        </span>
-                                                                    )}
-                                                                </td>
-                                                                <td className="px-6 py-4 whitespace-nowrap text-right h-full align-middle">
-                                                                    <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                                        <button onClick={() => openNewMovement(p.id)} title="Ajuste Rápido (IN/OUT)" className="p-2 bg-brand-bg border border-brand-darkBorder hover:border-brand-primary/50 rounded-lg text-brand-muted hover:text-brand-primary transition-all">
-                                                                            <Archive className="size-4" />
-                                                                        </button>
-                                                                        <button onClick={() => openEditProduct(p)} title="Editar Produto" className="p-2 bg-brand-bg border border-brand-darkBorder hover:border-brand-primary/50 rounded-lg text-brand-muted hover:text-brand-text transition-all">
-                                                                            <Edit3 className="size-4" />
-                                                                        </button>
-                                                                    </div>
-                                                                </td>
-                                                            </motion.tr>
-                                                        );
-                                                    })}
-                                                    {filteredProducts.length === 0 && (
-                                                        <tr><td colSpan={8} className="px-6 py-12 text-center text-sm text-brand-muted">Nenhum produto encontrado.</td></tr>
-                                                    )}
-                                                </AnimatePresence>
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                )}
-
-                                {/* TAB: MOVIMENTACOES */}
-                                {activeTab === "MOVIMENTACOES" && (
-                                    <div className="overflow-x-auto custom-scrollbar">
-                                        <table className="w-full text-left border-collapse">
-                                            <thead>
-                                                <tr className="border-b border-brand-darkBorder bg-white/5 text-[10px] font-bold text-brand-muted uppercase tracking-wider">
-                                                    <th className="px-6 py-4 font-bold w-12 text-center">Tipo</th>
-                                                    <th className="px-6 py-4 font-bold">Data</th>
-                                                    <th className="px-6 py-4 font-bold">Produto</th>
-                                                    <th className="px-6 py-4 font-bold text-center">Qtd</th>
-                                                    <th className="px-6 py-4 font-bold text-right">Custo Total</th>
-                                                    <th className="px-6 py-4 font-bold">Motivo / Operação</th>
-                                                    <th className="px-6 py-4 font-bold">Usuário</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody className="divide-y divide-brand-darkBorder">
-                                                <AnimatePresence>
-                                                    {filteredMovements.length === 0 && (
-                                                        <tr><td colSpan={7} className="px-6 py-12 text-center text-sm text-brand-muted">Nenhuma movimentação no período.</td></tr>
-                                                    )}
-                                                    {filteredMovements.map(m => {
-                                                        const p = products.find(prod => prod.id === m.productId);
-                                                        return (
-                                                            <motion.tr key={m.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="hover:bg-white/5 transition-colors">
-                                                                <td className="px-6 py-4">
-                                                                    <div className={`size-8 rounded-full flex items-center justify-center shrink-0 border ${m.type === "ENTRADA" ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20" : "bg-rose-500/10 text-rose-500 border-rose-500/20"}`} title={m.type}>
-                                                                        {m.type === "ENTRADA" ? <ArrowUpRight className="size-4" /> : <ArrowDownRight className="size-4" />}
-                                                                    </div>
-                                                                </td>
-                                                                <td className="px-6 py-4 text-sm font-semibold text-brand-text whitespace-nowrap">{formatDate(m.date)}</td>
-                                                                <td className="px-6 py-4">
-                                                                    <p className="text-sm font-bold text-brand-text">{p ? p.name : "Desconhecido"}</p>
-                                                                    <p className="text-[10px] text-brand-muted">{m.productId}</p>
-                                                                </td>
-                                                                <td className="px-6 py-4 text-center">
-                                                                    <p className={`text-sm font-black ${m.type === "ENTRADA" ? "text-emerald-500" : "text-rose-500"}`}>
-                                                                        {m.type === "ENTRADA" ? "+" : "-"}{m.quantity}
-                                                                    </p>
-                                                                    <p className="text-[10px] text-brand-muted">{p ? p.unit.split(" ")[0] : ""}</p>
-                                                                </td>
-                                                                <td className="px-6 py-4 text-right">
-                                                                    <p className="text-sm font-bold text-brand-text">{formatCurrency(m.quantity * m.unitCost)}</p>
-                                                                </td>
-                                                                <td className="px-6 py-4">
-                                                                    <p className="text-sm text-brand-text line-clamp-1">{m.reason}</p>
-                                                                </td>
-                                                                <td className="px-6 py-4 text-xs font-semibold text-brand-muted whitespace-nowrap">
-                                                                    {m.user}
-                                                                </td>
-                                                            </motion.tr>
-                                                        );
-                                                    })}
-                                                </AnimatePresence>
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                )}
-
-                            </div>
-                        </div>
-                    </main>
-                </div>
+                        </main>
+                    </div>
+                </PlanGuard>
 
                 {/* Modals outside to prevent remounts */}
                 <AnimatePresence>
