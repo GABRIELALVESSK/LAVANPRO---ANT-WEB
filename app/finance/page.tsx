@@ -1,6 +1,7 @@
 "use client";
 
 import { Sidebar } from "@/components/sidebar";
+import { AccessGuard } from "@/components/access-guard";
 import {
     TrendingUp, TrendingDown, DollarSign, Wallet, FileText,
     Plus, Search, Filter, Calendar as default_api, CheckCircle2,
@@ -247,241 +248,243 @@ export default function FinancePage() {
     const pendingExpense = periodTransactions.filter(t => t.type === "DESPESA" && t.status !== "PAGO").reduce((s, t) => s + t.value, 0);
 
     return (
-        <div className="flex h-screen bg-brand-bg text-brand-text font-sans">
-            <Sidebar />
-            <div className="flex-1 flex flex-col overflow-hidden">
-                <main className="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar">
-                    <div className="max-w-[1600px] mx-auto space-y-6">
+        <AccessGuard permission="finance">
+            <div className="flex h-screen bg-brand-bg text-brand-text font-sans">
+                <Sidebar />
+                <div className="flex-1 flex flex-col overflow-hidden">
+                    <main className="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar">
+                        <div className="max-w-[1600px] mx-auto space-y-6">
 
-                        {/* Header */}
-                        <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                            <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}>
-                                <h1 className="text-3xl font-black text-brand-text tracking-tight">Financeiro</h1>
-                                <p className="text-brand-muted text-sm font-medium mt-1">Gestão de fluxo de caixa, contas a pagar e a receber</p>
-                            </motion.div>
-                            <div className="flex items-center gap-3 self-start md:self-auto">
-                                <button className="p-2.5 bg-brand-card border border-brand-darkBorder rounded-xl hover:bg-white/5 transition-colors text-brand-muted hover:text-brand-text" title="Exportar">
-                                    <Download className="size-4" />
-                                </button>
-                                <button
-                                    onClick={() => { setForm(blankTransaction("RECEITA")); setIsCreating(true); }}
-                                    className="px-5 py-2.5 bg-brand-primary text-white rounded-xl text-sm font-bold hover:bg-brand-primaryHover transition-all shadow-lg shadow-brand-primary/20 flex items-center gap-2"
-                                >
-                                    <Plus className="size-4" /> Novo Lançamento
-                                </button>
-                            </div>
-                        </header>
-
-                        {/* Action Bar (Filters) */}
-                        <div className="flex flex-wrap items-center gap-3">
-                            <div className="flex bg-brand-card p-1 rounded-xl border border-brand-darkBorder relative">
-                                {(["TODOS", "RECEITAS", "DESPESAS"] as const).map(tab => (
-                                    <button
-                                        key={tab}
-                                        onClick={() => setActiveTab(tab)}
-                                        className={`px-4 py-2 text-xs font-bold rounded-lg transition-all relative z-10 ${activeTab === tab ? "text-white" : "text-brand-muted hover:text-brand-text"}`}
-                                    >
-                                        {activeTab === tab && (
-                                            <motion.div layoutId="financeTab" className="absolute inset-0 bg-brand-primary rounded-lg -z-10 shadow-sm" />
-                                        )}
-                                        {tab === "TODOS" ? "Extrato Geral" : tab === "RECEITAS" ? "Receitas" : "Despesas"}
+                            {/* Header */}
+                            <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}>
+                                    <h1 className="text-3xl font-black text-brand-text tracking-tight">Financeiro</h1>
+                                    <p className="text-brand-muted text-sm font-medium mt-1">Gestão de fluxo de caixa, contas a pagar e a receber</p>
+                                </motion.div>
+                                <div className="flex items-center gap-3 self-start md:self-auto">
+                                    <button className="p-2.5 bg-brand-card border border-brand-darkBorder rounded-xl hover:bg-white/5 transition-colors text-brand-muted hover:text-brand-text" title="Exportar">
+                                        <Download className="size-4" />
                                     </button>
-                                ))}
-                            </div>
-
-                            <div className="h-8 w-px bg-brand-darkBorder hidden md:block mx-1"></div>
-
-                            <div className="relative">
-                                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-brand-muted pointer-events-none" />
-                                <select value={filterPeriod} onChange={e => setFilterPeriod(e.target.value as any)}
-                                    className="pl-9 pr-8 py-2.5 bg-brand-card border border-brand-darkBorder rounded-xl text-xs font-bold text-brand-text appearance-none focus:outline-none focus:ring-2 focus:ring-brand-primary cursor-pointer hover:border-brand-primary/50 transition-colors">
-                                    <option value="MesAtual">Mês Atual</option>
-                                    <option value="Ultimos30">Últimos 30 dias</option>
-                                    <option value="Todos">Todo o período</option>
-                                </select>
-                            </div>
-
-                            <div className="flex-1 min-w-[200px] relative ml-auto">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-brand-muted" />
-                                <input type="text" placeholder="Buscar lançamentos..."
-                                    value={search} onChange={e => setSearch(e.target.value)}
-                                    className="w-full pl-10 pr-4 py-2.5 bg-brand-card border border-brand-darkBorder rounded-xl text-sm text-brand-text placeholder:text-brand-muted focus:outline-none focus:ring-2 focus:ring-brand-primary transition-all" />
-                            </div>
-                        </div>
-
-                        {/* Top Summary Cards */}
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="p-5 rounded-2xl bg-brand-card border border-brand-darkBorder flex items-center justify-between">
-                                <div>
-                                    <p className="text-xs font-bold uppercase tracking-wider text-brand-muted mb-1 flex items-center gap-1.5"><Wallet className="size-3.5" /> Saldo Atual (Realizado)</p>
-                                    <h2 className={`text-2xl font-black ${balance >= 0 ? "text-emerald-500" : "text-rose-500"}`}>{formatCurrency(balance)}</h2>
+                                    <button
+                                        onClick={() => { setForm(blankTransaction("RECEITA")); setIsCreating(true); }}
+                                        className="px-5 py-2.5 bg-brand-primary text-white rounded-xl text-sm font-bold hover:bg-brand-primaryHover transition-all shadow-lg shadow-brand-primary/20 flex items-center gap-2"
+                                    >
+                                        <Plus className="size-4" /> Novo Lançamento
+                                    </button>
                                 </div>
-                                <div className={`size-12 rounded-full flex items-center justify-center ${balance >= 0 ? "bg-emerald-500/10 text-emerald-500" : "bg-rose-500/10 text-rose-500"}`}>
-                                    <DollarSign className="size-6" />
-                                </div>
-                            </motion.div>
-                            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="p-5 rounded-2xl bg-brand-card border border-brand-darkBorder flex items-center justify-between">
-                                <div>
-                                    <p className="text-xs font-bold uppercase tracking-wider text-brand-muted mb-1 flex items-center gap-1.5"><TrendingUp className="size-3.5" /> Receitas (Pagas)</p>
-                                    <h2 className="text-2xl font-black text-brand-text">{formatCurrency(totalIncome)}</h2>
-                                    <p className="text-xs text-brand-muted mt-1 mt-1"><span className="text-amber-500 font-semibold">{formatCurrency(pendingIncome)}</span> a receber</p>
-                                </div>
-                                <div className="size-12 rounded-full bg-emerald-500/10 text-emerald-500 flex items-center justify-center">
-                                    <ArrowUpRight className="size-6" />
-                                </div>
-                            </motion.div>
-                            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="p-5 rounded-2xl bg-brand-card border border-brand-darkBorder flex items-center justify-between">
-                                <div>
-                                    <p className="text-xs font-bold uppercase tracking-wider text-brand-muted mb-1 flex items-center gap-1.5"><TrendingDown className="size-3.5" /> Despesas (Pagas)</p>
-                                    <h2 className="text-2xl font-black text-brand-text">{formatCurrency(totalExpense)}</h2>
-                                    <p className="text-xs text-brand-muted mt-1"><span className="text-rose-500 font-semibold">{formatCurrency(pendingExpense)}</span> a pagar</p>
-                                </div>
-                                <div className="size-12 rounded-full bg-rose-500/10 text-rose-500 flex items-center justify-center">
-                                    <ArrowDownRight className="size-6" />
-                                </div>
-                            </motion.div>
-                        </div>
+                            </header>
 
-                        {/* Sub Accounts (A Receber / A Pagar details) - Only show if overview tab */}
-                        {activeTab === "TODOS" && (pendingIncome > 0 || pendingExpense > 0) && (
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                {pendingIncome > 0 && (
-                                    <div className="p-4 rounded-xl border border-amber-500/20 bg-amber-500/5 flex items-center justify-between">
-                                        <div className="flex items-center gap-3">
-                                            <div className="p-2 bg-amber-500/10 text-amber-500 rounded-lg"><AlertCircle className="size-5" /></div>
-                                            <div>
-                                                <p className="text-xs font-bold text-amber-500 uppercase">Valores a Receber</p>
-                                                <p className="text-sm font-semibold text-brand-text">Existem faturas de clientes pendentes de pagamento.</p>
-                                            </div>
-                                        </div>
-                                        <button onClick={() => setActiveTab("RECEITAS")} className="px-4 py-2 bg-brand-bg border border-amber-500/20 rounded-lg text-xs font-bold text-amber-500 hover:bg-amber-500/10 transition-colors">Ver Receitas</button>
-                                    </div>
-                                )}
-                                {pendingExpense > 0 && (
-                                    <div className="p-4 rounded-xl border border-rose-500/20 bg-rose-500/5 flex items-center justify-between">
-                                        <div className="flex items-center gap-3">
-                                            <div className="p-2 bg-rose-500/10 text-rose-500 rounded-lg"><TrendingDown className="size-5" /></div>
-                                            <div>
-                                                <p className="text-xs font-bold text-rose-500 uppercase">Contas a Pagar</p>
-                                                <p className="text-sm font-semibold text-brand-text">Existem despesas pendentes neste período.</p>
-                                            </div>
-                                        </div>
-                                        <button onClick={() => setActiveTab("DESPESAS")} className="px-4 py-2 bg-brand-bg border border-rose-500/20 rounded-lg text-xs font-bold text-rose-500 hover:bg-rose-500/10 transition-colors">Ver Despesas</button>
-                                    </div>
-                                )}
-                            </div>
-                        )}
-
-                        {/* List Area */}
-                        <div className="bg-brand-card border border-brand-darkBorder rounded-2xl overflow-hidden flex flex-col">
-                            <div className="p-4 border-b border-brand-darkBorder flex items-center justify-between bg-white/5">
-                                <h3 className="font-bold text-brand-text flex items-center gap-2 text-sm">
-                                    <FileText className="size-4 text-brand-primary" /> Lançamentos
-                                </h3>
-                                <span className="text-xs text-brand-muted font-semibold">{filteredTransactions.length} registros</span>
-                            </div>
-
-                            <div className="overflow-x-auto custom-scrollbar">
-                                <table className="w-full text-left border-collapse">
-                                    <thead>
-                                        <tr className="border-b border-brand-darkBorder text-[10px] font-bold text-brand-muted uppercase tracking-wider">
-                                            <th className="px-6 py-4 font-bold">Data</th>
-                                            <th className="px-6 py-4 font-bold">Descrição</th>
-                                            <th className="px-6 py-4 font-bold">Categoria</th>
-                                            <th className="px-6 py-4 font-bold">Valor</th>
-                                            <th className="px-6 py-4 font-bold">Status</th>
-                                            <th className="px-6 py-4 font-bold text-right">Ação</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-brand-darkBorder">
-                                        <AnimatePresence>
-                                            {filteredTransactions.length === 0 && (
-                                                <tr>
-                                                    <td colSpan={6} className="px-6 py-12 text-center text-sm text-brand-muted">
-                                                        Nenhum lançamento encontrado para os filtros selecionados.
-                                                    </td>
-                                                </tr>
+                            {/* Action Bar (Filters) */}
+                            <div className="flex flex-wrap items-center gap-3">
+                                <div className="flex bg-brand-card p-1 rounded-xl border border-brand-darkBorder relative">
+                                    {(["TODOS", "RECEITAS", "DESPESAS"] as const).map(tab => (
+                                        <button
+                                            key={tab}
+                                            onClick={() => setActiveTab(tab)}
+                                            className={`px-4 py-2 text-xs font-bold rounded-lg transition-all relative z-10 ${activeTab === tab ? "text-white" : "text-brand-muted hover:text-brand-text"}`}
+                                        >
+                                            {activeTab === tab && (
+                                                <motion.div layoutId="financeTab" className="absolute inset-0 bg-brand-primary rounded-lg -z-10 shadow-sm" />
                                             )}
-                                            {filteredTransactions.map(t => (
-                                                <motion.tr key={t.id}
-                                                    initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                                                    className="hover:bg-white/5 transition-colors group"
-                                                >
-                                                    <td className="px-6 py-4 whitespace-nowrap">
-                                                        <p className="text-sm font-semibold text-brand-text">{formatDate(t.dueDate)}</p>
-                                                        {t.status === "PAGO" && t.paidDate && (
-                                                            <p className="text-[10px] text-brand-muted mt-0.5" title="Data do Pagamento">Pago: {formatDate(t.paidDate)}</p>
-                                                        )}
-                                                    </td>
-                                                    <td className="px-6 py-4">
-                                                        <div className="flex items-center gap-3">
-                                                            <div className={`size-8 rounded-full flex items-center justify-center shrink-0 border ${t.type === "RECEITA" ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20" : "bg-rose-500/10 text-rose-500 border-rose-500/20"}`}>
-                                                                {t.type === "RECEITA" ? <ArrowUpRight className="size-4" /> : <ArrowDownRight className="size-4" />}
-                                                            </div>
-                                                            <div>
-                                                                <p className="text-sm font-bold text-brand-text line-clamp-1" title={t.description}>{t.description}</p>
-                                                                <p className="text-xs text-brand-muted mt-0.5 line-clamp-1">{t.customerOrSupplier || "—"}</p>
-                                                            </div>
-                                                        </div>
-                                                    </td>
-                                                    <td className="px-6 py-4 whitespace-nowrap">
-                                                        <span className="text-xs font-medium text-brand-muted px-2 py-1 bg-brand-bg rounded-lg border border-brand-darkBorder">{t.category}</span>
-                                                    </td>
-                                                    <td className="px-6 py-4 whitespace-nowrap">
-                                                        <p className={`text-sm font-black ${t.type === "RECEITA" ? "text-emerald-500" : "text-brand-text"}`}>
-                                                            {t.type === "DESPESA" && "-"} {formatCurrency(t.value)}
-                                                        </p>
-                                                        <p className="text-[10px] text-brand-muted mt-0.5">{t.paymentMethod || "—"}</p>
-                                                    </td>
-                                                    <td className="px-6 py-4 whitespace-nowrap">
-                                                        <span className={`text-[10px] uppercase font-bold px-2.5 py-1 rounded-full border ${STATUS_COLORS[t.status]}`}>
-                                                            {t.status}
-                                                        </span>
-                                                    </td>
-                                                    <td className="px-6 py-4 whitespace-nowrap text-right">
-                                                        {t.status !== "PAGO" ? (
-                                                            <button
-                                                                onClick={() => handleSettle(t.id)}
-                                                                className="px-3 py-1.5 bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500 hover:text-white border border-emerald-500/20 hover:border-emerald-500 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ml-auto"
-                                                            >
-                                                                <CheckCircle2 className="size-3" /> Dar Baixa
-                                                            </button>
-                                                        ) : (
-                                                            <button className="p-1.5 text-brand-muted hover:text-brand-text transition-colors rounded-lg hover:bg-white/5">
-                                                                <MoreVertical className="size-4" />
-                                                            </button>
-                                                        )}
-                                                    </td>
-                                                </motion.tr>
-                                            ))}
-                                        </AnimatePresence>
-                                    </tbody>
-                                </table>
+                                            {tab === "TODOS" ? "Extrato Geral" : tab === "RECEITAS" ? "Receitas" : "Despesas"}
+                                        </button>
+                                    ))}
+                                </div>
+
+                                <div className="h-8 w-px bg-brand-darkBorder hidden md:block mx-1"></div>
+
+                                <div className="relative">
+                                    <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-brand-muted pointer-events-none" />
+                                    <select value={filterPeriod} onChange={e => setFilterPeriod(e.target.value as any)}
+                                        className="pl-9 pr-8 py-2.5 bg-brand-card border border-brand-darkBorder rounded-xl text-xs font-bold text-brand-text appearance-none focus:outline-none focus:ring-2 focus:ring-brand-primary cursor-pointer hover:border-brand-primary/50 transition-colors">
+                                        <option value="MesAtual">Mês Atual</option>
+                                        <option value="Ultimos30">Últimos 30 dias</option>
+                                        <option value="Todos">Todo o período</option>
+                                    </select>
+                                </div>
+
+                                <div className="flex-1 min-w-[200px] relative ml-auto">
+                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-brand-muted" />
+                                    <input type="text" placeholder="Buscar lançamentos..."
+                                        value={search} onChange={e => setSearch(e.target.value)}
+                                        className="w-full pl-10 pr-4 py-2.5 bg-brand-card border border-brand-darkBorder rounded-xl text-sm text-brand-text placeholder:text-brand-muted focus:outline-none focus:ring-2 focus:ring-brand-primary transition-all" />
+                                </div>
                             </div>
+
+                            {/* Top Summary Cards */}
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="p-5 rounded-2xl bg-brand-card border border-brand-darkBorder flex items-center justify-between">
+                                    <div>
+                                        <p className="text-xs font-bold uppercase tracking-wider text-brand-muted mb-1 flex items-center gap-1.5"><Wallet className="size-3.5" /> Saldo Atual (Realizado)</p>
+                                        <h2 className={`text-2xl font-black ${balance >= 0 ? "text-emerald-500" : "text-rose-500"}`}>{formatCurrency(balance)}</h2>
+                                    </div>
+                                    <div className={`size-12 rounded-full flex items-center justify-center ${balance >= 0 ? "bg-emerald-500/10 text-emerald-500" : "bg-rose-500/10 text-rose-500"}`}>
+                                        <DollarSign className="size-6" />
+                                    </div>
+                                </motion.div>
+                                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="p-5 rounded-2xl bg-brand-card border border-brand-darkBorder flex items-center justify-between">
+                                    <div>
+                                        <p className="text-xs font-bold uppercase tracking-wider text-brand-muted mb-1 flex items-center gap-1.5"><TrendingUp className="size-3.5" /> Receitas (Pagas)</p>
+                                        <h2 className="text-2xl font-black text-brand-text">{formatCurrency(totalIncome)}</h2>
+                                        <p className="text-xs text-brand-muted mt-1 mt-1"><span className="text-amber-500 font-semibold">{formatCurrency(pendingIncome)}</span> a receber</p>
+                                    </div>
+                                    <div className="size-12 rounded-full bg-emerald-500/10 text-emerald-500 flex items-center justify-center">
+                                        <ArrowUpRight className="size-6" />
+                                    </div>
+                                </motion.div>
+                                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="p-5 rounded-2xl bg-brand-card border border-brand-darkBorder flex items-center justify-between">
+                                    <div>
+                                        <p className="text-xs font-bold uppercase tracking-wider text-brand-muted mb-1 flex items-center gap-1.5"><TrendingDown className="size-3.5" /> Despesas (Pagas)</p>
+                                        <h2 className="text-2xl font-black text-brand-text">{formatCurrency(totalExpense)}</h2>
+                                        <p className="text-xs text-brand-muted mt-1"><span className="text-rose-500 font-semibold">{formatCurrency(pendingExpense)}</span> a pagar</p>
+                                    </div>
+                                    <div className="size-12 rounded-full bg-rose-500/10 text-rose-500 flex items-center justify-center">
+                                        <ArrowDownRight className="size-6" />
+                                    </div>
+                                </motion.div>
+                            </div>
+
+                            {/* Sub Accounts (A Receber / A Pagar details) - Only show if overview tab */}
+                            {activeTab === "TODOS" && (pendingIncome > 0 || pendingExpense > 0) && (
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {pendingIncome > 0 && (
+                                        <div className="p-4 rounded-xl border border-amber-500/20 bg-amber-500/5 flex items-center justify-between">
+                                            <div className="flex items-center gap-3">
+                                                <div className="p-2 bg-amber-500/10 text-amber-500 rounded-lg"><AlertCircle className="size-5" /></div>
+                                                <div>
+                                                    <p className="text-xs font-bold text-amber-500 uppercase">Valores a Receber</p>
+                                                    <p className="text-sm font-semibold text-brand-text">Existem faturas de clientes pendentes de pagamento.</p>
+                                                </div>
+                                            </div>
+                                            <button onClick={() => setActiveTab("RECEITAS")} className="px-4 py-2 bg-brand-bg border border-amber-500/20 rounded-lg text-xs font-bold text-amber-500 hover:bg-amber-500/10 transition-colors">Ver Receitas</button>
+                                        </div>
+                                    )}
+                                    {pendingExpense > 0 && (
+                                        <div className="p-4 rounded-xl border border-rose-500/20 bg-rose-500/5 flex items-center justify-between">
+                                            <div className="flex items-center gap-3">
+                                                <div className="p-2 bg-rose-500/10 text-rose-500 rounded-lg"><TrendingDown className="size-5" /></div>
+                                                <div>
+                                                    <p className="text-xs font-bold text-rose-500 uppercase">Contas a Pagar</p>
+                                                    <p className="text-sm font-semibold text-brand-text">Existem despesas pendentes neste período.</p>
+                                                </div>
+                                            </div>
+                                            <button onClick={() => setActiveTab("DESPESAS")} className="px-4 py-2 bg-brand-bg border border-rose-500/20 rounded-lg text-xs font-bold text-rose-500 hover:bg-rose-500/10 transition-colors">Ver Despesas</button>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* List Area */}
+                            <div className="bg-brand-card border border-brand-darkBorder rounded-2xl overflow-hidden flex flex-col">
+                                <div className="p-4 border-b border-brand-darkBorder flex items-center justify-between bg-white/5">
+                                    <h3 className="font-bold text-brand-text flex items-center gap-2 text-sm">
+                                        <FileText className="size-4 text-brand-primary" /> Lançamentos
+                                    </h3>
+                                    <span className="text-xs text-brand-muted font-semibold">{filteredTransactions.length} registros</span>
+                                </div>
+
+                                <div className="overflow-x-auto custom-scrollbar">
+                                    <table className="w-full text-left border-collapse">
+                                        <thead>
+                                            <tr className="border-b border-brand-darkBorder text-[10px] font-bold text-brand-muted uppercase tracking-wider">
+                                                <th className="px-6 py-4 font-bold">Data</th>
+                                                <th className="px-6 py-4 font-bold">Descrição</th>
+                                                <th className="px-6 py-4 font-bold">Categoria</th>
+                                                <th className="px-6 py-4 font-bold">Valor</th>
+                                                <th className="px-6 py-4 font-bold">Status</th>
+                                                <th className="px-6 py-4 font-bold text-right">Ação</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-brand-darkBorder">
+                                            <AnimatePresence>
+                                                {filteredTransactions.length === 0 && (
+                                                    <tr>
+                                                        <td colSpan={6} className="px-6 py-12 text-center text-sm text-brand-muted">
+                                                            Nenhum lançamento encontrado para os filtros selecionados.
+                                                        </td>
+                                                    </tr>
+                                                )}
+                                                {filteredTransactions.map(t => (
+                                                    <motion.tr key={t.id}
+                                                        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                                                        className="hover:bg-white/5 transition-colors group"
+                                                    >
+                                                        <td className="px-6 py-4 whitespace-nowrap">
+                                                            <p className="text-sm font-semibold text-brand-text">{formatDate(t.dueDate)}</p>
+                                                            {t.status === "PAGO" && t.paidDate && (
+                                                                <p className="text-[10px] text-brand-muted mt-0.5" title="Data do Pagamento">Pago: {formatDate(t.paidDate)}</p>
+                                                            )}
+                                                        </td>
+                                                        <td className="px-6 py-4">
+                                                            <div className="flex items-center gap-3">
+                                                                <div className={`size-8 rounded-full flex items-center justify-center shrink-0 border ${t.type === "RECEITA" ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20" : "bg-rose-500/10 text-rose-500 border-rose-500/20"}`}>
+                                                                    {t.type === "RECEITA" ? <ArrowUpRight className="size-4" /> : <ArrowDownRight className="size-4" />}
+                                                                </div>
+                                                                <div>
+                                                                    <p className="text-sm font-bold text-brand-text line-clamp-1" title={t.description}>{t.description}</p>
+                                                                    <p className="text-xs text-brand-muted mt-0.5 line-clamp-1">{t.customerOrSupplier || "—"}</p>
+                                                                </div>
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-6 py-4 whitespace-nowrap">
+                                                            <span className="text-xs font-medium text-brand-muted px-2 py-1 bg-brand-bg rounded-lg border border-brand-darkBorder">{t.category}</span>
+                                                        </td>
+                                                        <td className="px-6 py-4 whitespace-nowrap">
+                                                            <p className={`text-sm font-black ${t.type === "RECEITA" ? "text-emerald-500" : "text-brand-text"}`}>
+                                                                {t.type === "DESPESA" && "-"} {formatCurrency(t.value)}
+                                                            </p>
+                                                            <p className="text-[10px] text-brand-muted mt-0.5">{t.paymentMethod || "—"}</p>
+                                                        </td>
+                                                        <td className="px-6 py-4 whitespace-nowrap">
+                                                            <span className={`text-[10px] uppercase font-bold px-2.5 py-1 rounded-full border ${STATUS_COLORS[t.status]}`}>
+                                                                {t.status}
+                                                            </span>
+                                                        </td>
+                                                        <td className="px-6 py-4 whitespace-nowrap text-right">
+                                                            {t.status !== "PAGO" ? (
+                                                                <button
+                                                                    onClick={() => handleSettle(t.id)}
+                                                                    className="px-3 py-1.5 bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500 hover:text-white border border-emerald-500/20 hover:border-emerald-500 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ml-auto"
+                                                                >
+                                                                    <CheckCircle2 className="size-3" /> Dar Baixa
+                                                                </button>
+                                                            ) : (
+                                                                <button className="p-1.5 text-brand-muted hover:text-brand-text transition-colors rounded-lg hover:bg-white/5">
+                                                                    <MoreVertical className="size-4" />
+                                                                </button>
+                                                            )}
+                                                        </td>
+                                                    </motion.tr>
+                                                ))}
+                                            </AnimatePresence>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
                         </div>
+                    </main>
+                </div>
 
-                    </div>
-                </main>
-            </div>
+                {/* ── Modal: Novo Lançamento ── */}
+                <AnimatePresence>
+                    {isCreating && (
+                        <TransactionModal
+                            key="create-transaction"
+                            data={form}
+                            onChange={handleFormChange}
+                            onSave={handleCreate}
+                            onCancel={() => setIsCreating(false)}
+                        />
+                    )}
+                </AnimatePresence>
 
-            {/* ── Modal: Novo Lançamento ── */}
-            <AnimatePresence>
-                {isCreating && (
-                    <TransactionModal
-                        key="create-transaction"
-                        data={form}
-                        onChange={handleFormChange}
-                        onSave={handleCreate}
-                        onCancel={() => setIsCreating(false)}
-                    />
-                )}
-            </AnimatePresence>
-
-            <style jsx global>{`
+                <style jsx global>{`
                 .custom-scrollbar::-webkit-scrollbar { width: 5px; height: 5px; }
                 .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
                 .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.06); border-radius: 10px; }
             `}</style>
-        </div>
+            </div>
+        </AccessGuard>
     );
 }

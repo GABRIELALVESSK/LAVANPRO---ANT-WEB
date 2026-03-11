@@ -59,7 +59,7 @@ export async function middleware(request: NextRequest) {
     } = await supabase.auth.getSession()
 
     // list of protected routes
-    const protectedRoutes = ['/dashboard', '/customers', '/finance', '/orders', '/reports', '/settings']
+    const protectedRoutes = ['/dashboard', '/customers', '/finance', '/orders', '/reports', '/settings', '/team', '/stock', '/labels']
     const isProtectedRoute = protectedRoutes.some(route => request.nextUrl.pathname.startsWith(route))
 
     if (!session && isProtectedRoute) {
@@ -80,5 +80,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-    matcher: ['/dashboard/:path*', '/customers/:path*', '/finance/:path*', '/orders/:path*', '/reports/:path*', '/settings/:path*', '/login'],
+    matcher: ['/dashboard/:path*', '/customers/:path*', '/finance/:path*', '/orders/:path*', '/reports/:path*', '/settings/:path*', '/team/:path*', '/stock/:path*', '/labels/:path*', '/login'],
 }

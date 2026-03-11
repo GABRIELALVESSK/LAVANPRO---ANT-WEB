@@ -22,13 +22,28 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
+import { usePermissions } from "@/hooks/usePermissions";
 import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
+
+// All possible navigation items with their required permission key
+const ALL_NAV_ITEMS = [
+  { href: "/dashboard", icon: LayoutDashboard, label: "Visão Geral", group: "Principal", permission: null }, // always visible
+  { href: "/reports", icon: BarChart3, label: "Relatórios", group: "Principal", permission: "reports" as const },
+  { href: "/orders", icon: ReceiptText, label: "Pedidos", group: "Principal", permission: "orders" as const },
+  { href: "/customers", icon: Users, label: "Clientes", group: "Principal", permission: "customers" as const },
+  { href: "/finance", icon: Wallet, label: "Financeiro", group: "Principal", permission: "finance" as const },
+  { href: "/stock", icon: Package, label: "Estoque", group: "Operações", permission: "stock" as const },
+  { href: "/team", icon: UserCog, label: "Equipe", group: "Operações", permission: "team" as const },
+  { href: "/labels", icon: QrCode, label: "Etiquetagem QR", group: "Operações", permission: "labels" as const },
+  { href: "/settings", icon: Settings, label: "Configurações", group: "Operações", permission: "settings" as const },
+];
 
 export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const { user } = useAuth();
+  const { canAccessRoute } = usePermissions();
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
 
@@ -36,45 +51,31 @@ export function Sidebar() {
     setMounted(true);
   }, []);
 
-  const isAdmin =
-    user?.user_metadata?.role === "owner" ||
-    user?.user_metadata?.role === "Gerente" ||
-    user?.user_metadata?.role === "Gerente Geral" ||
-    user?.user_metadata?.role === "Administrador" ||
-    user?.email === "gabriel23900@gmail.com";
-
   const handleLogout = async () => {
     await supabase.auth.signOut();
     router.push("/login");
   };
 
-  const adminNav = [
-    { href: "/dashboard", icon: LayoutDashboard, label: "Visão Geral" },
-    { href: "/reports", icon: BarChart3, label: "Relatórios" },
-    { href: "/orders", icon: ReceiptText, label: "Pedidos" },
-    { href: "/customers", icon: Users, label: "Clientes" },
-    { href: "/finance", icon: Wallet, label: "Financeiro" },
-  ];
+  // Filter navigation items based on actual permissions
+  const visibleItems = ALL_NAV_ITEMS.filter((item) => {
+    if (item.permission === null) return true; // Dashboard always visible
+    return canAccessRoute(item.href);
+  });
 
-  const adminNavSecondary = [
-    { href: "/stock", icon: Package, label: "Estoque" },
-    { href: "/team", icon: UserCog, label: "Equipe" },
-    { href: "/labels", icon: QrCode, label: "Etiquetagem QR" },
-    { href: "/notifications", icon: Bell, label: "Notificações" },
-    { href: "/settings", icon: Settings, label: "Configurações" },
-  ];
+  // Group the visible items
+  const groups: { label: string; items: typeof ALL_NAV_ITEMS }[] = [];
+  const groupMap = new Map<string, typeof ALL_NAV_ITEMS>();
 
-  const operatorNav = [
-    { href: "/orders", icon: ReceiptText, label: "Pedidos" },
-    { href: "/customers", icon: Users, label: "Clientes" },
-  ];
+  for (const item of visibleItems) {
+    if (!groupMap.has(item.group)) {
+      groupMap.set(item.group, []);
+    }
+    groupMap.get(item.group)!.push(item);
+  }
 
-  const navGroups = isAdmin
-    ? [
-      { label: "Principal", items: adminNav },
-      { label: "Operações", items: adminNavSecondary },
-    ]
-    : [{ label: "Menu", items: operatorNav }];
+  for (const [label, items] of groupMap) {
+    groups.push({ label, items });
+  }
 
   return (
     <aside className="w-64 bg-brand-bg border-r border-brand-darkBorder flex flex-col shrink-0 min-h-screen">
@@ -92,7 +93,7 @@ export function Sidebar() {
 
         {/* Nav Groups */}
         <nav className="space-y-5">
-          {navGroups.map((group) => (
+          {groups.map((group) => (
             <div key={group.label}>
               <p className="text-[9px] font-bold uppercase tracking-[0.15em] text-brand-muted mb-2 px-1">
                 {group.label}
@@ -106,8 +107,8 @@ export function Sidebar() {
                       key={item.href}
                       href={item.href}
                       className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 ${isActive
-                          ? "bg-brand-primary text-white shadow-[0_4px_14px_rgba(139,92,246,0.35)]"
-                          : "text-brand-muted hover:text-brand-text hover:bg-brand-card"
+                        ? "bg-brand-primary text-white shadow-[0_4px_14px_rgba(139,92,246,0.35)]"
+                        : "text-brand-muted hover:text-brand-text hover:bg-brand-card"
                         }`}
                     >
                       <Icon className="size-4 shrink-0" />
@@ -132,8 +133,8 @@ export function Sidebar() {
             <button
               onClick={() => setTheme("light")}
               className={`p-2 rounded-lg flex-1 flex justify-center transition-colors ${theme === "light"
-                  ? "bg-brand-bg text-brand-primary shadow-sm"
-                  : "text-brand-muted hover:text-brand-text"
+                ? "bg-brand-bg text-brand-primary shadow-sm"
+                : "text-brand-muted hover:text-brand-text"
                 }`}
               title="Tema Claro"
             >
@@ -142,8 +143,8 @@ export function Sidebar() {
             <button
               onClick={() => setTheme("system")}
               className={`p-2 rounded-lg flex-1 flex justify-center transition-colors ${theme === "system"
-                  ? "bg-brand-bg text-brand-primary shadow-sm"
-                  : "text-brand-muted hover:text-brand-text"
+                ? "bg-brand-bg text-brand-primary shadow-sm"
+                : "text-brand-muted hover:text-brand-text"
                 }`}
               title="Tema do Sistema"
             >
@@ -152,8 +153,8 @@ export function Sidebar() {
             <button
               onClick={() => setTheme("dark")}
               className={`p-2 rounded-lg flex-1 flex justify-center transition-colors ${theme === "dark"
-                  ? "bg-brand-bg text-brand-primary shadow-sm"
-                  : "text-brand-muted hover:text-brand-text"
+                ? "bg-brand-bg text-brand-primary shadow-sm"
+                : "text-brand-muted hover:text-brand-text"
                 }`}
               title="Tema Escuro"
             >
