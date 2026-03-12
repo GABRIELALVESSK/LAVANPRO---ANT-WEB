@@ -110,7 +110,7 @@ export default function ReportsPage() {
     <AccessGuard permission="reports">
       <div className="flex min-h-screen bg-brand-bg text-brand-text font-sans">
         <Sidebar />
-        <PlanGuard moduleName="Relatórios" requiredPlan="pro">
+        <PlanGuard moduleName="Relatórios" requiredPlan="enterprise">
           <div className="flex-1 flex flex-col h-screen overflow-hidden">
             <main className="flex-1 overflow-y-auto bg-brand-bg">
               <Filters

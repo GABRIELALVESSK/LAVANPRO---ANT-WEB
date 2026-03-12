@@ -9,7 +9,7 @@ import {
     ArrowUpRight, ArrowDownRight, Tag, Scale, Coins, AlertCircle
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useState, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Product {
@@ -270,7 +270,18 @@ export default function StockPage() {
     const [productForm, setProductForm] = useState<ProductFormData>(blankProduct());
     const [editingProductId, setEditingProductId] = useState<string | null>(null);
 
-    // Handlers
+    useEffect(() => {
+        const savedProducts = localStorage.getItem("lavanpro_stock_products_v2");
+        const savedMovements = localStorage.getItem("lavanpro_stock_movements_v2");
+        if (savedProducts) { try { setProducts(JSON.parse(savedProducts)); } catch { } }
+        if (savedMovements) { try { setMovements(JSON.parse(savedMovements)); } catch { } }
+    }, []);
+
+    useEffect(() => {
+        localStorage.setItem("lavanpro_stock_products_v2", JSON.stringify(products));
+        localStorage.setItem("lavanpro_stock_movements_v2", JSON.stringify(movements));
+    }, [products, movements]);
+
     const handleProductChange = (f: keyof ProductFormData, v: any) => setProductForm(prev => ({ ...prev, [f]: v }));
 
     const handleSaveProduct = () => {
@@ -278,14 +289,14 @@ export default function StockPage() {
         if (editingProductId) {
             setProducts(prev => prev.map(p => p.id === editingProductId ? { ...productForm, id: p.id } as Product : p));
         } else {
-            const id = `PROD-${String(products.length + 101)}`;
+            const id = `PROD-${String(Date.now()).slice(-6)}`;
             setProducts(prev => [...prev, { ...productForm, id } as Product]);
         }
         setIsProductModalOpen(false);
     };
 
     const handleSaveMovement = (mov: Omit<Movement, "id">) => {
-        const id = `MOV-${String(movements.length + 1001)}`;
+        const id = `MOV-${String(Date.now()).slice(-6)}`;
         setMovements(prev => [{ ...mov, id }, ...prev]);
 
         // Update product stock automatically
@@ -342,7 +353,7 @@ export default function StockPage() {
         <AccessGuard permission="stock">
             <div className="flex h-screen bg-brand-bg text-brand-text font-sans">
                 <Sidebar />
-                <PlanGuard moduleName="Estoque" requiredPlan="enterprise">
+                <PlanGuard moduleName="Estoque" requiredPlan="pro">
                     <div className="flex-1 flex flex-col overflow-hidden">
                         <main className="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar">
                             <div className="max-w-[1600px] mx-auto space-y-6">

@@ -16,10 +16,14 @@ import {
   UserCog,
   QrCode,
   Bell,
+  Crown,
+  ChevronDown,
+  Building2,
   Lock,
   Check,
-  Crown
+  ShoppingBag
 } from "lucide-react";
+import { UNITS } from "@/lib/staffService";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -36,6 +40,7 @@ const ALL_NAV_ITEMS = [
   { href: "/reports", icon: BarChart3, label: "Relatórios", group: "Principal", permission: "reports" as const },
   { href: "/orders", icon: ReceiptText, label: "Pedidos", group: "Principal", permission: "orders" as const },
   { href: "/customers", icon: Users, label: "Clientes", group: "Principal", permission: "customers" as const },
+  { href: "/services", icon: ShoppingBag, label: "Serviços", group: "Principal", permission: "settings" as const },
   { href: "/finance", icon: Wallet, label: "Financeiro", group: "Principal", permission: "finance" as const },
   { href: "/stock", icon: Package, label: "Estoque", group: "Operações", permission: "stock" as const },
   { href: "/team", icon: UserCog, label: "Equipe", group: "Operações", permission: "team" as const },
@@ -44,8 +49,8 @@ const ALL_NAV_ITEMS = [
 ];
 
 const PREMIUM_ROUTES = ["/finance", "/labels", "/team", "/reports", "/stock"];
-const ENTERPRISE_ONLY_ROUTES = ["/stock", "/reports"];
-const PRO_REQUIRED_ROUTES = ["/finance", "/labels", "/team"];
+const ENTERPRISE_ONLY_ROUTES = ["/reports"];
+const PRO_REQUIRED_ROUTES = ["/finance", "/labels", "/team", "/stock"];
 
 export function Sidebar() {
   const pathname = usePathname();
@@ -57,6 +62,8 @@ export function Sidebar() {
   const [mounted, setMounted] = useState(false);
   const [isPlansModalOpen, setIsPlansModalOpen] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [selectedUnit, setSelectedUnit] = useState(UNITS[0]);
+  const [isUnitSelectorOpen, setIsUnitSelectorOpen] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -115,6 +122,49 @@ export function Sidebar() {
               <p className="text-[10px] text-brand-muted font-medium">Sistema de Gestão</p>
             </div>
           </div>
+
+          {/* Enterprise Unit Selector */}
+          {plan === 'enterprise' && (
+            <div className="mb-6 relative">
+              <label className="text-[9px] font-black uppercase tracking-widest text-brand-muted mb-2 block px-1">
+                Unidade Ativa
+              </label>
+              <button
+                onClick={() => setIsUnitSelectorOpen(!isUnitSelectorOpen)}
+                className="w-full flex items-center justify-between gap-3 px-3 py-2 bg-brand-card hover:bg-brand-card/80 border border-brand-darkBorder rounded-xl transition-all group"
+              >
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="size-6 rounded-lg bg-brand-primary/10 flex items-center justify-center shrink-0">
+                    <Building2 className="size-3.5 text-brand-primary" />
+                  </div>
+                  <span className="text-xs font-bold text-brand-text truncate uppercase tracking-tight">
+                    {selectedUnit}
+                  </span>
+                </div>
+                <ChevronDown className={`size-3 text-brand-muted transition-transform duration-300 ${isUnitSelectorOpen ? 'rotate-180' : ''}`} />
+              </button>
+
+              {isUnitSelectorOpen && (
+                <div className="absolute top-full left-0 right-0 mt-2 p-1.5 bg-brand-card border border-brand-darkBorder rounded-xl shadow-2xl z-50 animate-in fade-in slide-in-from-top-2">
+                  {UNITS.map((unit) => (
+                    <button
+                      key={unit}
+                      onClick={() => {
+                        setSelectedUnit(unit);
+                        setIsUnitSelectorOpen(false);
+                      }}
+                      className={`w-full text-left px-3 py-2 rounded-lg text-xs font-bold transition-colors ${selectedUnit === unit
+                        ? 'bg-brand-primary/10 text-brand-primary'
+                        : 'text-brand-muted hover:bg-white/5 hover:text-brand-text'
+                        }`}
+                    >
+                      {unit}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Nav Groups */}
           <nav className="space-y-5">
@@ -302,8 +352,9 @@ export function Sidebar() {
                 <ul className="space-y-4 mb-8 flex-1">
                   <li className="flex items-start gap-3"><Check className="size-4 text-brand-primary shrink-0 mt-0.5" /><span className="text-sm text-brand-text">Tudo do Starter</span></li>
                   <li className="flex items-start gap-3"><Check className="size-4 text-brand-primary shrink-0 mt-0.5" /><span className="text-sm text-brand-text">Etiquetas QR (E-tags)</span></li>
-                  <li className="flex items-start gap-3"><Check className="size-4 text-brand-primary shrink-0 mt-0.5" /><span className="text-sm text-brand-text">Financeiro e Relatórios</span></li>
-                  <li className="flex items-start gap-3"><Check className="size-4 text-brand-primary shrink-0 mt-0.5" /><span className="text-sm text-brand-text">Até 5 Usuários e Equipe</span></li>
+                  <li className="flex items-start gap-3"><Check className="size-4 text-brand-primary shrink-0 mt-0.5" /><span className="text-sm text-brand-text">Financeiro e Controle de Caixa</span></li>
+                  <li className="flex items-start gap-3"><Check className="size-4 text-brand-primary shrink-0 mt-0.5" /><span className="text-sm text-brand-text">Módulo de Estoque</span></li>
+                  <li className="flex items-start gap-3"><Check className="size-4 text-brand-primary shrink-0 mt-0.5" /><span className="text-sm text-brand-text">Até 3 Usuários e Equipe</span></li>
                 </ul>
 
                 <button
@@ -327,8 +378,9 @@ export function Sidebar() {
                 <ul className="space-y-4 mb-8 flex-1">
                   <li className="flex items-start gap-3"><Check className="size-4 text-brand-primary shrink-0 mt-0.5" /><span className="text-sm text-brand-text">Tudo do Profissional</span></li>
                   <li className="flex items-start gap-3"><Check className="size-4 text-brand-primary shrink-0 mt-0.5" /><span className="text-sm text-brand-text">Usuários Ilimitados</span></li>
-                  <li className="flex items-start gap-3"><Check className="size-4 text-brand-primary shrink-0 mt-0.5" /><span className="text-sm text-brand-text">Controle de Estoque/Insumos</span></li>
-                  <li className="flex items-start gap-3"><Check className="size-4 text-brand-primary shrink-0 mt-0.5" /><span className="text-sm text-brand-text">API Aberta</span></li>
+                  <li className="flex items-start gap-3"><Check className="size-4 text-brand-primary shrink-0 mt-0.5" /><span className="text-sm text-brand-text">Relatórios BI e Avançados</span></li>
+                  <li className="flex items-start gap-3"><Check className="size-4 text-brand-primary shrink-0 mt-0.5" /><span className="text-sm text-brand-text">Acesso a API Aberta</span></li>
+                  <li className="flex items-start gap-3"><Check className="size-4 text-brand-primary shrink-0 mt-0.5" /><span className="text-sm text-brand-text">Múltiplas Unidades</span></li>
                 </ul>
 
                 <button

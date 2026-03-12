@@ -7,7 +7,8 @@ import {
     Users, Search, Plus, X, Phone, Mail, MapPin,
     CheckCircle2, Edit3, Trash2, Calendar, Shield,
     UserCircle, ShieldCheck, Building2, TrendingUp,
-    ToggleLeft, ToggleRight, Settings, Loader2, AlertTriangle
+    ToggleLeft, ToggleRight, Settings, Loader2, AlertTriangle,
+    Lock, Sparkles
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useMemo, useEffect, useCallback } from "react";
@@ -16,6 +17,7 @@ import {
     ROLES, UNITS, blankStaff,
     fetchStaff, createStaff, updateStaff, deleteStaff
 } from "@/lib/staffService";
+import { useSubscription } from "@/hooks/useSubscription";
 
 // ─── Toast ────────────────────────────────────────────────────────────────────
 interface Toast { id: number; message: string; type: "success" | "error" }
@@ -223,6 +225,16 @@ export default function TeamPage() {
     const [staffList, setStaffList] = useState<Staff[]>([]);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
+    const { plan, isEnterprise } = useSubscription();
+
+    // Plan limits
+    const USER_LIMITS = {
+        free: 1,
+        pro: 5,
+        enterprise: Infinity,
+    };
+    const currentLimit = USER_LIMITS[plan] || 1;
+    const isLimitReached = staffList.length >= currentLimit;
 
     // Toasts
     const [toasts, setToasts] = useState<Toast[]>([]);
@@ -266,6 +278,13 @@ export default function TeamPage() {
 
     const handleSave = async () => {
         if (!form.name) return;
+
+        // Final guard against plan limits for NEW staff
+        if (!editingId && isLimitReached) {
+            addToast(`Limite de ${currentLimit} colaboradores atingido no plano ${plan.toUpperCase()}. Faça upgrade!`, "error");
+            return;
+        }
+
         setSaving(true);
         try {
             if (editingId) {
@@ -386,12 +405,27 @@ export default function TeamPage() {
                                         <h1 className="text-3xl font-black text-brand-text tracking-tight">Gestão de Equipe</h1>
                                         <p className="text-brand-muted text-sm font-medium mt-1">Colaboradores, permissões de acesso e controle operacional</p>
                                     </motion.div>
-                                    <button
-                                        onClick={openNew}
-                                        className="px-5 py-2.5 bg-brand-primary text-white rounded-xl text-sm font-bold hover:bg-brand-primaryHover transition-all shadow-lg shadow-brand-primary/20 flex items-center gap-2 self-start md:self-auto"
-                                    >
-                                        <Plus className="size-4" /> Novo Colaborador
-                                    </button>
+
+                                    <div className="flex flex-col items-end gap-2">
+                                        <button
+                                            onClick={openNew}
+                                            disabled={isLimitReached}
+                                            className={`px-5 py-2.5 rounded-xl text-sm font-bold transition-all shadow-lg flex items-center gap-2 self-start md:self-auto ${isLimitReached
+                                                ? "bg-brand-darkBorder text-brand-muted cursor-not-allowed grayscale"
+                                                : "bg-brand-primary text-white hover:bg-brand-primaryHover shadow-brand-primary/20"
+                                                }`}
+                                        >
+                                            {isLimitReached ? <Lock className="size-4" /> : <Plus className="size-4" />}
+                                            Novo Colaborador
+                                        </button>
+
+                                        {isLimitReached && (
+                                            <p className="text-[10px] font-bold text-amber-500 bg-amber-500/10 px-2 py-1 rounded-lg border border-amber-500/20 flex items-center gap-1.5 animate-pulse">
+                                                <Sparkles className="size-3" />
+                                                Limite de {currentLimit} usuários no plano {plan.toUpperCase()} atingido
+                                            </p>
+                                        )}
+                                    </div>
                                 </header>
 
                                 {/* Stats Cards */}

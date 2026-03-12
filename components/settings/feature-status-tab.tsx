@@ -38,7 +38,7 @@ const FEATURES: FeatureModule[] = [
     { key: "finance", label: "Financeiro", description: "Controle de receitas, despesas e fluxo de caixa", icon: Wallet, iconColor: "text-green-500 bg-green-500/10", requiredPlan: "pro" },
     { key: "reports", label: "Relatórios & BI", description: "Análises detalhadas, dashboards gerenciais e exportação de dados", icon: BarChart3, iconColor: "text-amber-500 bg-amber-500/10", requiredPlan: "enterprise" },
     { key: "team", label: "Equipe", description: "Gestão de colaboradores, turnos e produtividade", icon: UserCog, iconColor: "text-indigo-500 bg-indigo-500/10", requiredPlan: "pro" },
-    { key: "stock", label: "Estoque", description: "Controle de insumos, alertas de reposição e movimentações", icon: Package, iconColor: "text-orange-500 bg-orange-500/10", requiredPlan: "enterprise" },
+    { key: "stock", label: "Estoque", description: "Controle de insumos, alertas de reposição e movimentações", icon: Package, iconColor: "text-orange-500 bg-orange-500/10", requiredPlan: "pro" },
     { key: "notifications", label: "Notificações Avançadas", description: "WhatsApp, SMS e notificações push para clientes", icon: Bell, iconColor: "text-cyan-500 bg-cyan-500/10", requiredPlan: "pro" },
 ];
 
@@ -264,11 +264,11 @@ export function FeatureStatusTab({ currentPlan }: FeatureStatusTabProps) {
                         <p className="text-sm text-brand-muted mb-8">Ideal para lavanderias que buscam automação e controle financeiro.</p>
 
                         <ul className="space-y-4 mb-8 flex-1">
-                            <li className="flex items-start gap-3"><Check className="size-4 text-brand-primary shrink-0 mt-0.5" /><span className="text-sm text-brand-text">Até 5 Usuários</span></li>
+                            <li className="flex items-start gap-3"><Check className="size-4 text-brand-primary shrink-0 mt-0.5" /><span className="text-sm text-brand-text">Até 3 Usuários</span></li>
                             <li className="flex items-start gap-3"><Check className="size-4 text-brand-primary shrink-0 mt-0.5" /><span className="text-sm text-brand-text">Etiquetagem QR (E-tags)</span></li>
-                            <li className="flex items-start gap-3"><Check className="size-4 text-brand-primary shrink-0 mt-0.5" /><span className="text-sm text-brand-text">Financeiro Completo</span></li>
-                            <li className="flex items-start gap-3"><Check className="size-4 text-brand-primary shrink-0 mt-0.5" /><span className="text-sm text-brand-text">Controle de Entregas</span></li>
-                            <li className="flex items-start gap-3"><Check className="size-4 text-brand-primary shrink-0 mt-0.5" /><span className="text-sm text-brand-text">Suporte WhatsApp</span></li>
+                            <li className="flex items-start gap-3"><Check className="size-4 text-brand-primary shrink-0 mt-0.5" /><span className="text-sm text-brand-text">Financeiro e Controle de Caixa</span></li>
+                            <li className="flex items-start gap-3"><Check className="size-4 text-brand-primary shrink-0 mt-0.5" /><span className="text-sm text-brand-text">Controle de Estoque</span></li>
+                            <li className="flex items-start gap-4"><Check className="size-4 text-brand-primary shrink-0 mt-0.5" /><span className="text-sm text-brand-text">Suporte WhatsApp</span></li>
                         </ul>
                     </div>
 
@@ -290,7 +290,7 @@ export function FeatureStatusTab({ currentPlan }: FeatureStatusTabProps) {
                             <li className="flex items-start gap-3"><Check className="size-4 text-brand-primary shrink-0 mt-0.5" /><span className="text-sm text-brand-text">Usuários Ilimitados</span></li>
                             <li className="flex items-start gap-3"><Check className="size-4 text-brand-primary shrink-0 mt-0.5" /><span className="text-sm text-brand-text">Relatórios BI e Avançados</span></li>
                             <li className="flex items-start gap-3"><Check className="size-4 text-brand-primary shrink-0 mt-0.5" /><span className="text-sm text-brand-text">Gestão Multi-unidades</span></li>
-                            <li className="flex items-start gap-3"><Check className="size-4 text-brand-primary shrink-0 mt-0.5" /><span className="text-sm text-brand-text">Estoque e API Aberta</span></li>
+                            <li className="flex items-start gap-3"><Check className="size-4 text-brand-primary shrink-0 mt-0.5" /><span className="text-sm text-brand-text">API Aberta</span></li>
                             <li className="flex items-start gap-3"><Check className="size-4 text-brand-primary shrink-0 mt-0.5" /><span className="text-sm text-brand-text">Gerente de Contas</span></li>
                         </ul>
 

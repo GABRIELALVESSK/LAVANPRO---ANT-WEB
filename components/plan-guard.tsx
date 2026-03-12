@@ -76,8 +76,9 @@ export function PlanGuard({ children, moduleName, requiredPlan = 'pro' }: PlanGu
                             </div>
                             <ul className="space-y-3 mb-6">
                                 <li className="flex items-center gap-3"><Check className="size-4 text-emerald-500" /><span className="text-sm font-medium text-brand-text">Acesso a Etiquetas QR (E-tags)</span></li>
-                                <li className="flex items-center gap-3"><Check className="size-4 text-emerald-500" /><span className="text-sm font-medium text-brand-text">Gestão Financeira e Relatórios Completos</span></li>
-                                <li className="flex items-center gap-3"><Check className="size-4 text-emerald-500" /><span className="text-sm font-medium text-brand-text">Até 5 Usuários e Equipe</span></li>
+                                <li className="flex items-center gap-3"><Check className="size-4 text-emerald-500" /><span className="text-sm font-medium text-brand-text">Gestão Financeira e Fluxo de Caixa</span></li>
+                                <li className="flex items-center gap-3"><Check className="size-4 text-emerald-500" /><span className="text-sm font-medium text-brand-text">Módulo de Estoque e Insumos</span></li>
+                                <li className="flex items-center gap-3"><Check className="size-4 text-emerald-500" /><span className="text-sm font-medium text-brand-text">Até 3 Usuários e Equipe</span></li>
                             </ul>
                         </div>
                         <div className="w-full md:w-auto shrink-0 flex flex-col items-center">
@@ -105,8 +106,9 @@ export function PlanGuard({ children, moduleName, requiredPlan = 'pro' }: PlanGu
                             </div>
                             <ul className="space-y-3 mb-6">
                                 <li className="flex items-center gap-3"><Check className="size-4 text-emerald-500" /><span className="text-sm font-medium text-brand-text">Usuários Ilimitados</span></li>
-                                <li className="flex items-center gap-3"><Check className="size-4 text-emerald-500" /><span className="text-sm font-medium text-brand-text">Módulo de Estoque e Insumos</span></li>
+                                <li className="flex items-center gap-3"><Check className="size-4 text-emerald-500" /><span className="text-sm font-medium text-brand-text">Relatórios BI e Insights Avançados</span></li>
                                 <li className="flex items-center gap-3"><Check className="size-4 text-emerald-500" /><span className="text-sm font-medium text-brand-text">Múltiplas lojas e API</span></li>
+                                <li className="flex items-center gap-3"><Check className="size-4 text-emerald-500" /><span className="text-sm font-medium text-brand-text">Suporte prioritário 24/7</span></li>
                             </ul>
                         </div>
                         <div className="w-full md:w-auto shrink-0 flex flex-col items-center">

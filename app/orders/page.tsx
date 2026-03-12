@@ -116,7 +116,7 @@ export default function OrdersPage() {
         setNewOrder(n => {
             const items = [...n.items];
             if (field === "service") {
-                const svc = SERVICES.find(s => s.name === value);
+                const svc = currentServices.find(s => s.name === value);
                 items[idx] = { ...items[idx], service: value as string, unitPrice: svc?.price ?? items[idx].unitPrice };
             } else {
                 items[idx] = { ...items[idx], [field]: Number(value) };
@@ -147,18 +147,85 @@ export default function OrdersPage() {
         setNewOrder({ client: "", phone: "", email: "", address: "", delivery: "Entrega em Domicílio", paymentMethod: "PIX", paymentStatus: "A Pagar", estimatedDelivery: "", observations: "", items: [{ ...blankItem }] });
     };
 
+    const [realServices, setRealServices] = useState<any[]>([]);
+
+    useEffect(() => {
+        const savedServices = localStorage.getItem("lavanpro_services_pro");
+        if (savedServices) {
+            try { setRealServices(JSON.parse(savedServices)); } catch { }
+        }
+    }, []);
+
+    const currentServices = realServices.length > 0 ? realServices : SERVICES;
+
     const handleStatusChange = (statusOption: string) => {
         if (!selectedOrder) return;
 
         const cfg = STATUS_CONFIG[statusOption];
         const now = new Date().toTimeString().slice(0, 5);
+
+        // --- MOTOR DE BAIXA DE ESTOQUE ---
+        // Gatilho: Quando entra em "Em Lavagem" e ainda não foi debitado
+        if (statusOption === "Em Lavagem" && !(selectedOrder as any).stockDeducted) {
+            const savedStockProducts = localStorage.getItem("lavanpro_stock_products_v2");
+            const savedStockMovements = localStorage.getItem("lavanpro_stock_movements_v2");
+
+            if (savedStockProducts) {
+                try {
+                    let products = JSON.parse(savedStockProducts);
+                    let movements = savedStockMovements ? JSON.parse(savedStockMovements) : [];
+                    let hasStockIssue = false;
+
+                    selectedOrder.items.forEach(item => {
+                        const service = realServices.find(s => s.name === item.service);
+                        if (service && service.recipe && service.recipe.length > 0) {
+                            service.recipe.forEach((recipeItem: any) => {
+                                const productIdx = products.findIndex((p: any) => p.id === recipeItem.productId);
+                                if (productIdx !== -1) {
+                                    const totalQtyToDeduct = recipeItem.quantity * item.qty;
+
+                                    // Registra Movimentação de Saída
+                                    const newMovement = {
+                                        id: `MOV-AUTO-${Date.now()}-${Math.random().toString(36).slice(-4)}`,
+                                        date: new Date().toISOString().slice(0, 10),
+                                        type: "SAIDA",
+                                        productId: recipeItem.productId,
+                                        quantity: totalQtyToDeduct,
+                                        unitCost: products[productIdx].unitCost,
+                                        reason: `Consumo Pedido ${selectedOrder.id}`,
+                                        user: "Sistema (Automação)"
+                                    };
+                                    movements.unshift(newMovement);
+
+                                    // Atualiza Estoque Atual
+                                    products[productIdx].currentStock = Math.max(0, products[productIdx].currentStock - totalQtyToDeduct);
+                                }
+                            });
+                        }
+                    });
+
+                    // Persiste as alterações no estoque
+                    localStorage.setItem("lavanpro_stock_products_v2", JSON.stringify(products));
+                    localStorage.setItem("lavanpro_stock_movements_v2", JSON.stringify(movements));
+
+                    // Marca o pedido como debitado para não repetir a lógica
+                    (selectedOrder as any).stockDeducted = true;
+
+                    // Notifica a UI de estoque através do evento de storage
+                    window.dispatchEvent(new Event("storage"));
+                } catch (e) {
+                    console.error("Erro na automação de estoque:", e);
+                }
+            }
+        }
+
         const updated: Order = {
             ...selectedOrder,
             status: statusOption,
             progress: cfg?.progress ?? selectedOrder.progress,
             bgColor: cfg?.bg ?? selectedOrder.bgColor,
             textColor: cfg?.textColor ?? selectedOrder.textColor,
-            history: [...selectedOrder.history, { time: now, status: statusOption, note: "" }],
+            history: [...selectedOrder.history, { time: now, status: statusOption, note: statusOption === "Em Lavagem" ? "Iniciado processo e estoque baixado." : "" }],
         };
         setSelectedOrder(updated);
         setIsStatusDropdown(false);
@@ -412,7 +479,7 @@ export default function OrdersPage() {
                                                 <div key={idx} className="flex gap-2 items-center bg-brand-bg border border-brand-darkBorder rounded-xl p-3">
                                                     <select value={item.service} onChange={e => handleItemChange(idx, "service", e.target.value)}
                                                         className="flex-1 bg-transparent text-sm font-semibold text-brand-text outline-none appearance-none cursor-pointer">
-                                                        {SERVICES.map(s => <option key={s.name} value={s.name} className="bg-brand-card">{s.name}</option>)}
+                                                        {currentServices.map(s => <option key={s.name} value={s.name} className="bg-brand-card">{s.name}</option>)}
                                                     </select>
                                                     <input type="number" min={1} value={item.qty} onChange={e => handleItemChange(idx, "qty", e.target.value)}
                                                         className="w-14 text-center bg-brand-card border border-brand-darkBorder rounded-lg text-sm font-bold text-brand-text outline-none focus:ring-2 focus:ring-brand-primary py-1" />

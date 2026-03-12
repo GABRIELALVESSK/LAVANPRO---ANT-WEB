@@ -15,7 +15,11 @@ import {
   AlertTriangle,
   Truck,
   ArrowRight,
+  Lock,
+  Crown
 } from "lucide-react";
+import { useSubscription } from "@/hooks/useSubscription";
+import { PlanGuard } from "@/components/plan-guard";
 
 const operationalData = [
   { label: "Em Lavagem", value: 8, icon: Activity, color: "text-blue-500", bg: "bg-blue-500/10", dot: "bg-blue-500" },
@@ -26,6 +30,7 @@ const operationalData = [
 ];
 
 export default function Page() {
+  const { plan, isEnterprise } = useSubscription();
   const [activeRange, setActiveRange] = useState("30d");
   const [customDates, setCustomDates] = useState({
     start: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
@@ -91,11 +96,40 @@ export default function Page() {
             {/* Main Chart */}
             <MainChart activeRange={activeRange} customDates={customDates} />
 
-            {/* Donut + Bar side by side */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              <DonutChart activeRange={activeRange} customDates={customDates} />
-              <BarChart activeRange={activeRange} customDates={customDates} />
-            </div>
+            {/* Dashboard BI - Enterprise Only Section */}
+            <section className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm font-bold text-brand-muted uppercase tracking-widest flex items-center gap-2">
+                  Análise deBI e Mix de Produtos
+                  {!isEnterprise && <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-500/10 text-slate-400 text-[9px] font-black border border-brand-darkBorder uppercase"><Crown className="size-2.5" /> Enterprise</span>}
+                </h2>
+              </div>
+
+              <div className="relative">
+                {!isEnterprise && (
+                  <div className="absolute inset-0 z-10 bg-brand-bg/60 backdrop-blur-[2px] rounded-3xl flex flex-col items-center justify-center border-2 border-dashed border-brand-darkBorder group">
+                    <div className="p-4 bg-brand-card rounded-2xl border border-brand-darkBorder shadow-2xl text-center max-w-xs animate-in zoom-in-95 duration-300">
+                      <div className="size-12 bg-amber-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <Lock className="size-6 text-amber-500" />
+                      </div>
+                      <h3 className="text-sm font-bold text-brand-text mb-1 text-center">Gráficos Avançados Bloqueados</h3>
+                      <p className="text-[11px] text-brand-muted mb-4 text-center">A análise detalhada de mix de produtos e performance por período é exclusiva para assinantes Enterprise.</p>
+                      <button
+                        onClick={() => window.location.href = '/settings?tab=status'}
+                        className="px-4 py-2 bg-brand-primary text-white text-[10px] font-black rounded-lg hover:bg-brand-primaryHover transition-all flex items-center gap-2 mx-auto"
+                      >
+                        Fazer Upgrade Agora <ArrowRight className="size-3" />
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                <div className={`grid grid-cols-1 lg:grid-cols-2 gap-8 ${!isEnterprise ? 'opacity-20 pointer-events-none grayscale' : ''}`}>
+                  <DonutChart activeRange={activeRange} customDates={customDates} />
+                  <BarChart activeRange={activeRange} customDates={customDates} />
+                </div>
+              </div>
+            </section>
 
             {/* Transaction Table */}
             <TransactionTable activeRange={activeRange} customDates={customDates} />

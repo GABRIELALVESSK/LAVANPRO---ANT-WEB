@@ -2,7 +2,8 @@
 
 import { AccessGuard } from "@/components/access-guard";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/lib/supabase";
 import { Sidebar } from "@/components/sidebar";
@@ -15,6 +16,7 @@ import { OperationalPrefsTab } from "@/components/settings/operational-prefs-tab
 import { SystemParamsTab } from "@/components/settings/system-params-tab";
 import { FeatureStatusTab } from "@/components/settings/feature-status-tab";
 import { motion, AnimatePresence } from "framer-motion";
+import { CheckCircle2 } from "lucide-react";
 import type { SettingsTab } from "@/components/settings/settings-sidebar";
 import type { CompanyFormData } from "@/components/settings/company-data-tab";
 import type { UnitFormData } from "@/components/settings/unit-data-tab";
@@ -34,15 +36,67 @@ const DEFAULT_OPENING_HOURS: Record<string, { open: string; close: string; activ
   sun: { open: "08:00", close: "12:00", active: false },
 };
 
-export default function SettingsPage() {
+function PaymentSuccessModal({ onClose, plan }: { onClose: () => void; plan: string }) {
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.9, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.9, y: 20 }}
+        className="bg-brand-card w-full max-w-md rounded-3xl border border-brand-primary/30 shadow-2xl p-8 text-center relative overflow-hidden"
+      >
+        {/* Animated Background Glow */}
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-1/2 bg-brand-primary/20 blur-[80px] -z-10" />
+
+        <div className="mx-auto size-20 bg-emerald-500/10 rounded-full flex items-center justify-center mb-6 border border-emerald-500/20">
+          <motion.div
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ type: "spring", damping: 12, delay: 0.2 }}
+          >
+            <CheckCircle2 className="size-10 text-emerald-500" />
+          </motion.div>
+        </div>
+
+        <h2 className="text-2xl font-black text-brand-text mb-2">Pagamento Confirmado!</h2>
+        <p className="text-brand-muted text-sm mb-8">
+          Parabéns! Sua lavanderia agora está no plano <strong className="text-brand-primary uppercase">{plan}</strong>.
+          Todas as funcionalidades extras já estão liberadas para você.
+        </p>
+
+        <div className="space-y-3">
+          <button
+            onClick={onClose}
+            className="w-full py-3.5 bg-brand-primary text-white rounded-xl font-bold shadow-lg shadow-brand-primary/20 hover:bg-brand-primaryHover transition-all"
+          >
+            Começar a Usar
+          </button>
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
+function SettingsContent() {
   const [activeTab, setActiveTab] = useState<SettingsTab>("company");
   const [isSavingAll, setIsSavingAll] = useState(false);
   const [toasts, setToasts] = useState<{ id: string; message: string; type: "success" | "error" | "info" }[]>([]);
   const { user, loading } = useAuth();
+  const searchParams = useSearchParams();
+  const router = useRouter();
 
   const [currentPlan, setCurrentPlan] = useState<PlanTier>("free");
   const [planStatus, setPlanStatus] = useState<string>("trialing");
   const [trialEndsAt, setTrialEndsAt] = useState<Date | null>(null);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+
+  useEffect(() => {
+    if (searchParams.get("success") === "true") {
+      setShowSuccessModal(true);
+      // Limpa a URL para não mostrar o modal de novo no refresh
+      router.replace("/settings");
+    }
+  }, [searchParams, router]);
 
   const isAdmin =
     user?.user_metadata?.role === "owner" ||
@@ -304,5 +358,15 @@ export default function SettingsPage() {
         </div>
       </div>
     </AccessGuard>
+  );
+}
+
+export default function SettingsPage() {
+  return (
+    <Suspense fallback={<div className="h-screen bg-brand-bg flex items-center justify-center">
+      <div className="size-8 border-4 border-brand-primary/30 border-t-brand-primary rounded-full animate-spin"></div>
+    </div>}>
+      <SettingsContent />
+    </Suspense>
   );
 }
