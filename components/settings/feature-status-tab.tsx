@@ -244,23 +244,11 @@ export function FeatureStatusTab({ currentPlan }: FeatureStatusTabProps) {
                         <p className="text-sm text-brand-muted mb-8">Ideal para pequenas lavanderias ou iniciantes.</p>
 
                         <ul className="space-y-4 mb-8 flex-1">
-                            <li className="flex items-start gap-3"><Check className="size-4 text-brand-primary shrink-0 mt-0.5" /><span className="text-sm text-brand-text">Gestão básica</span></li>
-                            <li className="flex items-start gap-3"><Check className="size-4 text-brand-primary shrink-0 mt-0.5" /><span className="text-sm text-brand-text">1 Usuário</span></li>
-                            <li className="flex items-start gap-3"><Check className="size-4 text-brand-primary shrink-0 mt-0.5" /><span className="text-sm text-brand-text">Controle de caixa</span></li>
-                            <li className="flex items-start gap-3"><Check className="size-4 text-brand-primary shrink-0 mt-0.5" /><span className="text-sm text-brand-text">Suporte via email</span></li>
+                            <li className="flex items-start gap-3"><Check className="size-4 text-brand-primary shrink-0 mt-0.5" /><span className="text-sm text-brand-text">Gestão de Pedidos</span></li>
+                            <li className="flex items-start gap-3"><Check className="size-4 text-brand-primary shrink-0 mt-0.5" /><span className="text-sm text-brand-text">1 Usuário / 1 Unidade</span></li>
+                            <li className="flex items-start gap-3"><Check className="size-4 text-brand-primary shrink-0 mt-0.5" /><span className="text-sm text-brand-text">Controle de Caixa</span></li>
+                            <li className="flex items-start gap-3"><Check className="size-4 text-brand-primary shrink-0 mt-0.5" /><span className="text-sm text-brand-text">Suporte via E-mail</span></li>
                         </ul>
-
-                        <button
-                            onClick={() => handleUpgrade('free')}
-                            disabled={isUpdating || currentPlan === 'free'}
-                            className={`w-full py-3 px-4 rounded-xl font-bold text-sm transition-colors flex items-center justify-center gap-2 disabled:opacity-50 ${currentPlan === 'free' ? 'bg-brand-primary/20 text-brand-primary cursor-not-allowed border border-brand-primary/30' :
-                                planRank['free'] < planRank[currentPlan] ? 'bg-rose-500/10 text-rose-500 border border-rose-500/30 hover:bg-rose-500/20' :
-                                    'bg-brand-bg text-white border border-brand-darkBorder hover:bg-white/5'
-                                }`}
-                        >
-                            {currentPlan === 'free' ? 'Plano Atual' :
-                                planRank['free'] < planRank[currentPlan] ? <><ArrowDown className="size-4" /> Downgrade para Starter</> : 'Assinar Starter'}
-                        </button>
                     </div>
 
                     {/* Profissional */}
@@ -276,26 +264,12 @@ export function FeatureStatusTab({ currentPlan }: FeatureStatusTabProps) {
                         <p className="text-sm text-brand-muted mb-8">Ideal para lavanderias que buscam automação e controle financeiro.</p>
 
                         <ul className="space-y-4 mb-8 flex-1">
-                            <li className="flex items-start gap-3"><Check className="size-4 text-brand-primary shrink-0 mt-0.5" /><span className="text-sm text-brand-text">Tudo do Starter</span></li>
-                            <li className="flex items-start gap-3"><Check className="size-4 text-brand-primary shrink-0 mt-0.5" /><span className="text-sm text-brand-text">Ate 5 Usuários</span></li>
-                            <li className="flex items-start gap-3"><Check className="size-4 text-brand-primary shrink-0 mt-0.5" /><span className="text-sm text-brand-text">Etiquetas QR (E-tags)</span></li>
+                            <li className="flex items-start gap-3"><Check className="size-4 text-brand-primary shrink-0 mt-0.5" /><span className="text-sm text-brand-text">Até 5 Usuários</span></li>
+                            <li className="flex items-start gap-3"><Check className="size-4 text-brand-primary shrink-0 mt-0.5" /><span className="text-sm text-brand-text">Etiquetagem QR (E-tags)</span></li>
                             <li className="flex items-start gap-3"><Check className="size-4 text-brand-primary shrink-0 mt-0.5" /><span className="text-sm text-brand-text">Financeiro Completo</span></li>
                             <li className="flex items-start gap-3"><Check className="size-4 text-brand-primary shrink-0 mt-0.5" /><span className="text-sm text-brand-text">Controle de Entregas</span></li>
                             <li className="flex items-start gap-3"><Check className="size-4 text-brand-primary shrink-0 mt-0.5" /><span className="text-sm text-brand-text">Suporte WhatsApp</span></li>
                         </ul>
-
-                        <button
-                            onClick={() => handleUpgrade('pro')}
-                            disabled={isUpdating || currentPlan === 'pro'}
-                            className={`w-full py-3 px-4 rounded-xl font-bold text-sm transition-colors flex items-center justify-center gap-2 shadow-lg disabled:opacity-50 ${currentPlan === 'pro' ? 'bg-brand-primary/20 text-brand-primary cursor-not-allowed shadow-none border border-brand-primary/30' :
-                                planRank['pro'] < planRank[currentPlan] ? 'bg-rose-500/10 text-rose-500 border border-rose-500/30 hover:bg-rose-500/20 shadow-none' :
-                                    'bg-brand-primary text-white hover:bg-brand-primaryHover shadow-brand-primary/20'
-                                }`}
-                        >
-                            {currentPlan === 'pro' ? 'Plano Atual' :
-                                isUpdating ? 'Aguarde...' :
-                                    planRank['pro'] < planRank[currentPlan] ? <><ArrowDown className="size-4" /> Downgrade para Profissional</> : <><ArrowUp className="size-4" /> Faça Upgrade de Plano</>}
-                        </button>
                     </div>
 
                     {/* Enterprise */}
@@ -313,11 +287,11 @@ export function FeatureStatusTab({ currentPlan }: FeatureStatusTabProps) {
                         <p className="text-sm text-brand-muted mb-8">Para redes e grandes operações que buscam escala e BI.</p>
 
                         <ul className="space-y-4 mb-8 flex-1">
-                            <li className="flex items-start gap-3"><Check className="size-4 text-brand-primary shrink-0 mt-0.5" /><span className="text-sm text-brand-text">Tudo do Profissional</span></li>
                             <li className="flex items-start gap-3"><Check className="size-4 text-brand-primary shrink-0 mt-0.5" /><span className="text-sm text-brand-text">Usuários Ilimitados</span></li>
                             <li className="flex items-start gap-3"><Check className="size-4 text-brand-primary shrink-0 mt-0.5" /><span className="text-sm text-brand-text">Relatórios BI e Avançados</span></li>
                             <li className="flex items-start gap-3"><Check className="size-4 text-brand-primary shrink-0 mt-0.5" /><span className="text-sm text-brand-text">Gestão Multi-unidades</span></li>
                             <li className="flex items-start gap-3"><Check className="size-4 text-brand-primary shrink-0 mt-0.5" /><span className="text-sm text-brand-text">Estoque e API Aberta</span></li>
+                            <li className="flex items-start gap-3"><Check className="size-4 text-brand-primary shrink-0 mt-0.5" /><span className="text-sm text-brand-text">Gerente de Contas</span></li>
                         </ul>
 
                         <button
