@@ -48,7 +48,6 @@ export function useSubscription(): SubscriptionData {
 
                 if (error) {
                     console.error("Error fetching subscription:", error);
-                    // Fallback gracefully
                     return;
                 }
 
@@ -62,7 +61,7 @@ export function useSubscription(): SubscriptionData {
                         status: currentStatus,
                         trialEnd: sub.trial_end ? new Date(sub.trial_end) : null,
                         isStarter: currentPlan === 'free',
-                        isPro: currentPlan === 'pro' || currentPlan === 'enterprise', // Pro features include Enterprise
+                        isPro: currentPlan === 'pro' || currentPlan === 'enterprise',
                         isEnterprise: currentPlan === 'enterprise',
                         isTrialing: currentStatus === 'trialing',
                     });
@@ -78,8 +77,13 @@ export function useSubscription(): SubscriptionData {
 
         fetchSubscription();
 
+        // Listen for refresh events
+        const handleRefresh = () => fetchSubscription();
+        window.addEventListener('refresh-subscription', handleRefresh);
+
         return () => {
             isMounted = false;
+            window.removeEventListener('refresh-subscription', handleRefresh);
         };
     }, [user, authLoading]);
 

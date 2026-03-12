@@ -7,7 +7,7 @@ import {
     QrCode, Search, Printer, Tag, History,
     CheckCircle2, ChevronRight, SearchCode,
     PackageX, User, Cpu, X, Link2, Unlink2,
-    AlertCircle, CheckCheck, Clock
+    AlertCircle, CheckCheck, Clock, Trash2
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useMemo, useEffect, useCallback, Suspense } from "react";
@@ -127,18 +127,20 @@ function PrintModal({ label, order, onClose }: { label: ReusableLabel; order: Mo
 
     const handlePrint = () => {
         setPrinting(true);
+        // Pequeno delay para garantir que o DOM está pronto com as classes de impressão
         setTimeout(() => {
             window.print();
             setPrinting(false);
-            // OnClose is omitted to let user see it sent
-        }, 500);
+        }, 100);
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm print:hidden">
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm print:bg-white print:p-0 print:backdrop-blur-none">
             <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                className="bg-brand-card w-full max-w-sm rounded-2xl border border-brand-darkBorder shadow-2xl flex flex-col overflow-hidden relative">
-                <div className="p-4 border-b border-brand-darkBorder bg-white/5 space-y-4">
+                className="bg-brand-card w-full max-w-sm rounded-2xl border border-brand-darkBorder shadow-2xl flex flex-col overflow-hidden relative print:border-none print:shadow-none print:w-auto print:max-w-none print:rounded-none">
+
+                {/* Header - Hidden on print */}
+                <div className="p-4 border-b border-brand-darkBorder bg-white/5 space-y-4 print:hidden">
                     <div className="flex justify-between items-center">
                         <h3 className="text-sm font-bold text-brand-text flex items-center gap-2">
                             <Printer className="size-4 text-brand-primary" /> Visualização de Impressão
@@ -164,14 +166,14 @@ function PrintModal({ label, order, onClose }: { label: ReusableLabel; order: Mo
                     )}
                 </div>
 
-                <div className="p-6 flex justify-center bg-zinc-950 overflow-y-auto max-h-[500px] custom-scrollbar">
-                    {/* Visual Preview */}
-                    <div id="printable-content" className="bg-white text-black p-6 w-[80mm] min-h-[80mm] shadow-sm text-center space-y-4 font-mono uppercase">
+                {/* Preview Area - Visible on print */}
+                <div className="p-6 flex justify-center bg-zinc-950 overflow-y-auto max-h-[500px] custom-scrollbar print:bg-white print:p-0 print:overflow-visible print:max-h-none">
+                    <div id="printable-content" className="bg-white text-black p-6 w-[80mm] min-h-[80mm] shadow-sm text-center space-y-4 font-mono uppercase print:shadow-none print:w-[80mm] print:p-5 print:m-0">
                         {printType === "label" ? (
-                            <div className="space-y-4 py-4 border-2 border-black p-4">
+                            <div className="space-y-4 py-4 border-2 border-black p-4 print:border-2">
                                 <h4 className="font-black text-2xl leading-none italic">LavanPro</h4>
-                                <div className="bg-black text-white rounded-lg py-4 border-4 border-black">
-                                    <span className="text-7xl font-black tracking-tighter">{label.displayNumber}</span>
+                                <div className="bg-black text-white rounded-lg py-3 border-4 border-black print:bg-black print:text-white">
+                                    <span className="text-6xl font-black tracking-tighter">{label.displayNumber}</span>
                                 </div>
                                 <div className="flex items-center justify-center p-2">
                                     <QRCode value={label.code} size={140} />
@@ -239,7 +241,8 @@ function PrintModal({ label, order, onClose }: { label: ReusableLabel; order: Mo
                     </div>
                 </div>
 
-                <div className="p-4 border-t border-brand-darkBorder bg-white/5">
+                {/* Footer - Hidden on print */}
+                <div className="p-4 border-t border-brand-darkBorder bg-white/5 print:hidden">
                     <button onClick={handlePrint} disabled={printing}
                         className="w-full py-3 bg-brand-primary text-white rounded-xl font-bold hover:opacity-90 transition-all shadow-lg flex items-center justify-center gap-2">
                         {printing ? (
@@ -251,6 +254,31 @@ function PrintModal({ label, order, onClose }: { label: ReusableLabel; order: Mo
                     <p className="text-[10px] text-center text-brand-muted mt-3 font-medium">Compatível com impressoras térmicas de 58mm/80mm.</p>
                 </div>
             </motion.div>
+
+            <style jsx global>{`
+                @media print {
+                    @page { margin: 0; size: auto; }
+                    html, body {
+                        background: #fff !important;
+                        height: auto !important;
+                        overflow: visible !important;
+                    }
+                    /* Esconde TUDO que não é o modal de impressão */
+                    body > *:not(.fixed.inset-0.z-50) {
+                        display: none !important;
+                    }
+                    #__next > *:not(.fixed.inset-0.z-50) {
+                        display: none !important;
+                    }
+                    /* Garante que o backdrop do modal fique branco no print e não oculte seus filhos */
+                    .fixed.inset-0.z-50 {
+                        background: white !important;
+                        position: absolute !important;
+                        display: block !important;
+                        overflow: visible !important;
+                    }
+                }
+            `}</style>
         </div>
     );
 }
@@ -387,10 +415,15 @@ function LabelsContent() {
             showToast("Não é possível deletar uma etiqueta em uso.", "error");
             return;
         }
-        if (window.confirm(`Tem certeza que deseja remover permanentemente a etiqueta ${label.code}?`)) {
+
+        // Simpler delete logic to avoid any issues with window.confirm
+        const confirmed = window.confirm(`Remover etiqueta ${label.code} permanentemente?`);
+        if (confirmed) {
             setLabels(prev => prev.filter(l => l.id !== labelId));
-            if (selectedLabel?.id === labelId) setSelectedLabel(null);
-            showToast(`Etiqueta ${label.code} removida com sucesso.`);
+            if (selectedLabel?.id === labelId) {
+                setSelectedLabel(null);
+            }
+            showToast(`Etiqueta ${label.code} removida.`);
         }
     };
 
@@ -632,11 +665,38 @@ function LabelsContent() {
                                                         const isSelected = selectedLabelState?.id === label.id;
                                                         const isAvail = label.status === "available";
                                                         return (
-                                                            <motion.button key={label.id}
-                                                                onClick={() => setSelectedLabel(label)}
+                                                            <motion.div key={label.id}
                                                                 initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }}
-                                                                className={`relative rounded-2xl border p-3 flex flex-col items-center gap-2 transition-all group text-left 
-                                                            ${isSelected ? "border-brand-primary bg-brand-primary/10 shadow-[0_0_20px_rgba(139,92,246,0.15)]" : "border-brand-darkBorder bg-brand-bg hover:border-brand-primary/40 hover:bg-white/3"}`}>
+                                                                className={`relative rounded-2xl border p-3 flex flex-col items-center gap-2 transition-all group cursor-pointer
+                                                            ${isSelected ? "border-brand-primary bg-brand-primary/10 shadow-[0_0_20px_rgba(139,92,246,0.15)]" : "border-brand-darkBorder bg-brand-bg hover:border-brand-primary/40 hover:bg-white/3"}`}
+                                                                onClick={() => setSelectedLabel(label)}>
+
+                                                                {/* Botões de Ação (Ajustados para z-index correto e tamanho menor) */}
+                                                                <div className="absolute top-1 left-1 flex gap-1 z-10">
+                                                                    {isAvail && (
+                                                                        <button
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                deleteLabel(label.id);
+                                                                            }}
+                                                                            className="size-6 rounded-md bg-rose-500 text-white flex items-center justify-center hover:bg-rose-600 shadow-md transition-all active:scale-90"
+                                                                            title="Excluir"
+                                                                        >
+                                                                            <Trash2 className="size-3" />
+                                                                        </button>
+                                                                    )}
+                                                                    <button
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            setPrintLabel(label);
+                                                                        }}
+                                                                        className="size-6 rounded-md bg-brand-primary text-white flex items-center justify-center hover:bg-brand-primaryHover shadow-md transition-all active:scale-90"
+                                                                        title="Imprimir"
+                                                                    >
+                                                                        <Printer className="size-3" />
+                                                                    </button>
+                                                                </div>
+
                                                                 {/* Status pill */}
                                                                 <div className={`absolute top-2 right-2 size-2.5 rounded-full ${isAvail ? "bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.6)]" : "bg-brand-primary shadow-[0_0_6px_rgba(139,92,246,0.6)]"}`} />
                                                                 {/* Tag Number */}
@@ -652,20 +712,7 @@ function LabelsContent() {
                                                                     <p className="text-[9px] font-bold text-brand-primary bg-brand-primary/10 rounded-md px-2 py-0.5 truncate max-w-full">{ord.id}</p>
                                                                 )}
                                                                 {isAvail && <p className="text-[9px] font-bold text-emerald-400 bg-emerald-500/10 rounded-md px-2 py-0.5">Disponível</p>}
-
-                                                                <div className="flex items-center gap-3 mt-auto opacity-0 group-hover:opacity-100 transition-opacity">
-                                                                    <button onClick={e => { e.stopPropagation(); setPrintLabel(label); }}
-                                                                        className="text-[9px] font-bold text-brand-muted hover:text-brand-primary flex items-center gap-1 transition-colors">
-                                                                        <Printer className="size-3" /> Imprimir
-                                                                    </button>
-                                                                    {isAvail && (
-                                                                        <button onClick={e => { e.stopPropagation(); deleteLabel(label.id); }}
-                                                                            className="text-[9px] font-bold text-brand-muted hover:text-rose-400 flex items-center gap-1 transition-colors">
-                                                                            <X className="size-3" /> Deletar
-                                                                        </button>
-                                                                    )}
-                                                                </div>
-                                                            </motion.button>
+                                                            </motion.div>
                                                         );
                                                     })}
                                                 </AnimatePresence>
@@ -698,8 +745,26 @@ function LabelsContent() {
                                                                 {selectedLabelState.status === "available" ? <><CheckCircle2 className="size-3" /> Disponível</> : <><Link2 className="size-3" /> Em Uso</>}
                                                             </div>
                                                         </div>
-                                                        <div className="bg-white p-1.5 rounded-xl shrink-0">
-                                                            <QRCode value={selectedLabelState.code} size={64} />
+                                                        <div className="flex flex-col items-end gap-3 shrink-0">
+                                                            <div className="bg-white p-2 rounded-2xl shadow-inner">
+                                                                <QRCode value={selectedLabelState.code} size={60} />
+                                                            </div>
+                                                            <div className="flex gap-2">
+                                                                {selectedLabelState.status === "available" && (
+                                                                    <button
+                                                                        onClick={() => deleteLabel(selectedLabelState.id)}
+                                                                        className="h-10 px-4 rounded-xl bg-rose-500/10 text-rose-500 hover:bg-rose-500 hover:text-white transition-all border border-rose-500/20 flex items-center gap-2 font-bold text-xs"
+                                                                    >
+                                                                        <Trash2 className="size-4" /> EXCLUIR
+                                                                    </button>
+                                                                )}
+                                                                <button
+                                                                    onClick={() => setPrintLabel(selectedLabelState)}
+                                                                    className="h-10 px-5 rounded-xl bg-brand-primary text-white shadow-lg shadow-brand-primary/20 hover:opacity-90 transition-all flex items-center gap-2 font-black text-xs tracking-wider"
+                                                                >
+                                                                    <Printer className="size-4" /> IMPRIMIR TAG
+                                                                </button>
+                                                            </div>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -827,7 +892,7 @@ function LabelsContent() {
                 {/* Scan Action Modal */}
                 <AnimatePresence>
                     {scanLabelState && (
-                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+                        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
                             <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }}
                                 className="bg-brand-card w-full max-w-lg rounded-2xl border border-brand-primary/50 shadow-2xl flex flex-col overflow-hidden">
                                 {/* Modal Header */}
@@ -870,7 +935,8 @@ function LabelsContent() {
                                                     className="w-full py-3 bg-brand-primary text-white rounded-xl font-bold hover:opacity-90 transition-all flex items-center justify-center gap-2 disabled:opacity-40">
                                                     <Link2 className="size-4" /> Vincular
                                                 </button>
-                                            </div>                            </>
+                                            </div>
+                                        </>
                                     ) : scanOrder ? (
                                         <>
                                             <div className="bg-brand-bg border border-brand-darkBorder rounded-2xl p-4 space-y-2">
@@ -891,7 +957,7 @@ function LabelsContent() {
                                             <div>
                                                 <p className="text-xs font-bold uppercase tracking-wider text-brand-muted mb-2">Avançar para qual etapa?</p>
                                                 <div className="grid grid-cols-3 gap-2">
-                                                    {PRODUCTION_STAGES.filter(s => s !== scanOrder.status).map(stage => (
+                                                    {(["Recebido", "Em Triagem", "Em Lavagem", "Em Secagem", "Em Finalização", "Pronto"] as OrderStatus[]).filter(s => s !== scanOrder.status).map(stage => (
                                                         <button key={stage} onClick={() => {
                                                             handleStageAdvancement(scanLabelState, scanOrder, stage);
                                                             setScanModal(null);
@@ -910,9 +976,13 @@ function LabelsContent() {
                                     ) : null}
                                 </div>
 
-                                <div className="p-4 border-t border-brand-darkBorder bg-white/5 flex justify-end">
+                                <div className="p-4 border-t border-brand-darkBorder bg-white/5 flex justify-between items-center gap-3">
+                                    <button onClick={() => { setPrintLabel(scanLabelState); setScanModal(null); }}
+                                        className="flex items-center gap-2 px-4 py-2.5 bg-brand-primary text-white rounded-xl text-sm font-bold shadow-lg hover:opacity-90 transition-all">
+                                        <Printer className="size-4" /> IMPRIMIR ETIQUETA
+                                    </button>
                                     <button onClick={() => { setScanModal(null); setLinkOrderId(""); }}
-                                        className="px-4 py-2 bg-brand-bg border border-brand-darkBorder rounded-xl text-sm font-bold text-brand-muted hover:text-white transition-colors">
+                                        className="px-4 py-2.5 bg-brand-bg border border-brand-darkBorder rounded-xl text-sm font-bold text-brand-muted hover:text-white transition-colors">
                                         Fechar
                                     </button>
                                 </div>
@@ -924,7 +994,7 @@ function LabelsContent() {
                 {/* Camera Scanner Modal */}
                 <AnimatePresence>
                     {isCameraActive && (
-                        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/95 backdrop-blur-md">
+                        <div className="fixed inset-0 z-[210] flex items-center justify-center p-4 bg-black/95 backdrop-blur-md">
                             <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }}
                                 className="bg-brand-card w-full max-w-lg rounded-3xl border border-brand-primary/30 overflow-hidden relative shadow-2xl">
                                 <div className="p-6 border-b border-brand-darkBorder flex items-center justify-between">
@@ -945,7 +1015,7 @@ function LabelsContent() {
                                         className="w-full h-full object-cover"
                                         onUserMedia={() => {
                                             const codeReader = new BrowserMultiFormatReader();
-                                            const videoElement = document.querySelector('video') as HTMLVideoElement;
+                                            const videoElement = document.querySelector('video');
                                             if (videoElement) {
                                                 (codeReader as any).decodeFromVideoElement(videoElement, (result: any) => {
                                                     if (result) handleCameraScan(result.getText());
@@ -978,8 +1048,8 @@ function LabelsContent() {
                 <AnimatePresence>
                     {toast && (
                         <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 30 }}
-                            className={`fixed bottom-6 right-6 z-50 flex items-center gap-3 px-5 py-3 rounded-2xl shadow-xl border text-sm font-bold max-w-sm
-                        ${toast.type === "success" ? "bg-emerald-500/90 border-emerald-400/50 text-white" : "bg-rose-500/90 border-rose-400/50 text-white"}`}>
+                            className={`fixed bottom-6 right-6 z-[300] flex items-center gap-3 px-5 py-3 rounded-2xl shadow-xl border text-sm font-bold max-w-sm
+                            ${toast.type === "success" ? "bg-emerald-500/90 border-emerald-400/50 text-white" : "bg-rose-500/90 border-rose-400/50 text-white"}`}>
                             {toast.type === "success" ? <CheckCheck className="size-4 shrink-0" /> : <AlertCircle className="size-4 shrink-0" />}
                             {toast.msg}
                         </motion.div>
@@ -987,55 +1057,39 @@ function LabelsContent() {
                 </AnimatePresence>
 
                 <style jsx global>{`
-                .custom-scrollbar::-webkit-scrollbar { width: 5px; height: 5px; }
-                .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-                .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.06); border-radius: 10px; }
-
-                @media print {
-                    /* Reset Geral */
-                    @page { margin: 0; size: auto; }
-                    * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-                    
-                    body { 
-                        visibility: hidden; 
-                        background: white !important;
+                    .custom-scrollbar::-webkit-scrollbar { width: 5px; height: 5px; }
+                    .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+                    .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.06); border-radius: 10px; }
+                    body { overflow-x: hidden; }
+                    @media print {
+                        @page { margin: 0; size: auto; }
+                        html, body {
+                            background: #fff !important;
+                            height: auto !important;
+                            overflow: visible !important;
+                            -webkit-print-color-adjust: exact !important;
+                            print-color-adjust: exact !important;
+                        }
+                        body > *:not(.fixed.inset-0.z-[200]) { display: none !important; }
+                        #__next > *:not(.fixed.inset-0.z-[200]) { display: none !important; }
+                        .fixed.inset-0.z-[200] {
+                            position: absolute !important;
+                            top: 0 !important;
+                            left: 0 !important;
+                            width: 100% !important;
+                            background: white !important;
+                            display: block !important;
+                            overflow: visible !important;
+                            z-index: 99999 !important;
+                        }
+                        #printable-content {
+                            width: 80mm !important;
+                            margin: 0 auto !important;
+                            padding: 5mm !important;
+                            display: block !important;
+                        }
                     }
-
-                    /* Mostra apenas a área de impressão */
-                    #printable-content, #printable-content * {
-                        visibility: visible !important;
-                        color: black !important;
-                    }
-
-                    #printable-content {
-                        position: fixed !important;
-                        left: 0 !important;
-                        top: 0 !important;
-                        width: 100% !important;
-                        max-width: 80mm !important;
-                        margin: 0 auto !important;
-                        padding: 10mm !important;
-                        background: white !important;
-                        display: block !important;
-                        height: auto !important;
-                        box-shadow: none !important;
-                        border: none !important;
-                        z-index: 9999 !important;
-                    }
-
-                    /* Garantia de cores pretas para impressão térmica */
-                    #printable-content .bg-black {
-                        background-color: black !important;
-                        color: white !important;
-                        border: 1px solid black !important;
-                    }
-                    
-                    /* Esconde elementos indesejáveis do modal que podem vazar */
-                    .bg-black\/80, .fixed.inset-0.z-50:not(#printable-content) {
-                        display: none !important;
-                    }
-                }
-            `}</style>
+                `}</style>
             </div>
         </AccessGuard>
     );

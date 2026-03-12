@@ -21,7 +21,8 @@ import {
   Building2,
   Lock,
   Check,
-  ShoppingBag
+  ShoppingBag,
+  MessageSquare
 } from "lucide-react";
 import { UNITS } from "@/lib/staffService";
 import Image from "next/image";
@@ -45,11 +46,12 @@ const ALL_NAV_ITEMS = [
   { href: "/stock", icon: Package, label: "Estoque", group: "Operações", permission: "stock" as const },
   { href: "/team", icon: UserCog, label: "Equipe", group: "Operações", permission: "team" as const },
   { href: "/labels", icon: QrCode, label: "Etiquetagem QR", group: "Operações", permission: "labels" as const },
+  { href: "/chat", icon: MessageSquare, label: "Mensagens IA", group: "Operações", permission: "settings" as const },
   { href: "/settings", icon: Settings, label: "Configurações", group: "Operações", permission: "settings" as const },
 ];
 
-const PREMIUM_ROUTES = ["/finance", "/labels", "/team", "/reports", "/stock"];
-const ENTERPRISE_ONLY_ROUTES = ["/reports"];
+const PREMIUM_ROUTES = ["/finance", "/labels", "/team", "/reports", "/stock", "/chat"];
+const ENTERPRISE_ONLY_ROUTES = ["/reports", "/chat"];
 const PRO_REQUIRED_ROUTES = ["/finance", "/labels", "/team", "/stock"];
 
 export function Sidebar() {
@@ -57,7 +59,7 @@ export function Sidebar() {
   const router = useRouter();
   const { user } = useAuth();
   const { canAccessRoute } = usePermissions();
-  const { isStarter, plan } = useSubscription();
+  const { isStarter, isEnterprise, plan } = useSubscription();
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   const [isPlansModalOpen, setIsPlansModalOpen] = useState(false);
@@ -182,7 +184,7 @@ export function Sidebar() {
                     let isLocked = false;
                     if (isStarter && PREMIUM_ROUTES.includes(item.href)) {
                       isLocked = true;
-                    } else if (plan === 'pro' && ENTERPRISE_ONLY_ROUTES.includes(item.href)) {
+                    } else if (ENTERPRISE_ONLY_ROUTES.includes(item.href) && !isEnterprise) {
                       isLocked = true;
                     }
 

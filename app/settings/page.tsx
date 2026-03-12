@@ -127,6 +127,9 @@ function SettingsContent() {
           setCurrentPlan(sub.plan as PlanTier);
           setPlanStatus(sub.status);
           setTrialEndsAt(sub.trial_end ? new Date(sub.trial_end) : null);
+
+          // Avisa outros componentes (o Sidebar) que o plano mudou ativamente
+          window.dispatchEvent(new CustomEvent('refresh-subscription'));
         }
       };
       // For now we don't block the page load while fetching
