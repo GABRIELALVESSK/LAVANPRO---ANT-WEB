@@ -44,6 +44,8 @@ const ALL_NAV_ITEMS = [
 ];
 
 const PREMIUM_ROUTES = ["/finance", "/labels", "/team", "/reports", "/stock"];
+const ENTERPRISE_ONLY_ROUTES = ["/stock", "/reports"];
+const PRO_REQUIRED_ROUTES = ["/finance", "/labels", "/team"];
 
 export function Sidebar() {
   const pathname = usePathname();
@@ -125,7 +127,14 @@ export function Sidebar() {
                   {group.items.map((item) => {
                     const Icon = item.icon;
                     const isActive = pathname === item.href;
-                    const isLocked = isStarter && PREMIUM_ROUTES.includes(item.href);
+
+                    // Logic to check if route is locked based on current plan:
+                    let isLocked = false;
+                    if (isStarter && PREMIUM_ROUTES.includes(item.href)) {
+                      isLocked = true;
+                    } else if (plan === 'pro' && ENTERPRISE_ONLY_ROUTES.includes(item.href)) {
+                      isLocked = true;
+                    }
 
                     return isLocked ? (
                       <button

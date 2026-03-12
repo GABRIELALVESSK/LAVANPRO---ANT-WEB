@@ -55,6 +55,18 @@ export default function SettingsPage() {
   useEffect(() => {
     if (user) {
       const fetchPlan = async () => {
+        // 1. Sincroniza ativamente com Sandbox Asaas primeiro
+        try {
+          await fetch("/api/asaas/sync", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ ownerId: user.id })
+          });
+        } catch (e) {
+          console.log("Sync error:", e);
+        }
+
+        // 2. Lê a versão mais atual do BD
         const { data, error } = await supabase.rpc('get_my_subscription');
         if (data && data.length > 0) {
           const sub = data[0];

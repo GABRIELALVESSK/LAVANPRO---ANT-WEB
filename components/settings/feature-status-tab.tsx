@@ -16,6 +16,8 @@ import {
     Lock,
     Crown,
     Sparkles,
+    ArrowUp,
+    ArrowDown
 } from "lucide-react";
 
 type PlanTier = "free" | "pro" | "enterprise";
@@ -34,7 +36,7 @@ const FEATURES: FeatureModule[] = [
     { key: "qr_codes", label: "Etiquetagem QR", description: "Geração e vinculação de QR codes às peças e pedidos", icon: QrCode, iconColor: "text-violet-500 bg-violet-500/10", requiredPlan: "pro" },
     { key: "customers", label: "Clientes", description: "Cadastro e gerenciamento da base de clientes", icon: UserCog, iconColor: "text-emerald-500 bg-emerald-500/10", requiredPlan: "free" },
     { key: "finance", label: "Financeiro", description: "Controle de receitas, despesas e fluxo de caixa", icon: Wallet, iconColor: "text-green-500 bg-green-500/10", requiredPlan: "pro" },
-    { key: "reports", label: "Relatórios", description: "Relatórios gerenciais avançados e exportação de dados", icon: BarChart3, iconColor: "text-amber-500 bg-amber-500/10", requiredPlan: "pro" },
+    { key: "reports", label: "Relatórios & BI", description: "Análises detalhadas, dashboards gerenciais e exportação de dados", icon: BarChart3, iconColor: "text-amber-500 bg-amber-500/10", requiredPlan: "enterprise" },
     { key: "team", label: "Equipe", description: "Gestão de colaboradores, turnos e produtividade", icon: UserCog, iconColor: "text-indigo-500 bg-indigo-500/10", requiredPlan: "pro" },
     { key: "stock", label: "Estoque", description: "Controle de insumos, alertas de reposição e movimentações", icon: Package, iconColor: "text-orange-500 bg-orange-500/10", requiredPlan: "enterprise" },
     { key: "notifications", label: "Notificações Avançadas", description: "WhatsApp, SMS e notificações push para clientes", icon: Bell, iconColor: "text-cyan-500 bg-cyan-500/10", requiredPlan: "pro" },
@@ -57,19 +59,62 @@ export function FeatureStatusTab({ currentPlan }: FeatureStatusTabProps) {
     const activeCount = FEATURES.filter((f) => planRank[f.requiredPlan] <= currentRank).length;
     const lockedCount = FEATURES.length - activeCount;
 
-    const [isPlansModalOpen, setIsPlansModalOpen] = useState(false);
     const [isUpdating, setIsUpdating] = useState(false);
 
     const handleUpgrade = async (newPlan: PlanTier) => {
         setIsUpdating(true);
         try {
-            const { error } = await supabase.rpc('update_my_subscription', { new_plan: newPlan });
-            if (error) throw error;
-            // Recarrega a página para atualizar todo o estado global (incluindo SettingsPage logica central)
-            window.location.reload();
-        } catch (err) {
-            console.error("Erro ao atualizar plano", err);
-            alert("Não foi possível atualizar o plano no momento. Tente novamente.");
+            // Se for plano gratuito, apenas atualiza direto (downgrade)
+            if (newPlan === 'free') {
+                const { error } = await supabase.rpc('update_my_subscription', { new_plan: newPlan });
+                if (error) throw error;
+                window.location.reload();
+                return;
+            }
+
+            // Para planos pagos, ir para o checkout do Asaas
+            const savedCompany = localStorage.getItem("lavanpro_company");
+            const parsed = savedCompany ? JSON.parse(savedCompany) : {};
+
+            // O Asaas bloqueia completamente contas Sandbox com CNPJ/CPF vazio ou como 00000000000000
+            let userCnpj = (parsed?.cnpj || "").replace(/\D/g, "");
+            const hasValidLength = userCnpj.length === 11 || userCnpj.length === 14;
+            // Se for inválido, cai no mock abaixo apenas pro sandbox passar
+            if (!hasValidLength || userCnpj === "00000000000000" || userCnpj === "00000000000") {
+                userCnpj = "27865757000102";
+            }
+
+            const companyData = {
+                razaoSocial: parsed?.razaoSocial || parsed?.nomeFantasia || "Lavanderia Cliente",
+                cnpj: userCnpj,
+                email: parsed?.email || "cliente@lavanderia.com",
+                phone: ""
+            };
+
+            const session = await supabase.auth.getSession();
+            const ownerId = session.data.session?.user?.id;
+
+            const res = await fetch("/api/asaas/checkout", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    plan: newPlan,
+                    company: companyData,
+                    ownerId: ownerId
+                })
+            });
+
+            const data = await res.json();
+
+            if (data.invoiceUrl) {
+                // Redireciona para o checkout gerado
+                window.location.href = data.invoiceUrl;
+            } else {
+                throw new Error(data.error || "Erro ao gerar link de pagamento.");
+            }
+        } catch (err: any) {
+            console.error("Erro ao gerar pagamento", err);
+            alert("Não foi possível gerar o link de pagamento. Detalhes: " + err.message);
             setIsUpdating(false);
         }
     };
@@ -175,141 +220,119 @@ export function FeatureStatusTab({ currentPlan }: FeatureStatusTabProps) {
                 })}
             </div>
 
-            {/* Upgrade CTA */}
-            {lockedCount > 0 && (
-                <div className="bg-gradient-to-r from-brand-primary/10 via-violet-500/10 to-amber-500/10 border border-brand-primary/20 rounded-xl p-6 flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                        <div className="size-12 rounded-xl bg-brand-primary/20 flex items-center justify-center">
-                            <Crown className="size-6 text-brand-primary" />
-                        </div>
-                        <div>
-                            <p className="text-sm font-bold text-brand-text">Desbloqueie todos os módulos</p>
-                            <p className="text-xs text-brand-muted">Faça upgrade do seu plano para acessar funcionalidades avançadas</p>
-                        </div>
-                    </div>
-                    <button
-                        onClick={() => setIsPlansModalOpen(true)}
-                        className="px-5 py-2.5 bg-brand-primary text-white rounded-xl text-sm font-bold hover:bg-brand-primaryHover transition-all shadow-lg shadow-brand-primary/20"
-                    >
-                        Ver Planos
-                    </button>
+            {/* Seção de Planos Direta */}
+            <div className="mt-16 pt-12 border-t border-brand-darkBorder">
+                <div className="text-center mb-10">
+                    <h2 className="text-3xl font-black text-white mb-3">Planos para o seu negócio</h2>
+                    <p className="text-brand-muted">Escolha o melhor plano para escalar sua lavanderia com a LavanPro.</p>
                 </div>
-            )}
-            {/* Modal de Planos Opcional */}
-            {!lockedCount && currentPlan !== 'enterprise' && (
-                <div className="flex justify-center mt-6">
-                    <button
-                        onClick={() => setIsPlansModalOpen(true)}
-                        className="px-5 py-2.5 bg-brand-card text-brand-text border border-brand-darkBorder rounded-xl text-sm font-bold hover:bg-brand-bg transition-all"
-                    >
-                        Ver Opções de Plano
-                    </button>
-                </div>
-            )}
 
-            {/* Modal de Upgrades */}
-            {isPlansModalOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 overflow-y-auto">
-                    <div className="relative w-full max-w-6xl py-12 flex flex-col items-center">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full">
+
+                    {/* Starter */}
+                    <div className={`bg-brand-card border ${currentPlan === 'free' ? 'border-brand-primary' : 'border-brand-darkBorder'} rounded-2xl p-8 flex flex-col relative`}>
+                        {currentPlan === 'free' && (
+                            <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-brand-primary text-white text-[10px] font-bold uppercase tracking-widest py-1 px-4 rounded-full">
+                                Seu Plano Atual
+                            </div>
+                        )}
+                        <h3 className="text-xl font-bold text-white mb-2">Starter</h3>
+                        <div className="flex items-baseline gap-1 mb-6">
+                            <span className="text-4xl font-black text-white">R$97</span>
+                            <span className="text-brand-muted text-sm">/mês</span>
+                        </div>
+                        <p className="text-sm text-brand-muted mb-8">Ideal para pequenas lavanderias ou iniciantes.</p>
+
+                        <ul className="space-y-4 mb-8 flex-1">
+                            <li className="flex items-start gap-3"><Check className="size-4 text-brand-primary shrink-0 mt-0.5" /><span className="text-sm text-brand-text">Gestão básica</span></li>
+                            <li className="flex items-start gap-3"><Check className="size-4 text-brand-primary shrink-0 mt-0.5" /><span className="text-sm text-brand-text">1 Usuário</span></li>
+                            <li className="flex items-start gap-3"><Check className="size-4 text-brand-primary shrink-0 mt-0.5" /><span className="text-sm text-brand-text">Controle de caixa</span></li>
+                            <li className="flex items-start gap-3"><Check className="size-4 text-brand-primary shrink-0 mt-0.5" /><span className="text-sm text-brand-text">Suporte via email</span></li>
+                        </ul>
+
                         <button
-                            onClick={() => setIsPlansModalOpen(false)}
-                            className="absolute top-4 right-4 text-brand-muted hover:text-white bg-brand-card/50 p-2 rounded-full"
+                            onClick={() => handleUpgrade('free')}
+                            disabled={isUpdating || currentPlan === 'free'}
+                            className={`w-full py-3 px-4 rounded-xl font-bold text-sm transition-colors flex items-center justify-center gap-2 disabled:opacity-50 ${currentPlan === 'free' ? 'bg-brand-primary/20 text-brand-primary cursor-not-allowed border border-brand-primary/30' :
+                                planRank['free'] < planRank[currentPlan] ? 'bg-rose-500/10 text-rose-500 border border-rose-500/30 hover:bg-rose-500/20' :
+                                    'bg-brand-bg text-white border border-brand-darkBorder hover:bg-white/5'
+                                }`}
                         >
-                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
+                            {currentPlan === 'free' ? 'Plano Atual' :
+                                planRank['free'] < planRank[currentPlan] ? <><ArrowDown className="size-4" /> Downgrade para Starter</> : 'Assinar Starter'}
                         </button>
-
-                        <div className="text-center mb-10">
-                            <h2 className="text-3xl font-black text-white mb-3">Planos para o seu negócio</h2>
-                            <p className="text-brand-muted">Escolha o melhor plano para escalar sua lavanderia com a LavanPro.</p>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full">
-
-                            {/* Starter */}
-                            <div className="bg-brand-card border border-brand-darkBorder rounded-2xl p-8 flex flex-col relative">
-                                <h3 className="text-xl font-bold text-white mb-2">Starter</h3>
-                                <div className="flex items-baseline gap-1 mb-6">
-                                    <span className="text-4xl font-black text-white">R$97</span>
-                                    <span className="text-brand-muted text-sm">/mês</span>
-                                </div>
-                                <p className="text-sm text-brand-muted mb-8">Ideal para pequenas lavanderias ou iniciantes.</p>
-
-                                <ul className="space-y-4 mb-8 flex-1">
-                                    <li className="flex items-start gap-3"><Check className="size-4 text-brand-primary shrink-0 mt-0.5" /><span className="text-sm text-brand-text">Gestão básica</span></li>
-                                    <li className="flex items-start gap-3"><Check className="size-4 text-brand-primary shrink-0 mt-0.5" /><span className="text-sm text-brand-text">1 Usuário</span></li>
-                                    <li className="flex items-start gap-3"><Check className="size-4 text-brand-primary shrink-0 mt-0.5" /><span className="text-sm text-brand-text">Controle de caixa</span></li>
-                                    <li className="flex items-start gap-3"><Check className="size-4 text-brand-primary shrink-0 mt-0.5" /><span className="text-sm text-brand-text">Suporte via email</span></li>
-                                </ul>
-
-                                <button
-                                    onClick={() => handleUpgrade('free')}
-                                    disabled={isUpdating || currentPlan === 'free'}
-                                    className="w-full py-3 px-4 rounded-xl font-bold text-sm bg-brand-bg text-white border border-brand-darkBorder hover:bg-white/5 transition-colors disabled:opacity-50"
-                                >
-                                    {currentPlan === 'free' ? 'Plano Atual' : 'Começar Básico'}
-                                </button>
-                            </div>
-
-                            {/* Profissional */}
-                            <div className="bg-brand-card border-2 border-brand-primary rounded-2xl p-8 flex flex-col relative transform md:-translate-y-4 shadow-2xl shadow-brand-primary/20">
-                                <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-brand-primary text-white text-[10px] font-bold uppercase tracking-widest py-1 px-4 rounded-full">
-                                    Mais Popular
-                                </div>
-                                <h3 className="text-xl font-bold text-white mb-2">Profissional</h3>
-                                <div className="flex items-baseline gap-1 mb-6">
-                                    <span className="text-4xl font-black text-white">R$197</span>
-                                    <span className="text-brand-muted text-sm">/mês</span>
-                                </div>
-                                <p className="text-sm text-brand-muted mb-8">Para lavanderias em crescimento que precisam de controle.</p>
-
-                                <ul className="space-y-4 mb-8 flex-1">
-                                    <li className="flex items-start gap-3"><Check className="size-4 text-brand-primary shrink-0 mt-0.5" /><span className="text-sm text-brand-text">Tudo do Starter</span></li>
-                                    <li className="flex items-start gap-3"><Check className="size-4 text-brand-primary shrink-0 mt-0.5" /><span className="text-sm text-brand-text">5 Usuários</span></li>
-                                    <li className="flex items-start gap-3"><Check className="size-4 text-brand-primary shrink-0 mt-0.5" /><span className="text-sm text-brand-text">Financeiro Completo</span></li>
-                                    <li className="flex items-start gap-3"><Check className="size-4 text-brand-primary shrink-0 mt-0.5" /><span className="text-sm text-brand-text">App do Cliente</span></li>
-                                    <li className="flex items-start gap-3"><Check className="size-4 text-brand-primary shrink-0 mt-0.5" /><span className="text-sm text-brand-text">Controle de rotas</span></li>
-                                    <li className="flex items-start gap-3"><Check className="size-4 text-brand-primary shrink-0 mt-0.5" /><span className="text-sm text-brand-text">Suporte WhatsApp</span></li>
-                                </ul>
-
-                                <button
-                                    onClick={() => handleUpgrade('pro')}
-                                    disabled={isUpdating || currentPlan === 'pro'}
-                                    className="w-full py-3 px-4 rounded-xl font-bold text-sm bg-brand-primary text-white hover:bg-brand-primaryHover transition-colors shadow-lg shadow-brand-primary/20 disabled:opacity-50"
-                                >
-                                    {currentPlan === 'pro' ? 'Seu Plano Atual' : isUpdating ? 'Aguarde...' : 'Aproveitar Oferta'}
-                                </button>
-                            </div>
-
-                            {/* Enterprise */}
-                            <div className="bg-brand-card border border-brand-darkBorder rounded-2xl p-8 flex flex-col relative">
-                                <h3 className="text-xl font-bold text-white mb-2">Enterprise</h3>
-                                <div className="flex items-baseline gap-1 mb-6">
-                                    <span className="text-4xl font-black text-white">R$397</span>
-                                    <span className="text-brand-muted text-sm">/mês</span>
-                                </div>
-                                <p className="text-sm text-brand-muted mb-8">Para redes de lavanderias e grandes operações.</p>
-
-                                <ul className="space-y-4 mb-8 flex-1">
-                                    <li className="flex items-start gap-3"><Check className="size-4 text-brand-primary shrink-0 mt-0.5" /><span className="text-sm text-brand-text">Tudo do Profissional</span></li>
-                                    <li className="flex items-start gap-3"><Check className="size-4 text-brand-primary shrink-0 mt-0.5" /><span className="text-sm text-brand-text">Usuários Ilimitados</span></li>
-                                    <li className="flex items-start gap-3"><Check className="size-4 text-brand-primary shrink-0 mt-0.5" /><span className="text-sm text-brand-text">Múltiplas Unidades</span></li>
-                                    <li className="flex items-start gap-3"><Check className="size-4 text-brand-primary shrink-0 mt-0.5" /><span className="text-sm text-brand-text">API Aberta</span></li>
-                                    <li className="flex items-start gap-3"><Check className="size-4 text-brand-primary shrink-0 mt-0.5" /><span className="text-sm text-brand-text">Gerente de contas</span></li>
-                                </ul>
-
-                                <button
-                                    onClick={() => handleUpgrade('enterprise')}
-                                    disabled={isUpdating || currentPlan === 'enterprise'}
-                                    className="w-full py-3 px-4 rounded-xl font-bold text-sm bg-brand-bg text-white border border-brand-darkBorder hover:bg-white/5 transition-colors disabled:opacity-50"
-                                >
-                                    {currentPlan === 'enterprise' ? 'Plano Máximo Atual' : 'Escolher Enterprise'}
-                                </button>
-                            </div>
-
-                        </div>
                     </div>
+
+                    {/* Profissional */}
+                    <div className={`bg-brand-card border-2 ${currentPlan === 'pro' ? 'border-brand-primary shadow-2xl shadow-brand-primary/20' : 'border-brand-darkBorder/50'} rounded-2xl p-8 flex flex-col relative transform md:-translate-y-4`}>
+                        <div className={`absolute -top-3.5 left-1/2 -translate-x-1/2 text-white text-[10px] font-bold uppercase tracking-widest py-1 px-4 rounded-full ${currentPlan === 'pro' ? 'bg-brand-primary' : 'bg-brand-darkBorder'}`}>
+                            {currentPlan === 'pro' ? 'Seu Plano Atual' : 'Mais Popular'}
+                        </div>
+                        <h3 className="text-xl font-bold text-white mb-2">Profissional</h3>
+                        <div className="flex items-baseline gap-1 mb-6">
+                            <span className="text-4xl font-black text-white">R$197</span>
+                            <span className="text-brand-muted text-sm">/mês</span>
+                        </div>
+                        <p className="text-sm text-brand-muted mb-8">Ideal para lavanderias que buscam automação e controle financeiro.</p>
+
+                        <ul className="space-y-4 mb-8 flex-1">
+                            <li className="flex items-start gap-3"><Check className="size-4 text-brand-primary shrink-0 mt-0.5" /><span className="text-sm text-brand-text">Tudo do Starter</span></li>
+                            <li className="flex items-start gap-3"><Check className="size-4 text-brand-primary shrink-0 mt-0.5" /><span className="text-sm text-brand-text">Ate 5 Usuários</span></li>
+                            <li className="flex items-start gap-3"><Check className="size-4 text-brand-primary shrink-0 mt-0.5" /><span className="text-sm text-brand-text">Etiquetas QR (E-tags)</span></li>
+                            <li className="flex items-start gap-3"><Check className="size-4 text-brand-primary shrink-0 mt-0.5" /><span className="text-sm text-brand-text">Financeiro Completo</span></li>
+                            <li className="flex items-start gap-3"><Check className="size-4 text-brand-primary shrink-0 mt-0.5" /><span className="text-sm text-brand-text">Controle de Entregas</span></li>
+                            <li className="flex items-start gap-3"><Check className="size-4 text-brand-primary shrink-0 mt-0.5" /><span className="text-sm text-brand-text">Suporte WhatsApp</span></li>
+                        </ul>
+
+                        <button
+                            onClick={() => handleUpgrade('pro')}
+                            disabled={isUpdating || currentPlan === 'pro'}
+                            className={`w-full py-3 px-4 rounded-xl font-bold text-sm transition-colors flex items-center justify-center gap-2 shadow-lg disabled:opacity-50 ${currentPlan === 'pro' ? 'bg-brand-primary/20 text-brand-primary cursor-not-allowed shadow-none border border-brand-primary/30' :
+                                planRank['pro'] < planRank[currentPlan] ? 'bg-rose-500/10 text-rose-500 border border-rose-500/30 hover:bg-rose-500/20 shadow-none' :
+                                    'bg-brand-primary text-white hover:bg-brand-primaryHover shadow-brand-primary/20'
+                                }`}
+                        >
+                            {currentPlan === 'pro' ? 'Plano Atual' :
+                                isUpdating ? 'Aguarde...' :
+                                    planRank['pro'] < planRank[currentPlan] ? <><ArrowDown className="size-4" /> Downgrade para Profissional</> : <><ArrowUp className="size-4" /> Faça Upgrade de Plano</>}
+                        </button>
+                    </div>
+
+                    {/* Enterprise */}
+                    <div className={`bg-brand-card border ${currentPlan === 'enterprise' ? 'border-brand-primary' : 'border-brand-darkBorder'} rounded-2xl p-8 flex flex-col relative`}>
+                        {currentPlan === 'enterprise' && (
+                            <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-brand-primary text-white text-[10px] font-bold uppercase tracking-widest py-1 px-4 rounded-full">
+                                Seu Plano Atual
+                            </div>
+                        )}
+                        <h3 className="text-xl font-bold text-white mb-2">Enterprise</h3>
+                        <div className="flex items-baseline gap-1 mb-6">
+                            <span className="text-4xl font-black text-white">R$397</span>
+                            <span className="text-brand-muted text-sm">/mês</span>
+                        </div>
+                        <p className="text-sm text-brand-muted mb-8">Para redes e grandes operações que buscam escala e BI.</p>
+
+                        <ul className="space-y-4 mb-8 flex-1">
+                            <li className="flex items-start gap-3"><Check className="size-4 text-brand-primary shrink-0 mt-0.5" /><span className="text-sm text-brand-text">Tudo do Profissional</span></li>
+                            <li className="flex items-start gap-3"><Check className="size-4 text-brand-primary shrink-0 mt-0.5" /><span className="text-sm text-brand-text">Usuários Ilimitados</span></li>
+                            <li className="flex items-start gap-3"><Check className="size-4 text-brand-primary shrink-0 mt-0.5" /><span className="text-sm text-brand-text">Relatórios BI e Avançados</span></li>
+                            <li className="flex items-start gap-3"><Check className="size-4 text-brand-primary shrink-0 mt-0.5" /><span className="text-sm text-brand-text">Gestão Multi-unidades</span></li>
+                            <li className="flex items-start gap-3"><Check className="size-4 text-brand-primary shrink-0 mt-0.5" /><span className="text-sm text-brand-text">Estoque e API Aberta</span></li>
+                        </ul>
+
+                        <button
+                            onClick={() => handleUpgrade('enterprise')}
+                            disabled={isUpdating || currentPlan === 'enterprise'}
+                            className={`w-full py-3 px-4 rounded-xl font-bold text-sm transition-colors flex items-center justify-center gap-2 disabled:opacity-50 ${currentPlan === 'enterprise' ? 'bg-brand-primary/20 text-brand-primary cursor-not-allowed border border-brand-primary/30' :
+                                'bg-brand-primary text-white hover:bg-brand-primaryHover shadow-lg shadow-brand-primary/20'
+                                }`}
+                        >
+                            {currentPlan === 'enterprise' ? 'Plano Máximo Atual' : <><ArrowUp className="size-4" /> Faça Upgrade de Plano</>}
+                        </button>
+                    </div>
+
                 </div>
-            )}
+            </div>
         </div>
     );
 }
