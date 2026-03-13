@@ -6,22 +6,24 @@ import {
     Truck, CheckCircle2, AlertCircle, Clock, Activity, History, Timer,
     X, User, Phone, Mail, CreditCard, Home, ChevronDown, Search,
     Plus, Trash2, Printer, QrCode, Filter, ArrowRight, Package,
-    CalendarDays, StickyNote, MapPin, ChevronRight, MoreVertical
+    CalendarDays, StickyNote, MapPin, ChevronRight, Edit2, MoreVertical
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { Order, OrderItem, HistoryEntry, SERVICES as initialServices } from "../../lib/orders-data";
+import { Customer, seedCustomers } from "../../lib/customers-data";
 import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 
-const SERVICES = [
-    { name: "Lavagem Completa", price: 45 },
-    { name: "Apenas Passar", price: 25 },
-    { name: "Lavagem a Seco", price: 80 },
-    { name: "Edredom / Cobertor", price: 60 },
-    { name: "Enxoval (kg)", price: 12 },
-    { name: "Tapete Pequeno", price: 35 },
-    { name: "Tapete Grande", price: 75 },
-    { name: "Terno / Blazer", price: 90 },
-];
+const StatusColors: Record<string, string> = {
+    "Recebido": "bg-slate-500",
+    "Em Triagem": "bg-violet-500",
+    "Em Lavagem": "bg-blue-500",
+    "Em Secagem": "bg-amber-500",
+    "Em Finalização": "bg-cyan-500",
+    "Pronto": "bg-emerald-500",
+    "Entregue": "bg-teal-500",
+    "Cancelado": "bg-rose-500",
+};
 
 const STATUS_CONFIG: Record<string, { color: string; bg: string; progress: number; textColor: string }> = {
     "Recebido": { color: "text-slate-400", bg: "bg-slate-400", progress: 5, textColor: "text-slate-400" },
@@ -36,16 +38,6 @@ const STATUS_CONFIG: Record<string, { color: string; bg: string; progress: numbe
 
 const PAYMENT_STATUSES = ["A Pagar", "Pago - PIX", "Pago - Cartão", "Pago - Dinheiro", "Faturado"];
 
-interface OrderItem { service: string; qty: number; unitPrice: number; }
-interface HistoryEntry { time: string; status: string; note: string; }
-interface Order {
-    id: string; client: string; phone: string; email: string; address: string;
-    paymentMethod: string; paymentStatus: string; delivery: string;
-    items: OrderItem[]; status: string; progress: number; bgColor: string;
-    textColor: string; observations: string; estimatedDelivery: string;
-    history: HistoryEntry[]; createdAt: string;
-}
-
 const seedOrders: Order[] = [
     { id: "#ORD-2856", client: "Carlos Machado", phone: "(11) 98765-4321", email: "carlos.machado@email.com", address: "Rua Augusta, 1500 - Consolação", paymentMethod: "Cartão de Crédito", paymentStatus: "Pago - Cartão", delivery: "Entrega em Domicílio", items: [{ service: "Lavagem Completa", qty: 3, unitPrice: 45 }], status: "Em Lavagem", progress: 32, bgColor: "bg-brand-primary", textColor: "text-brand-primary", observations: "Cliente pediu amaciante extra.", estimatedDelivery: "2026-03-09", history: [{ time: "08:00", status: "Recebido", note: "Pedido registrado." }, { time: "08:30", status: "Em Triagem", note: "Triagem concluída." }, { time: "09:15", status: "Em Lavagem", note: "Iniciado processo de lavagem." }], createdAt: "2026-03-08" },
     { id: "#ORD-2854", client: "Maria Oliveira", phone: "(11) 91234-5678", email: "maria.oli@email.com", address: "Av. Paulista, 1000 - Bela Vista", paymentMethod: "PIX", paymentStatus: "Pago - PIX", delivery: "Retirada no Balcão", items: [{ service: "Edredom / Cobertor", qty: 2, unitPrice: 60 }], status: "Em Secagem", progress: 50, bgColor: "bg-amber-500", textColor: "text-amber-500", observations: "", estimatedDelivery: "2026-03-08", history: [{ time: "07:00", status: "Recebido", note: "" }, { time: "08:00", status: "Em Lavagem", note: "" }, { time: "11:00", status: "Em Secagem", note: "Passou para secagem." }], createdAt: "2026-03-08" },
@@ -54,7 +46,7 @@ const seedOrders: Order[] = [
     { id: "#ORD-2849", client: "Hotel Bela Vista", phone: "(11) 97777-3333", email: "contato@hotelbelavista.com", address: "Rua Oscar Freire, 1200", paymentMethod: "Boleto", paymentStatus: "Faturado", delivery: "Entrega em Domicílio", items: [{ service: "Enxoval (kg)", qty: 50, unitPrice: 12 }], status: "Cancelado", progress: 0, bgColor: "bg-rose-500", textColor: "text-rose-500", observations: "URGENTE: Pedido cancelado pelo cliente.", estimatedDelivery: "2026-03-10", history: [{ time: "14:00", status: "Recebido", note: "" }, { time: "15:30", status: "Cancelado", note: "Cliente solicitou cancelamento." }], createdAt: "2026-03-08" },
 ];
 
-function calcTotal(items: OrderItem[]) { return items.reduce((s, i) => s + i.qty * i.unitPrice, 0); }
+function calcTotal(items: OrderItem[]) { return items.reduce((s: number, i: OrderItem) => s + i.qty * i.unitPrice, 0); }
 function formatCurrency(v: number) { return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }); }
 
 export default function OrdersPage() {
@@ -72,7 +64,12 @@ export default function OrdersPage() {
     const [filterPayment, setFilterPayment] = useState("Todos");
 
     // New order form
-    const blankItem: OrderItem = { service: SERVICES[0].name, qty: 1, unitPrice: SERVICES[0].price };
+    const [allCustomers, setAllCustomers] = useState<any[]>([]);
+    const [customerSearch, setCustomerSearch] = useState("");
+    const [showCustSuggestions, setShowCustSuggestions] = useState(false);
+    const [activeServiceIdx, setActiveServiceIdx] = useState<number | null>(null);
+    const [showServiceSuggestions, setShowServiceSuggestions] = useState(false);
+    const blankItem: OrderItem = { service: "", qty: 1, unitPrice: 0 };
     const [newOrder, setNewOrder] = useState({
         client: "", phone: "", email: "", address: "",
         delivery: "Entrega em Domicílio",
@@ -117,7 +114,13 @@ export default function OrdersPage() {
             const items = [...n.items];
             if (field === "service") {
                 const svc = currentServices.find(s => s.name === value);
-                items[idx] = { ...items[idx], service: value as string, unitPrice: svc?.price ?? items[idx].unitPrice };
+                items[idx] = { 
+                    ...items[idx], 
+                    service: value as string, 
+                    unitPrice: svc ? svc.price : items[idx].unitPrice 
+                };
+            } else if (field === "unitPrice") {
+                items[idx] = { ...items[idx], unitPrice: Number(value) };
             } else {
                 items[idx] = { ...items[idx], [field]: Number(value) };
             }
@@ -125,13 +128,88 @@ export default function OrdersPage() {
         });
     };
 
+    const handleAddSelectedItem = () => {
+        if (!selectedOrder) return;
+        setSelectedOrder({ ...selectedOrder, items: [...selectedOrder.items, { ...blankItem }] });
+    };
+
+    const handleRemoveSelectedItem = (idx: number) => {
+        if (!selectedOrder) return;
+        setSelectedOrder({ ...selectedOrder, items: selectedOrder.items.filter((_, i) => i !== idx) });
+    };
+
+    const handleSelectedItemChange = (idx: number, field: keyof OrderItem, value: string | number) => {
+        if (!selectedOrder) return;
+        const items = [...selectedOrder.items];
+        if (field === "service") {
+            const svc = currentServices.find(s => s.name === value);
+            items[idx] = { 
+                ...items[idx], 
+                service: value as string, 
+                unitPrice: svc ? svc.price : items[idx].unitPrice 
+            };
+        } else if (field === "unitPrice") {
+            items[idx] = { ...items[idx], unitPrice: Number(value) };
+        } else {
+            items[idx] = { ...items[idx], [field]: Number(value) };
+        }
+        setSelectedOrder({ ...selectedOrder, items });
+    };
+
     const handleCreateOrder = () => {
         if (!newOrder.client || newOrder.items.length === 0) return;
+
         const idNum = Math.floor(Math.random() * 9000) + 1000;
+        const orderId = `#ORD-${idNum}`;
         const now = new Date();
         const timeStr = now.toTimeString().slice(0, 5);
+        const dateStr = now.toISOString().slice(0, 10);
+
+        const newOrderEntry = {
+            id: orderId,
+            date: dateStr,
+            service: newOrder.items.map((i: OrderItem) => i.service).join(", "),
+            value: calcTotal(newOrder.items),
+            status: "Triagem"
+        };
+
+        // Sync with Customers Database
+        const existingCustIdx = allCustomers.findIndex((c: Customer) => c.name.toLowerCase() === newOrder.client.toLowerCase());
+        let updatedCusts = [...allCustomers];
+
+        if (existingCustIdx !== -1) {
+            // Update existing customer history
+            const target = updatedCusts[existingCustIdx];
+            updatedCusts[existingCustIdx] = {
+                ...target,
+                phone: newOrder.phone || target.phone,
+                email: newOrder.email || target.email,
+                address: newOrder.address || target.address,
+                orders: [newOrderEntry, ...target.orders]
+            };
+        } else {
+            // Register new customer
+            const newCust = {
+                id: `C${String(allCustomers.length + 1).padStart(3, "0")}`,
+                name: newOrder.client,
+                phone: newOrder.phone,
+                email: newOrder.email,
+                address: newOrder.address,
+                origin: "Balcão",
+                notes: "",
+                active: true,
+                createdAt: dateStr,
+                tags: ["Recorrente"],
+                orders: [newOrderEntry]
+            };
+            updatedCusts = [newCust, ...updatedCusts];
+        }
+
+        setAllCustomers(updatedCusts);
+        localStorage.setItem("lavanpro_customers", JSON.stringify(updatedCusts));
+
         const freshOrder: Order = {
-            id: `#ORD-${idNum}`,
+            id: orderId,
             client: newOrder.client, phone: newOrder.phone, email: newOrder.email,
             address: newOrder.address, delivery: newOrder.delivery,
             paymentMethod: newOrder.paymentMethod, paymentStatus: newOrder.paymentStatus,
@@ -140,23 +218,72 @@ export default function OrdersPage() {
             observations: newOrder.observations,
             estimatedDelivery: newOrder.estimatedDelivery,
             history: [{ time: timeStr, status: "Triagem", note: "Pedido criado." }],
-            createdAt: now.toISOString().slice(0, 10),
+            createdAt: dateStr,
         };
+        
         setOrders(prev => [freshOrder, ...prev]);
         setIsNewOrderOpen(false);
+        setCustomerSearch("");
+        setShowCustSuggestions(false);
         setNewOrder({ client: "", phone: "", email: "", address: "", delivery: "Entrega em Domicílio", paymentMethod: "PIX", paymentStatus: "A Pagar", estimatedDelivery: "", observations: "", items: [{ ...blankItem }] });
     };
+
+    useEffect(() => {
+        const handleClick = () => {
+            setShowCustSuggestions(false);
+            setShowServiceSuggestions(false);
+        };
+        window.addEventListener("click", handleClick);
+        return () => window.removeEventListener("click", handleClick);
+    }, []);
 
     const [realServices, setRealServices] = useState<any[]>([]);
 
     useEffect(() => {
+        const loadCusts = () => {
+            const savedCustomers = localStorage.getItem("lavanpro_customers");
+            if (savedCustomers) {
+                try { setAllCustomers(JSON.parse(savedCustomers)); } catch { }
+            } else {
+                setAllCustomers(seedCustomers);
+            }
+        };
+
         const savedServices = localStorage.getItem("lavanpro_services_pro");
         if (savedServices) {
             try { setRealServices(JSON.parse(savedServices)); } catch { }
         }
+        
+        loadCusts();
+
+        const handleStorage = (e: StorageEvent) => {
+            if (e.key === "lavanpro_customers") loadCusts();
+        };
+        window.addEventListener("storage", handleStorage);
+        return () => window.removeEventListener("storage", handleStorage);
     }, []);
 
-    const currentServices = realServices.length > 0 ? realServices : SERVICES;
+    const currentServices = realServices.length > 0 ? realServices : initialServices;
+
+    const filteredCustomers = useMemo(() => {
+        if (!customerSearch) return [];
+        return allCustomers.filter(c => 
+            c.name.toLowerCase().includes(customerSearch.toLowerCase()) || 
+            (c.phone && c.phone.includes(customerSearch))
+        ).slice(0, 5);
+    }, [allCustomers, customerSearch]);
+
+    const selectCustomer = (c: any) => {
+        setNewOrder(n => ({ 
+            ...n, 
+            client: c.name, 
+            phone: c.phone || "", 
+            email: c.email || "", 
+            address: c.address || "" 
+        }));
+        setCustomerSearch(c.name);
+        setShowCustSuggestions(false);
+    };
 
     const handleStatusChange = (statusOption: string) => {
         if (!selectedOrder) return;
@@ -176,8 +303,8 @@ export default function OrdersPage() {
                     let movements = savedStockMovements ? JSON.parse(savedStockMovements) : [];
                     let hasStockIssue = false;
 
-                    selectedOrder.items.forEach(item => {
-                        const service = realServices.find(s => s.name === item.service);
+                    selectedOrder.items.forEach((item: OrderItem) => {
+                        const service = realServices.find((s: any) => s.name === item.service);
                         if (service && service.recipe && service.recipe.length > 0) {
                             service.recipe.forEach((recipeItem: any) => {
                                 const productIdx = products.findIndex((p: any) => p.id === recipeItem.productId);
@@ -231,16 +358,39 @@ export default function OrdersPage() {
         setIsStatusDropdown(false);
     };
 
+    const handleDeleteOrder = (id: string) => {
+        if (confirm("Tem certeza que deseja excluir este pedido? Esta ação é irreversível e removerá o pedido de todos os registros.")) {
+            setOrders(prev => prev.filter(o => o.id !== id));
+            setSelectedOrder(null);
+        }
+    };
+
     const handleSaveOrder = () => {
         if (!selectedOrder) return;
 
-        // Verifica se o pedido foi salvo como Entregue e se tem QR Code vinculado
+        // Sync with Customers Database if name/contact changed
+        const existingCustIdx = allCustomers.findIndex((c: Customer) => c.id === selectedOrder.client); // Assuming client field might store ID or we match by name
+        // (Simplified sync for now based on name if ID isn't clear)
+        const updatedCusts = allCustomers.map((c: Customer) => {
+            if (c.name === selectedOrder.client) {
+                return {
+                    ...c,
+                    phone: selectedOrder.phone || c.phone,
+                    email: selectedOrder.email || c.email,
+                    address: selectedOrder.address || c.address
+                };
+            }
+            return c;
+        });
+        setAllCustomers(updatedCusts);
+        localStorage.setItem("lavanpro_customers", JSON.stringify(updatedCusts));
+
+        // ... existing QR Logic ...
         if (selectedOrder.status === "Entregue") {
             try {
                 const savedLabels = localStorage.getItem("lavanpro_labels");
                 if (savedLabels) {
                     const labels = JSON.parse(savedLabels);
-                    // Garante a extração correta do ID removendo `#` e espaços
                     const cleanId = String(selectedOrder.id).replace("#", "").trim();
                     const linkedLabel = labels.find((l: any) => String(l.currentOrderId).trim() === cleanId);
 
@@ -251,27 +401,10 @@ export default function OrdersPage() {
                                 l.id === linkedLabel.id ? { ...l, status: "available", currentOrderId: null } : l
                             );
                             localStorage.setItem("lavanpro_labels", JSON.stringify(updatedLabels));
-
-                            // Também atualiza histórico se existir
-                            const savedHistory = localStorage.getItem("lavanpro_label_history");
-                            if (savedHistory) {
-                                const history = JSON.parse(savedHistory);
-                                const updatedHistory = history.map((h: any) =>
-                                    (h.labelId === linkedLabel.id && h.orderId === cleanId && !h.releasedAt)
-                                        ? { ...h, releasedAt: new Date().toISOString() }
-                                        : h
-                                );
-                                localStorage.setItem("lavanpro_label_history", JSON.stringify(updatedHistory));
-                            }
-
-                            // Dispara evento de storage para a página de Etiquetas atualizar
-                            window.dispatchEvent(new Event("storage"));
                         }
                     }
                 }
-            } catch (e) {
-                console.error("Erro ao processar desvínculo de QR Code:", e);
-            }
+            } catch (e) {}
         }
 
         setOrders(prev => prev.map(o => o.id === selectedOrder.id ? selectedOrder : o));
@@ -378,12 +511,13 @@ export default function OrdersPage() {
                                                 <th className="p-4">Total</th>
                                                 <th className="p-4">Status</th>
                                                 <th className="p-4">Pagamento</th>
-                                                <th className="p-4 pr-6">Entrega Prev.</th>
+                                                <th className="p-4">Entrega Prev.</th>
+                                                <th className="p-4 pr-6 text-right">Ações</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-brand-darkBorder">
                                             {filteredOrders.length === 0 && (
-                                                <tr><td colSpan={7} className="text-center py-12 text-brand-muted text-sm">Nenhum pedido encontrado.</td></tr>
+                                                <tr><td colSpan={8} className="text-center py-12 text-brand-muted text-sm">Nenhum pedido encontrado.</td></tr>
                                             )}
                                             {filteredOrders.map((order) => {
                                                 const cfg = STATUS_CONFIG[order.status];
@@ -418,8 +552,26 @@ export default function OrdersPage() {
                                                                     : "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
                                                                 }`}>{order.paymentStatus}</span>
                                                         </td>
-                                                        <td className="p-4 pr-6 text-sm text-brand-muted font-semibold">
+                                                        <td className="p-4 text-sm text-brand-muted font-semibold">
                                                             {order.estimatedDelivery || "—"}
+                                                        </td>
+                                                        <td className="p-4 pr-6 text-right">
+                                                            <div className="flex justify-end gap-2">
+                                                                <button 
+                                                                    onClick={(e) => { e.stopPropagation(); handleDeleteOrder(order.id); }}
+                                                                    className="p-2.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 rounded-lg border border-rose-500/20 transition-all opacity-0 group-hover:opacity-100"
+                                                                    title="Excluir Pedido"
+                                                                >
+                                                                    <Trash2 className="size-4" />
+                                                                </button>
+                                                                <button 
+                                                                    onClick={(e) => { e.stopPropagation(); setSelectedOrder(order); }}
+                                                                    className="p-2.5 bg-brand-primary/10 hover:bg-brand-primary/20 text-brand-primary rounded-lg border border-brand-primary/20 transition-all opacity-0 group-hover:opacity-100"
+                                                                    title="Editar Pedido"
+                                                                >
+                                                                    <Edit2 className="size-4" />
+                                                                </button>
+                                                            </div>
                                                         </td>
                                                     </tr>
                                                 );
@@ -435,115 +587,303 @@ export default function OrdersPage() {
 
                 <AnimatePresence>
 
-                    {/* --- MODAL: Novo Pedido --- */}
+                    {/* --- MODAL: Novo Pedido (REFORMULADO PREMIUM) --- */}
                     {isNewOrderOpen && (
-                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-                            <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                                className="bg-brand-card w-full max-w-2xl rounded-2xl border border-brand-darkBorder shadow-2xl flex flex-col max-h-[90vh]">
-                                <div className="p-5 border-b border-brand-darkBorder flex justify-between items-center bg-white/5">
-                                    <h3 className="text-lg font-bold text-brand-text flex items-center gap-2"><Plus className="size-5 text-brand-primary" /> Novo Pedido</h3>
-                                    <button onClick={() => setIsNewOrderOpen(false)} className="text-brand-muted hover:text-brand-text bg-brand-bg p-2 rounded-lg border border-brand-darkBorder"><X className="size-4" /></button>
+                        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+                            <motion.div 
+                                initial={{ opacity: 0, scale: 0.9, y: 30 }} 
+                                animate={{ opacity: 1, scale: 1, y: 0 }} 
+                                exit={{ opacity: 0, scale: 0.9, y: 30 }}
+                                className="bg-[#0f111a]/95 w-full max-w-3xl rounded-[2.5rem] border border-white/10 shadow-[0_32px_64px_-16px_rgba(0,0,0,0.6)] flex flex-col max-h-[94vh] overflow-hidden"
+                            >
+                                {/* Header Minimalista */}
+                                <div className="px-10 py-8 flex justify-between items-center">
+                                    <div className="flex items-center gap-5">
+                                        <div className="size-14 rounded-[1.25rem] bg-brand-primary/20 flex items-center justify-center border border-brand-primary/30 shadow-[0_0_20px_rgba(139,92,246,0.2)]">
+                                            <Plus className="size-7 text-brand-primary" />
+                                        </div>
+                                        <div>
+                                            <h3 className="text-2xl font-black text-white tracking-tight">Novo Pedido</h3>
+                                            <p className="text-xs text-brand-muted font-bold uppercase tracking-widest mt-0.5">Registro de Entrada de Serviço</p>
+                                        </div>
+                                    </div>
+                                    <button onClick={() => setIsNewOrderOpen(false)} className="size-12 bg-white/5 hover:bg-rose-500/20 border border-white/10 hover:border-rose-500/30 rounded-2xl text-brand-muted hover:text-rose-400 transition-all flex items-center justify-center group">
+                                        <X className="size-5 group-hover:rotate-90 transition-transform" />
+                                    </button>
                                 </div>
-                                <div className="p-6 overflow-y-auto custom-scrollbar space-y-6 flex-1">
 
-                                    {/* Client Info */}
-                                    <section>
-                                        <h4 className="text-xs font-bold uppercase tracking-wider text-brand-muted mb-3 flex items-center gap-2"><User className="size-3.5" /> Dados do Cliente</h4>
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                            {[
-                                                { label: "Nome do Cliente", field: "client", type: "text", placeholder: "João da Silva" },
-                                                { label: "Telefone", field: "phone", type: "text", placeholder: "(11) 9 0000-0000" },
-                                                { label: "E-mail", field: "email", type: "email", placeholder: "cliente@email.com" },
-                                            ].map(({ label, field, type, placeholder }) => (
-                                                <div key={field} className="space-y-1.5">
-                                                    <label className="text-[11px] font-bold uppercase tracking-wider text-brand-muted">{label}</label>
-                                                    <input type={type} placeholder={placeholder} value={(newOrder as any)[field]}
-                                                        onChange={e => setNewOrder(n => ({ ...n, [field]: e.target.value }))}
-                                                        className="w-full px-3 py-2.5 bg-brand-bg border border-brand-darkBorder rounded-xl text-sm text-brand-text placeholder:text-brand-muted focus:outline-none focus:ring-2 focus:ring-brand-primary transition-all" />
+                                <div className="flex-1 overflow-y-auto custom-scrollbar px-10 pb-10 space-y-10">
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+                                        {/* Coluna 1: Cliente e Logística */}
+                                        <div className="space-y-10">
+                                            <section>
+                                                <div className="flex items-center gap-3 mb-6">
+                                                    <div className="h-5 w-1 bg-brand-primary rounded-full" />
+                                                    <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-brand-muted">Informações Relevantes</h4>
                                                 </div>
-                                            ))}
-                                            <div className="space-y-1.5 sm:col-span-2">
-                                                <label className="text-[11px] font-bold uppercase tracking-wider text-brand-muted">Endereço</label>
-                                                <input type="text" placeholder="Av. Paulista, 1000 - Centro" value={newOrder.address}
-                                                    onChange={e => setNewOrder(n => ({ ...n, address: e.target.value }))}
-                                                    className="w-full px-3 py-2.5 bg-brand-bg border border-brand-darkBorder rounded-xl text-sm text-brand-text placeholder:text-brand-muted focus:outline-none focus:ring-2 focus:ring-brand-primary transition-all" />
-                                            </div>
-                                        </div>
-                                    </section>
+                                                <div className="space-y-4">
+                                                    {/* Nome do Cliente com Autocomplete */}
+                                                    <div className="relative group">
+                                                        <div className="absolute left-5 top-1/2 -translate-y-1/2 transition-colors">
+                                                            <User className="size-4 text-brand-muted group-focus-within:text-brand-primary" />
+                                                        </div>
+                                                        <input 
+                                                            type="text" 
+                                                            placeholder="Ex: João da Silva" 
+                                                            value={customerSearch}
+                                                            onFocus={() => setShowCustSuggestions(true)}
+                                                            onClick={e => e.stopPropagation()}
+                                                            onChange={e => {
+                                                                setCustomerSearch(e.target.value);
+                                                                setNewOrder(n => ({ ...n, client: e.target.value }));
+                                                                setShowCustSuggestions(true);
+                                                            }}
+                                                            className="w-full pl-14 pr-5 py-4 bg-white/[0.03] border border-white/5 rounded-2xl text-sm font-bold text-white placeholder:text-brand-muted focus:bg-white/[0.05] focus:border-brand-primary/50 focus:outline-none transition-all"
+                                                        />
+                                                        <label className="absolute left-5 -top-2 px-2 bg-[#0f111a] text-[10px] font-bold text-brand-muted uppercase tracking-wider group-focus-within:text-brand-primary transition-colors">
+                                                            Nome do Cliente
+                                                        </label>
 
-                                    {/* Items */}
-                                    <section>
-                                        <h4 className="text-xs font-bold uppercase tracking-wider text-brand-muted mb-3 flex items-center gap-2"><Package className="size-3.5" /> Itens do Pedido</h4>
-                                        <div className="space-y-2">
-                                            {newOrder.items.map((item, idx) => (
-                                                <div key={idx} className="flex gap-2 items-center bg-brand-bg border border-brand-darkBorder rounded-xl p-3">
-                                                    <select value={item.service} onChange={e => handleItemChange(idx, "service", e.target.value)}
-                                                        className="flex-1 bg-transparent text-sm font-semibold text-brand-text outline-none appearance-none cursor-pointer">
-                                                        {currentServices.map(s => <option key={s.name} value={s.name} className="bg-brand-card">{s.name}</option>)}
-                                                    </select>
-                                                    <input type="number" min={1} value={item.qty} onChange={e => handleItemChange(idx, "qty", e.target.value)}
-                                                        className="w-14 text-center bg-brand-card border border-brand-darkBorder rounded-lg text-sm font-bold text-brand-text outline-none focus:ring-2 focus:ring-brand-primary py-1" />
-                                                    <span className="text-xs font-bold text-emerald-500 w-20 text-right">{formatCurrency(item.qty * item.unitPrice)}</span>
-                                                    {newOrder.items.length > 1 && (
-                                                        <button onClick={() => handleRemoveItem(idx)} className="text-rose-500 hover:text-rose-400 p-1"><Trash2 className="size-4" /></button>
-                                                    )}
+                                                        {/* Sugestões de Clientes */}
+                                                        <AnimatePresence>
+                                                            {showCustSuggestions && filteredCustomers.length > 0 && (
+                                                                <motion.div 
+                                                                    initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }}
+                                                                    className="absolute left-0 right-0 top-full mt-2 bg-[#161925] border border-white/10 rounded-2xl shadow-2xl z-[70] overflow-hidden"
+                                                                >
+                                                                    {filteredCustomers.map(c => (
+                                                                        <button key={c.id} onClick={() => selectCustomer(c)}
+                                                                            className="w-full text-left px-5 py-3 hover:bg-white/5 transition-colors border-b border-white/5 last:border-0">
+                                                                            <p className="text-xs font-bold text-white">{c.name}</p>
+                                                                            <p className="text-[10px] text-brand-muted">{c.phone || "Sem telefone"}</p>
+                                                                        </button>
+                                                                    ))}
+                                                                </motion.div>
+                                                            )}
+                                                        </AnimatePresence>
+                                                    </div>
+
+                                                    {[
+                                                        { icon: Phone, label: "Telefone / WhatsApp", field: "phone", type: "text", placeholder: "(11) 9 0000-0000" },
+                                                        { icon: Mail, label: "E-mail de Contato", field: "email", type: "email", placeholder: "cliente@email.com" },
+                                                        { icon: MapPin, label: "Endereço Completo", field: "address", type: "text", placeholder: "Rua, Número, Bairro - Cidade" },
+                                                    ].map(({ icon: Icon, label, field, type, placeholder }) => (
+                                                        <div key={field} className="relative group">
+                                                            <div className="absolute left-5 top-1/2 -translate-y-1/2 transition-colors">
+                                                                <Icon className="size-4 text-brand-muted group-focus-within:text-brand-primary" />
+                                                            </div>
+                                                            <input 
+                                                                type={type} 
+                                                                placeholder={placeholder} 
+                                                                value={(newOrder as any)[field]}
+                                                                onChange={e => setNewOrder(n => ({ ...n, [field]: e.target.value }))}
+                                                                className="w-full pl-14 pr-5 py-4 bg-white/[0.03] border border-white/5 rounded-2xl text-sm font-bold text-white placeholder:text-brand-muted focus:bg-white/[0.05] focus:border-brand-primary/50 focus:outline-none transition-all"
+                                                            />
+                                                            <label className="absolute left-5 -top-2 px-2 bg-[#0f111a] text-[10px] font-bold text-brand-muted uppercase tracking-wider group-focus-within:text-brand-primary transition-colors">
+                                                                {label}
+                                                            </label>
+                                                        </div>
+                                                    ))}
                                                 </div>
-                                            ))}
-                                        </div>
-                                        <button onClick={handleAddItem} className="mt-2 w-full py-2 border border-dashed border-brand-darkBorder rounded-xl text-xs font-bold text-brand-muted hover:text-brand-primary hover:border-brand-primary transition-all flex items-center justify-center gap-2">
-                                            <Plus className="size-3.5" /> Adicionar Item
-                                        </button>
-                                        <div className="mt-3 flex justify-end">
-                                            <span className="text-sm font-black text-brand-text">Total: <span className="text-brand-primary">{formatCurrency(calcTotal(newOrder.items))}</span></span>
-                                        </div>
-                                    </section>
+                                            </section>
 
-                                    {/* Logistics & Payment */}
-                                    <section>
-                                        <h4 className="text-xs font-bold uppercase tracking-wider text-brand-muted mb-3 flex items-center gap-2"><Truck className="size-3.5" /> Logística e Pagamento</h4>
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                            <div className="space-y-1.5">
-                                                <label className="text-[11px] font-bold uppercase tracking-wider text-brand-muted">Método de Entrega</label>
-                                                <select value={newOrder.delivery} onChange={e => setNewOrder(n => ({ ...n, delivery: e.target.value }))}
-                                                    className="w-full px-3 py-2.5 bg-brand-bg border border-brand-darkBorder rounded-xl text-sm text-brand-text appearance-none focus:outline-none focus:ring-2 focus:ring-brand-primary">
-                                                    <option>Entrega em Domicílio</option>
-                                                    <option>Retirada no Balcão</option>
-                                                </select>
-                                            </div>
-                                            <div className="space-y-1.5">
-                                                <label className="text-[11px] font-bold uppercase tracking-wider text-brand-muted">Forma de Pagamento</label>
-                                                <select value={newOrder.paymentMethod} onChange={e => setNewOrder(n => ({ ...n, paymentMethod: e.target.value }))}
-                                                    className="w-full px-3 py-2.5 bg-brand-bg border border-brand-darkBorder rounded-xl text-sm text-brand-text appearance-none focus:outline-none focus:ring-2 focus:ring-brand-primary">
-                                                    <option>PIX</option><option>Cartão de Crédito</option><option>Cartão de Débito</option><option>Dinheiro</option><option>Boleto</option>
-                                                </select>
-                                            </div>
-                                            <div className="space-y-1.5">
-                                                <label className="text-[11px] font-bold uppercase tracking-wider text-brand-muted">Status do Pagamento</label>
-                                                <select value={newOrder.paymentStatus} onChange={e => setNewOrder(n => ({ ...n, paymentStatus: e.target.value }))}
-                                                    className="w-full px-3 py-2.5 bg-brand-bg border border-brand-darkBorder rounded-xl text-sm text-brand-text appearance-none focus:outline-none focus:ring-2 focus:ring-brand-primary">
-                                                    {PAYMENT_STATUSES.map(p => <option key={p}>{p}</option>)}
-                                                </select>
-                                            </div>
-                                            <div className="space-y-1.5">
-                                                <label className="text-[11px] font-bold uppercase tracking-wider text-brand-muted">Previsão de Entrega</label>
-                                                <input type="date" value={newOrder.estimatedDelivery} onChange={e => setNewOrder(n => ({ ...n, estimatedDelivery: e.target.value }))}
-                                                    className="w-full px-3 py-2.5 bg-brand-bg border border-brand-darkBorder rounded-xl text-sm text-brand-text focus:outline-none focus:ring-2 focus:ring-brand-primary" />
-                                            </div>
+                                            <section>
+                                                <div className="flex items-center gap-3 mb-6">
+                                                    <div className="h-5 w-1 bg-brand-primary rounded-full" />
+                                                    <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-brand-muted">Configuração de Entrega</h4>
+                                                </div>
+                                                <div className="grid grid-cols-1 gap-4">
+                                                    <div className="relative group">
+                                                        <div className="absolute left-5 top-1/2 -translate-y-1/2">
+                                                            <Home className="size-4 text-brand-muted group-focus-within:text-brand-primary" />
+                                                        </div>
+                                                        <select 
+                                                            value={newOrder.delivery} 
+                                                            onChange={e => setNewOrder(n => ({ ...n, delivery: e.target.value }))}
+                                                            className="w-full pl-14 pr-12 py-4 bg-white/[0.03] border border-white/5 rounded-2xl text-sm font-bold text-white focus:border-brand-primary/50 outline-none appearance-none cursor-pointer"
+                                                        >
+                                                            <option className="bg-[#161925]">Entrega em Domicílio</option>
+                                                            <option className="bg-[#161925]">Retirada no Balcão</option>
+                                                        </select>
+                                                        <ChevronDown className="absolute right-5 top-1/2 -translate-y-1/2 size-4 text-brand-muted pointer-events-none" />
+                                                        <label className="absolute left-5 -top-2 px-2 bg-[#0f111a] text-[10px] font-bold text-brand-muted uppercase tracking-wider">Método</label>
+                                                    </div>
+                                                    <div className="relative group">
+                                                        <div className="absolute left-5 top-1/2 -translate-y-1/2">
+                                                            <CalendarDays className="size-4 text-brand-muted group-focus-within:text-brand-primary" />
+                                                        </div>
+                                                        <input 
+                                                            type="date" 
+                                                            value={newOrder.estimatedDelivery}
+                                                            onChange={e => setNewOrder(n => ({ ...n, estimatedDelivery: e.target.value }))}
+                                                            className="w-full pl-14 pr-5 py-4 bg-white/[0.03] border border-white/5 rounded-2xl text-sm font-bold text-white focus:border-brand-primary/50 outline-none transition-all [color-scheme:dark]"
+                                                        />
+                                                        <label className="absolute left-5 -top-2 px-2 bg-[#0f111a] text-[10px] font-bold text-brand-muted uppercase tracking-wider">Previsão</label>
+                                                    </div>
+                                                </div>
+                                            </section>
                                         </div>
-                                    </section>
 
-                                    {/* Observations */}
-                                    <section>
-                                        <h4 className="text-xs font-bold uppercase tracking-wider text-brand-muted mb-3 flex items-center gap-2"><StickyNote className="size-3.5" /> Observações Internas</h4>
-                                        <textarea rows={3} placeholder="Anotações internas, instruções especiais, alertas..." value={newOrder.observations}
-                                            onChange={e => setNewOrder(n => ({ ...n, observations: e.target.value }))}
-                                            className="w-full px-3 py-2.5 bg-brand-bg border border-brand-darkBorder rounded-xl text-sm text-brand-text placeholder:text-brand-muted focus:outline-none focus:ring-2 focus:ring-brand-primary resize-none" />
-                                    </section>
+                                        {/* Coluna 2: Itens e Pagamento */}
+                                        <div className="space-y-10">
+                                            <section>
+                                                <div className="flex items-center justify-between mb-6">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="h-5 w-1 bg-brand-primary rounded-full" />
+                                                        <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-brand-muted">Serviços Adicionados</h4>
+                                                    </div>
+                                                    <button onClick={handleAddItem} className="flex items-center gap-2 text-brand-primary hover:text-brand-primary/80 transition-colors">
+                                                        <Plus className="size-3" />
+                                                        <span className="text-[10px] font-black uppercase tracking-widest">Adicionar</span>
+                                                    </button>
+                                                </div>
+                                                <div className="space-y-4 max-h-[380px] overflow-y-auto pr-4 custom-scrollbar pb-24">
+                                                    {newOrder.items.map((item, idx) => (
+                                                        <div key={idx} className={`group relative bg-white/[0.02] border border-white/5 rounded-[2rem] p-6 flex flex-col gap-5 transition-all hover:bg-white/[0.04] hover:border-brand-primary/30 ${activeServiceIdx === idx ? 'z-[110]' : 'z-10'}`}>
+                                                            <div className="flex items-center gap-4">
+                                                                                <div className="flex-1 relative">
+                                                                                    <div className="absolute left-0 top-1/2 -translate-y-1/2">
+                                                                                        <Search className="size-4 text-brand-muted" />
+                                                                                    </div>
+                                                                                    <input 
+                                                                                        type="text"
+                                                                                        placeholder="Nome do serviço..."
+                                                                                        value={item.service}
+                                                                                        onClick={e => e.stopPropagation()}
+                                                                                        onChange={e => {
+                                                                                            handleItemChange(idx, "service", e.target.value);
+                                                                                            setActiveServiceIdx(idx);
+                                                                                            setShowServiceSuggestions(true);
+                                                                                        }}
+                                                                                        onFocus={() => {
+                                                                                            setActiveServiceIdx(idx);
+                                                                                            setShowServiceSuggestions(true);
+                                                                                        }}
+                                                                                        className="w-full bg-transparent pl-7 text-sm font-black text-white outline-none placeholder:text-brand-muted"
+                                                                                    />
+
+                                                                                    <AnimatePresence>
+                                                                                        {showServiceSuggestions && activeServiceIdx === idx && (
+                                                                                            <motion.div 
+                                                                                                initial={{ opacity: 0, y: 10 }}
+                                                                                                animate={{ opacity: 1, y: 0 }}
+                                                                                                exit={{ opacity: 0, y: 10 }}
+                                                                                                className="absolute top-[calc(100%+12px)] left-0 w-full min-w-[320px] bg-[#1a1d29] border border-white/10 rounded-2xl shadow-[0_32px_64px_-16px_rgba(0,0,0,0.8)] z-[120] overflow-hidden max-h-[280px] overflow-y-auto custom-scrollbar backdrop-blur-3xl"
+                                                                                            >
+                                                                                                {currentServices
+                                                                                                    .filter(s => s.name.toLowerCase().includes(item.service.toLowerCase()))
+                                                                                                    .map((s, sIdx) => (
+                                                                                                        <button 
+                                                                                                            key={sIdx}
+                                                                                                            onClick={(e) => {
+                                                                                                                e.stopPropagation();
+                                                                                                                handleItemChange(idx, "service", s.name);
+                                                                                                                setShowServiceSuggestions(false);
+                                                                                                                setActiveServiceIdx(null);
+                                                                                                            }}
+                                                                                                            className="w-full text-left px-5 py-4 hover:bg-white/5 transition-colors border-b border-white/5 last:border-0 flex justify-between items-center gap-4 group/item"
+                                                                                                        >
+                                                                                                            <span className="text-xs font-bold text-white group-hover/item:text-brand-primary transition-colors flex-1">{s.name}</span>
+                                                                                                            <span className="text-[10px] font-black text-emerald-400 bg-emerald-400/10 px-2 py-1 rounded-lg shrink-0">{formatCurrency(s.price)}</span>
+                                                                                                        </button>
+                                                                                                    ))}
+                                                                                                {currentServices.filter(s => s.name.toLowerCase().includes(item.service.toLowerCase())).length === 0 && (
+                                                                                                    <div className="px-5 py-3 text-[10px] text-brand-muted italic">Serviço novo (preço manual)</div>
+                                                                                                )}
+                                                                                            </motion.div>
+                                                                                        )}
+                                                                                    </AnimatePresence>
+                                                                                </div>
+                                                                <div className="text-right">
+                                                                    <div className="flex items-center gap-2 bg-black/40 rounded-lg px-2 py-1">
+                                                                        <span className="text-[10px] font-black text-brand-muted">R$</span>
+                                                                        <input 
+                                                                            type="number"
+                                                                            value={item.unitPrice}
+                                                                            onChange={e => handleItemChange(idx, "unitPrice", e.target.value)}
+                                                                            className="w-16 bg-transparent text-sm font-black text-emerald-400 outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                                                        />
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                            
+                                                            <div className="flex items-center justify-between">
+                                                                <div className="flex items-center bg-black/40 rounded-lg p-1">
+                                                                    <button onClick={() => handleItemChange(idx, "qty", Math.max(1, item.qty - 1))} className="size-8 flex items-center justify-center text-brand-muted hover:text-white">-</button>
+                                                                    <span className="w-10 text-center text-xs font-black text-brand-primary">{item.qty}</span>
+                                                                    <button onClick={() => handleItemChange(idx, "qty", item.qty + 1)} className="size-8 flex items-center justify-center text-brand-muted hover:text-white">+</button>
+                                                                </div>
+                                                                <div className="flex items-center gap-4">
+                                                                    <p className="text-lg font-black text-emerald-400">{formatCurrency(item.qty * item.unitPrice)}</p>
+                                                                    {newOrder.items.length > 1 && (
+                                                                        <button onClick={() => handleRemoveItem(idx)} className="text-rose-500 hover:text-rose-400 transition-colors p-2 bg-white/5 rounded-xl"><Trash2 className="size-4" /></button>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                                <div className="mt-6 p-5 bg-brand-primary/5 border border-brand-primary/10 rounded-2xl flex items-center justify-between">
+                                                    <span className="text-[10px] font-black uppercase tracking-[0.2em] text-brand-muted">Total Acumulado</span>
+                                                    <span className="text-2xl font-black text-brand-primary">{formatCurrency(calcTotal(newOrder.items))}</span>
+                                                </div>
+                                            </section>
+
+                                            <section>
+                                                <div className="flex items-center gap-3 mb-6">
+                                                    <div className="h-5 w-1 bg-brand-primary rounded-full" />
+                                                    <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-brand-muted">Financeiro e Notas</h4>
+                                                </div>
+                                                <div className="space-y-4">
+                                                    <div className="grid grid-cols-2 gap-4">
+                                                        <div className="relative group">
+                                                            <div className="absolute left-5 top-1/2 -translate-y-1/2">
+                                                                <CreditCard className="size-4 text-brand-muted group-focus-within:text-brand-primary" />
+                                                            </div>
+                                                            <select value={newOrder.paymentMethod} onChange={e => setNewOrder(n => ({ ...n, paymentMethod: e.target.value }))}
+                                                                className="w-full pl-14 pr-10 py-4 bg-white/[0.03] border border-white/5 rounded-2xl text-sm font-bold text-white focus:border-brand-primary/50 outline-none appearance-none cursor-pointer">
+                                                                <option className="bg-[#161925]">PIX</option><option className="bg-[#161925]">Cartão</option><option className="bg-[#161925]">Dinheiro</option>
+                                                            </select>
+                                                            <ChevronDown className="absolute right-5 top-1/2 -translate-y-1/2 size-4 text-brand-muted pointer-events-none" />
+                                                        </div>
+                                                        <div className="relative group">
+                                                            <select value={newOrder.paymentStatus} onChange={e => setNewOrder(n => ({ ...n, paymentStatus: e.target.value }))}
+                                                                className="w-full px-5 py-4 bg-white/[0.03] border border-white/5 rounded-2xl text-sm font-bold text-white focus:border-brand-primary/50 outline-none appearance-none cursor-pointer">
+                                                                {PAYMENT_STATUSES.map(p => <option key={p} className="bg-[#161925]">{p}</option>)}
+                                                            </select>
+                                                            <ChevronDown className="absolute right-5 top-1/2 -translate-y-1/2 size-4 text-brand-muted pointer-events-none" />
+                                                        </div>
+                                                    </div>
+                                                    <div className="relative group">
+                                                        <div className="absolute left-5 top-5">
+                                                            <StickyNote className="size-4 text-brand-muted group-focus-within:text-brand-primary" />
+                                                        </div>
+                                                        <textarea 
+                                                            rows={3} 
+                                                            placeholder="Observações especiais..." 
+                                                            value={newOrder.observations}
+                                                            onChange={e => setNewOrder(n => ({ ...n, observations: e.target.value }))}
+                                                            className="w-full pl-14 pr-5 py-4 bg-white/[0.03] border border-white/5 rounded-2xl text-sm font-bold text-white placeholder:text-brand-muted focus:bg-white/[0.05] focus:border-brand-primary/50 outline-none transition-all resize-none shadow-inner" 
+                                                        />
+                                                    </div>
+                                                </div>
+                                            </section>
+                                        </div>
+                                    </div>
                                 </div>
-                                <div className="p-5 border-t border-brand-darkBorder">
-                                    <button onClick={handleCreateOrder} disabled={!newOrder.client || newOrder.items.length === 0}
-                                        className="w-full py-3 bg-brand-primary text-white rounded-xl font-bold hover:bg-brand-primaryHover transition-all shadow-lg shadow-brand-primary/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
-                                        <CheckCircle2 className="size-4" /> Registrar Pedido
+
+                                <div className="px-10 py-8 bg-white/[0.02] border-t border-white/5">
+                                    <button 
+                                        onClick={handleCreateOrder} 
+                                        disabled={!newOrder.client || newOrder.items.length === 0}
+                                        className="w-full group relative py-6 bg-brand-primary text-white rounded-[1.75rem] font-black text-sm tracking-[0.2em] uppercase overflow-hidden transition-all hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50 shadow-[0_20px_40px_-10px_rgba(139,92,246,0.4)]"
+                                    >
+                                        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
+                                        <span className="relative flex items-center justify-center gap-4">
+                                            <CheckCircle2 className="size-6" />
+                                            Registrar Entrada de Pedido
+                                        </span>
                                     </button>
                                 </div>
                             </motion.div>
@@ -580,45 +920,76 @@ export default function OrdersPage() {
                         </div>
                     )}
 
-                    {/* --- MODAL: Detalhes do Pedido --- */}
+                    {/* --- MODAL: Detalhes do Pedido (REFORMULADO PREMIUM) --- */}
                     {selectedOrder && (
-                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-                            <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                                className="bg-brand-card w-full max-w-2xl rounded-2xl border border-brand-darkBorder shadow-2xl flex flex-col max-h-[92vh]">
-                                <div className="p-5 border-b border-brand-darkBorder flex justify-between items-center bg-white/5">
-                                    <h3 className="text-lg font-bold text-brand-text flex items-center gap-2">
-                                        <Activity className="size-5 text-brand-primary" />
-                                        Detalhes: <span className="text-brand-primary">{selectedOrder.id}</span>
-                                    </h3>
-                                    <div className="flex items-center gap-2">
-                                        <button title="Imprimir Ticket" className="p-2 bg-brand-bg border border-brand-darkBorder rounded-lg text-brand-muted hover:text-brand-text transition-colors"><Printer className="size-4" /></button>
-                                        <button title="Gerar Etiqueta QR" onClick={() => { setSelectedOrder(null); router.push(`/labels?order=${selectedOrder.id.replace('#', '')}`); }} className="p-2 bg-brand-primary/10 border border-brand-primary/20 rounded-lg text-brand-primary hover:bg-brand-primary/20 transition-colors"><QrCode className="size-4" /></button>
-                                        <button onClick={() => { setSelectedOrder(null); setIsStatusDropdown(false); }} className="text-brand-muted hover:text-brand-text bg-brand-bg p-2 rounded-lg border border-brand-darkBorder"><X className="size-4" /></button>
+                        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+                            <motion.div 
+                                initial={{ opacity: 0, scale: 0.9, y: 30 }} 
+                                animate={{ opacity: 1, scale: 1, y: 0 }} 
+                                exit={{ opacity: 0, scale: 0.9, y: 30 }}
+                                className="bg-[#0f111a]/95 w-full max-w-4xl rounded-[2.5rem] border border-white/10 shadow-[0_32px_64px_-16px_rgba(0,0,0,0.6)] flex flex-col max-h-[94vh] overflow-hidden"
+                            >
+                                {/* Header Minimalista */}
+                                <div className="px-10 py-8 border-b border-white/5 flex justify-between items-center bg-white/[0.02]">
+                                    <div className="flex items-center gap-6">
+                                        <div className="size-16 rounded-2xl bg-brand-primary/20 flex items-center justify-center border border-brand-primary/30 shadow-[0_0_30px_rgba(139,92,246,0.2)]">
+                                            <Package className="size-8 text-brand-primary" />
+                                        </div>
+                                        <div>
+                                            <div className="flex items-center gap-3">
+                                                <h3 className="text-2xl font-black text-white tracking-tight">Voucher do Pedido</h3>
+                                                <span className="px-3 py-1 rounded-full bg-white/5 border border-white/10 text-[10px] font-black text-brand-muted uppercase tracking-[0.2em]">{selectedOrder.id}</span>
+                                            </div>
+                                            <p className="text-xs text-brand-muted font-bold mt-1">Registrado em {selectedOrder.createdAt} • Alta Prioridade</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                        <button 
+                                            onClick={() => handleDeleteOrder(selectedOrder.id)}
+                                            className="p-4 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 rounded-2xl text-rose-500 transition-all flex items-center gap-2 group/del"
+                                            title="Excluir Pedido"
+                                        >
+                                            <Trash2 className="size-5 group-hover/del:scale-110 transition-transform" />
+                                        </button>
+                                        <button className="p-4 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl text-brand-muted hover:text-white transition-all"><Printer className="size-5" /></button>
+                                        <button onClick={() => { setSelectedOrder(null); router.push(`/labels?order=${selectedOrder.id.replace('#', '')}`); }} className="px-5 py-4 bg-brand-primary/10 hover:bg-brand-primary/20 border border-brand-primary/20 rounded-2xl text-brand-primary font-black text-xs tracking-widest uppercase transition-all flex items-center gap-3">
+                                            <QrCode className="size-5" /> Vincular QR
+                                        </button>
+                                        <button onClick={() => setSelectedOrder(null)} className="p-4 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl text-brand-muted hover:text-white transition-all"><X className="size-5" /></button>
                                     </div>
                                 </div>
-                                <div className="p-5 overflow-y-auto custom-scrollbar flex-1 space-y-5">
 
-                                    {/* Status bar */}
-                                    <div className="p-4 bg-brand-bg border border-brand-darkBorder rounded-xl">
-                                        <div className="flex items-center justify-between mb-3">
-                                            <span className="text-xs font-bold uppercase tracking-wider text-brand-muted">Status Operacional</span>
+                                <div className="flex-1 overflow-y-auto custom-scrollbar p-10 space-y-12">
+                                    
+                                    {/* Status Flow Moderno */}
+                                    <section className="bg-white/[0.03] border border-white/10 rounded-[2.5rem] p-8 shadow-inner">
+                                        <div className="flex items-center justify-between mb-8">
+                                            <div className="flex items-center gap-3">
+                                                <div className="relative size-3">
+                                                    <span className="absolute inset-0 rounded-full bg-brand-primary animate-ping opacity-20" />
+                                                    <span className="relative block size-3 rounded-full bg-brand-primary" />
+                                                </div>
+                                                <h4 className="text-[11px] font-black uppercase tracking-[0.3em] text-brand-primary">Estágio da Operação</h4>
+                                            </div>
                                             <div className="relative">
-                                                <button onClick={() => setIsStatusDropdown(!isStatusDropdown)}
-                                                    className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${selectedOrder.textColor} bg-current/10`} style={{ borderColor: 'currentColor', opacity: 1 }}>
-                                                    <span className="relative flex h-2 w-2">
-                                                        <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${selectedOrder.bgColor}`} />
-                                                        <span className={`relative inline-flex rounded-full h-2 w-2 ${selectedOrder.bgColor}`} />
-                                                    </span>
+                                                <button 
+                                                    onClick={() => setIsStatusDropdown(!isStatusDropdown)}
+                                                    className={`group flex items-center gap-4 px-6 py-3 rounded-2xl text-xs font-black border transition-all ${selectedOrder.textColor} bg-white/5 border-white/10 hover:border-brand-primary/50 shadow-lg`}
+                                                >
                                                     {selectedOrder.status}
-                                                    <ChevronDown className={`size-3 transition-transform ${isStatusDropdown ? "rotate-180" : ""}`} />
+                                                    <ChevronDown className={`size-4 transition-transform duration-300 ${isStatusDropdown ? "rotate-180" : ""}`} />
                                                 </button>
                                                 <AnimatePresence>
                                                     {isStatusDropdown && (
-                                                        <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
-                                                            className="absolute right-0 top-full mt-2 w-40 bg-brand-card border border-brand-darkBorder rounded-xl shadow-2xl overflow-hidden z-[60]">
+                                                        <motion.div 
+                                                            initial={{ opacity: 0, y: 10, scale: 0.95 }} 
+                                                            animate={{ opacity: 1, y: 0, scale: 1 }} 
+                                                            exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                                                            className="absolute right-0 top-full mt-4 w-64 bg-[#161925] border border-white/10 rounded-[1.5rem] shadow-[0_32px_64px_rgba(0,0,0,0.6)] overflow-hidden z-[70] p-2"
+                                                        >
                                                             {Object.keys(STATUS_CONFIG).map(s => (
                                                                 <button key={s} onClick={() => handleStatusChange(s)}
-                                                                    className={`w-full text-left px-4 py-2 text-xs font-bold transition-colors hover:bg-white/5 ${selectedOrder.status === s ? "text-brand-primary bg-brand-primary/5" : "text-brand-muted hover:text-brand-text"}`}>
+                                                                    className={`w-full text-left px-5 py-3.5 text-xs font-bold transition-all rounded-xl ${selectedOrder.status === s ? "text-brand-primary bg-brand-primary/10" : "text-brand-muted hover:text-white hover:bg-white/5"}`}>
                                                                     {s}
                                                                 </button>
                                                             ))}
@@ -627,125 +998,257 @@ export default function OrdersPage() {
                                                 </AnimatePresence>
                                             </div>
                                         </div>
-                                        <div className="relative h-2 w-full bg-brand-card rounded-full overflow-hidden">
-                                            <motion.div animate={{ width: `${selectedOrder.progress}%` }} transition={{ duration: 0.8 }}
-                                                className={`absolute h-full rounded-full ${selectedOrder.bgColor}`} />
-                                        </div>
-                                        <div className="flex justify-between text-[10px] font-bold text-brand-muted uppercase mt-2">
-                                            {["Recebido", "Triagem", "Lavagem", "Secagem", "Finaliz.", "Pronto", "Entregue"].map(l => <span key={l}>{l}</span>)}
-                                        </div>
-                                    </div>
 
-                                    {/* Client & Service Details */}
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                        {[
-                                            { icon: User, label: "Cliente", field: "client", type: "text" },
-                                            { icon: Phone, label: "Telefone", field: "phone", type: "text" },
-                                            { icon: Mail, label: "Email", field: "email", type: "email" },
-                                            { icon: MapPin, label: "Endereço", field: "address", type: "text" },
-                                        ].map(({ icon: Icon, label, field, type }) => (
-                                            <div key={field} className="p-3 bg-brand-bg border border-brand-darkBorder rounded-xl flex items-center gap-3">
-                                                <div className="p-2 bg-white/5 border border-white/10 rounded-lg shrink-0"><Icon className="size-3.5 text-brand-muted" /></div>
-                                                <div className="w-full overflow-hidden">
-                                                    <p className="text-[10px] text-brand-muted uppercase font-bold mb-0.5">{label}</p>
-                                                    <input type={type} value={(selectedOrder as any)[field]}
-                                                        onChange={e => setSelectedOrder({ ...selectedOrder, [field]: e.target.value })}
-                                                        className="w-full bg-transparent outline-none text-sm font-bold text-brand-text border-b border-transparent focus:border-brand-primary transition-colors pb-0.5 truncate" />
-                                                </div>
-                                            </div>
-                                        ))}
-                                        <div className="p-3 bg-brand-bg border border-brand-darkBorder rounded-xl flex items-center gap-3">
-                                            <div className="p-2 bg-white/5 border border-white/10 rounded-lg shrink-0"><Home className="size-3.5 text-brand-muted" /></div>
-                                            <div className="w-full">
-                                                <p className="text-[10px] text-brand-muted uppercase font-bold mb-0.5">Entrega</p>
-                                                <select value={selectedOrder.delivery} onChange={e => setSelectedOrder({ ...selectedOrder, delivery: e.target.value })}
-                                                    className="w-full bg-transparent text-sm font-bold text-brand-text outline-none appearance-none cursor-pointer">
-                                                    <option className="bg-brand-card">Entrega em Domicílio</option>
-                                                    <option className="bg-brand-card">Retirada no Balcão</option>
-                                                </select>
-                                            </div>
-                                        </div>
-                                        <div className="p-3 bg-brand-bg border border-brand-darkBorder rounded-xl flex items-center gap-3">
-                                            <div className="p-2 bg-white/5 border border-white/10 rounded-lg shrink-0"><CalendarDays className="size-3.5 text-brand-muted" /></div>
-                                            <div className="w-full">
-                                                <p className="text-[10px] text-brand-muted uppercase font-bold mb-0.5">Previsão de Entrega</p>
-                                                <input type="date" value={selectedOrder.estimatedDelivery}
-                                                    onChange={e => setSelectedOrder({ ...selectedOrder, estimatedDelivery: e.target.value })}
-                                                    className="w-full bg-transparent text-sm font-bold text-brand-text outline-none" />
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* Items */}
-                                    <div>
-                                        <h4 className="text-xs font-bold uppercase tracking-wider text-brand-muted mb-3 flex items-center gap-2"><Package className="size-3.5" /> Itens do Pedido</h4>
-                                        <div className="bg-brand-bg border border-brand-darkBorder rounded-xl overflow-hidden divide-y divide-brand-darkBorder">
-                                            {selectedOrder.items.map((item, idx) => (
-                                                <div key={idx} className="flex items-center justify-between px-4 py-3">
-                                                    <div>
-                                                        <p className="text-sm font-semibold text-brand-text">{item.service}</p>
-                                                        <p className="text-xs text-brand-muted">{item.qty}x {formatCurrency(item.unitPrice)}</p>
-                                                    </div>
-                                                    <span className="text-sm font-bold text-emerald-500">{formatCurrency(item.qty * item.unitPrice)}</span>
-                                                </div>
-                                            ))}
-                                            <div className="flex items-center justify-between px-4 py-3 bg-white/5">
-                                                <span className="text-sm font-black text-brand-text">Total</span>
-                                                <span className="text-sm font-black text-brand-primary">{formatCurrency(calcTotal(selectedOrder.items))}</span>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* Payment */}
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <div className="p-3 bg-brand-bg border border-brand-darkBorder rounded-xl">
-                                            <p className="text-[10px] font-bold uppercase tracking-wider text-brand-muted mb-1">Forma de Pagamento</p>
-                                            <select value={selectedOrder.paymentMethod} onChange={e => setSelectedOrder({ ...selectedOrder, paymentMethod: e.target.value })}
-                                                className="w-full bg-transparent text-sm font-bold text-brand-text outline-none appearance-none cursor-pointer">
-                                                <option className="bg-brand-card">PIX</option><option className="bg-brand-card">Cartão de Crédito</option><option className="bg-brand-card">Cartão de Débito</option><option className="bg-brand-card">Dinheiro</option><option className="bg-brand-card">Boleto</option>
-                                            </select>
-                                        </div>
-                                        <div className="p-3 bg-brand-bg border border-brand-darkBorder rounded-xl">
-                                            <p className="text-[10px] font-bold uppercase tracking-wider text-brand-muted mb-1">Status do Pagamento</p>
-                                            <select value={selectedOrder.paymentStatus} onChange={e => setSelectedOrder({ ...selectedOrder, paymentStatus: e.target.value })}
-                                                className="w-full bg-transparent text-sm font-bold text-brand-text outline-none appearance-none cursor-pointer">
-                                                {PAYMENT_STATUSES.map(p => <option key={p} className="bg-brand-card">{p}</option>)}
-                                            </select>
-                                        </div>
-                                    </div>
-
-                                    {/* Observations */}
-                                    <div>
-                                        <h4 className="text-xs font-bold uppercase tracking-wider text-brand-muted mb-3 flex items-center gap-2"><StickyNote className="size-3.5" /> Observações Internas</h4>
-                                        <textarea rows={2} placeholder="Nenhuma observação..." value={selectedOrder.observations}
-                                            onChange={e => setSelectedOrder({ ...selectedOrder, observations: e.target.value })}
-                                            className="w-full px-3 py-2.5 bg-brand-bg border border-brand-darkBorder rounded-xl text-sm text-brand-text placeholder:text-brand-muted focus:outline-none focus:ring-2 focus:ring-brand-primary resize-none" />
-                                    </div>
-
-                                    {/* Timeline */}
-                                    <div>
-                                        <h4 className="text-xs font-bold uppercase tracking-wider text-brand-muted mb-3 flex items-center gap-2"><History className="size-3.5" /> Histórico de Movimentação</h4>
-                                        <div className="relative pl-5 space-y-3">
-                                            <div className="absolute left-2 top-1 bottom-1 w-px bg-brand-darkBorder" />
-                                            {selectedOrder.history.map((h, idx) => (
-                                                <div key={idx} className="relative flex items-start gap-3">
-                                                    <div className="absolute -left-3 top-1.5 size-2.5 rounded-full border-2 border-brand-primary bg-brand-bg" />
-                                                    <div className="bg-brand-bg border border-brand-darkBorder rounded-xl px-3 py-2 flex-1">
-                                                        <div className="flex items-center justify-between">
-                                                            <span className="text-xs font-black text-brand-primary">{h.status}</span>
-                                                            <span className="text-[10px] text-brand-muted font-semibold flex items-center gap-1"><Timer className="size-3" />{h.time}</span>
+                                        <div className="relative px-4">
+                                            {/* Linha de fundo */}
+                                            <div className="absolute top-[22px] left-4 right-4 h-1.5 bg-white/[0.05] rounded-full" />
+                                            {/* Linha de progresso ativa */}
+                                            <motion.div 
+                                                initial={{ width: 0 }}
+                                                animate={{ width: `calc(${selectedOrder.progress}% - 32px)` }} 
+                                                className={`absolute top-[22px] left-4 h-1.5 rounded-full shadow-[0_0_20px_rgba(139,92,246,0.4)] ${selectedOrder.bgColor}`} 
+                                            />
+                                            
+                                            <div className="relative flex justify-between">
+                                                {["Recebido", "Triagem", "Lavagem", "Secagem", "Finaliz.", "Pronto", "Entregue"].map((label, idx) => {
+                                                    const stepProgress = (idx / 6) * 100;
+                                                    const isActive = selectedOrder.progress >= stepProgress;
+                                                    const isCurrent = selectedOrder.status === label || (label === "Finaliz." && selectedOrder.status === "Em Finalização") || (label === "Triagem" && selectedOrder.status === "Em Triagem") || (label === "Lavagem" && selectedOrder.status === "Em Lavagem") || (label === "Secagem" && selectedOrder.status === "Em Secagem");
+                                                    
+                                                    return (
+                                                        <div key={label} className="flex flex-col items-center group">
+                                                            <div className={`size-12 rounded-full border-[5px] ${isActive ? 'bg-[#0f111a] border-brand-primary shadow-[0_0_15px_rgba(139,92,246,0.3)]' : 'bg-[#0f111a] border-white/5'} flex items-center justify-center transition-all duration-700 z-10 ${isCurrent ? 'scale-125 border-brand-primary shadow-[0_0_30px_rgba(139,92,246,0.5)]' : ''}`}>
+                                                                {isActive ? <CheckCircle2 className="size-5 text-brand-primary" /> : <div className="size-2 rounded-full bg-white/10" />}
+                                                            </div>
+                                                            <span className={`mt-5 text-[10px] font-black uppercase tracking-[0.2em] transition-colors duration-500 ${isActive ? 'text-white' : 'text-brand-muted'}`}>{label}</span>
                                                         </div>
-                                                        {h.note && <p className="text-xs text-brand-muted mt-0.5">{h.note}</p>}
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    </section>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+                                        {/* Coluna 1: Dados do Cliente e Logística */}
+                                        <div className="space-y-12">
+                                            <section>
+                                                <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-brand-muted mb-6 flex items-center gap-3">
+                                                    <div className="size-1.5 rounded-full bg-brand-primary" /> Perfil do Cliente
+                                                </h4>
+                                                <div className="bg-white/[0.02] border border-white/5 rounded-[2rem] overflow-hidden divide-y divide-white/5">
+                                                    {[
+                                                        { icon: User, label: "Titular", field: "client", type: "text" },
+                                                        { icon: Phone, label: "WhatsApp", field: "phone", type: "text" },
+                                                        { icon: MapPin, label: "Localização", field: "address", type: "text" },
+                                                    ].map(({ icon: Icon, label, field, type }) => (
+                                                        <div key={field} className="flex items-center gap-6 p-5 hover:bg-white/[0.02] transition-colors group">
+                                                            <div className="size-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-brand-muted group-hover:text-brand-primary transition-colors">
+                                                                <Icon className="size-4" />
+                                                            </div>
+                                                            <div className="flex-1">
+                                                                <p className="text-[9px] font-black uppercase tracking-widest text-brand-muted mb-1">{label}</p>
+                                                                <input 
+                                                                    type={type} 
+                                                                    value={(selectedOrder as any)[field]}
+                                                                    onChange={e => setSelectedOrder({ ...selectedOrder, [field]: e.target.value })}
+                                                                    className="w-full bg-transparent text-sm font-bold text-white outline-none focus:text-brand-primary transition-colors"
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </section>
+
+                                            <section>
+                                                <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-brand-muted mb-6 flex items-center gap-3">
+                                                    <div className="size-1.5 rounded-full bg-brand-primary" /> Planejamento Logístico
+                                                </h4>
+                                                <div className="grid grid-cols-2 gap-4">
+                                                    <div className="p-5 bg-white/[0.02] border border-white/5 rounded-3xl group">
+                                                        <p className="text-[9px] font-black uppercase tracking-widest text-brand-muted mb-3">Modalidade</p>
+                                                        <select 
+                                                            value={selectedOrder.delivery} 
+                                                            onChange={e => setSelectedOrder({ ...selectedOrder, delivery: e.target.value })}
+                                                            className="w-full bg-transparent text-xs font-black text-white outline-none appearance-none cursor-pointer"
+                                                        >
+                                                            <option className="bg-[#161925]">Domicílio</option>
+                                                            <option className="bg-[#161925]">Balcão</option>
+                                                        </select>
+                                                    </div>
+                                                    <div className="p-5 bg-white/[0.02] border border-white/5 rounded-3xl">
+                                                        <p className="text-[9px] font-black uppercase tracking-widest text-brand-muted mb-3">Estimativa</p>
+                                                        <input 
+                                                            type="date" 
+                                                            value={selectedOrder.estimatedDelivery}
+                                                            onChange={e => setSelectedOrder({ ...selectedOrder, estimatedDelivery: e.target.value })}
+                                                            className="w-full bg-transparent text-xs font-black text-white outline-none [color-scheme:dark]"
+                                                        />
                                                     </div>
                                                 </div>
-                                            ))}
+                                            </section>
                                         </div>
+
+                                        {/* Coluna 2: Itens e Pagamento */}
+                                        <div className="space-y-12">
+                                            <section>
+                                                <div className="flex items-center justify-between mb-6">
+                                                    <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-brand-muted flex items-center gap-3">
+                                                        <div className="size-1.5 rounded-full bg-brand-primary" /> Especificação do Pedido
+                                                    </h4>
+                                                    <button onClick={handleAddSelectedItem} className="flex items-center gap-2 px-4 py-2 bg-brand-primary/10 hover:bg-brand-primary/20 border border-brand-primary/30 rounded-xl transition-all group">
+                                                        <Plus className="size-3.5 text-brand-primary" />
+                                                        <span className="text-[10px] font-black uppercase tracking-widest text-brand-primary">Adicionar</span>
+                                                    </button>
+                                                </div>
+                                                <div className="bg-white/[0.02] border border-white/5 rounded-[2.5rem] overflow-hidden shadow-inner">
+                                                    <div className="p-8 space-y-6 max-h-[400px] overflow-y-auto pr-6 custom-scrollbar">
+                                                        {selectedOrder.items.map((item: OrderItem, idx: number) => (
+                                                            <div key={idx} className={`group/item relative bg-white/[0.03] border border-white/5 rounded-3xl p-6 flex flex-col gap-6 transition-all hover:bg-white/[0.05] ${activeServiceIdx === idx ? 'z-[110]' : 'z-10'}`}>
+                                                                <div className="flex items-center gap-6">
+                                                                    <div className="flex-1 relative">
+                                                                        <div className="absolute left-0 top-1/2 -translate-y-1/2">
+                                                                            <Search className="size-4 text-brand-muted" />
+                                                                        </div>
+                                                                        <input 
+                                                                            type="text"
+                                                                            placeholder="Serviço..."
+                                                                            value={item.service}
+                                                                            onClick={e => e.stopPropagation()}
+                                                                            onFocus={() => { setActiveServiceIdx(idx); setShowServiceSuggestions(true); }}
+                                                                            onChange={e => handleSelectedItemChange(idx, "service", e.target.value)}
+                                                                            className="w-full bg-transparent pl-8 text-sm font-black text-white outline-none placeholder:text-brand-muted"
+                                                                        />
+                                                                        
+                                                                        <AnimatePresence>
+                                                                            {showServiceSuggestions && activeServiceIdx === idx && (
+                                                                                <motion.div 
+                                                                                    initial={{ opacity: 0, y: 10 }}
+                                                                                    animate={{ opacity: 1, y: 0 }}
+                                                                                    exit={{ opacity: 0, y: 10 }}
+                                                                                    className="absolute top-[calc(100%+12px)] left-0 w-full min-w-[320px] bg-[#1a1d29] border border-white/10 rounded-2xl shadow-[0_32px_64px_-16px_rgba(0,0,0,0.8)] z-[120] overflow-hidden max-h-[280px] overflow-y-auto custom-scrollbar backdrop-blur-3xl"
+                                                                                >
+                                                                                    {currentServices
+                                                                                        .filter(s => s.name.toLowerCase().includes(item.service.toLowerCase()))
+                                                                                        .map((s, sIdx) => (
+                                                                                            <button 
+                                                                                                key={sIdx}
+                                                                                                onClick={(e) => {
+                                                                                                    e.stopPropagation();
+                                                                                                    handleSelectedItemChange(idx, "service", s.name);
+                                                                                                    setShowServiceSuggestions(false);
+                                                                                                    setActiveServiceIdx(null);
+                                                                                                }}
+                                                                                                className="w-full text-left px-5 py-4 hover:bg-white/5 transition-colors border-b border-white/5 last:border-0 flex justify-between items-center gap-4 group/opt"
+                                                                                            >
+                                                                                                <span className="text-xs font-bold text-white group-hover/opt:text-brand-primary transition-colors flex-1">{s.name}</span>
+                                                                                                <span className="text-[10px] font-black text-emerald-400 bg-emerald-400/10 px-2 py-1 rounded-lg shrink-0">{formatCurrency(s.price)}</span>
+                                                                                            </button>
+                                                                                        ))}
+                                                                                </motion.div>
+                                                                            )}
+                                                                        </AnimatePresence>
+                                                                    </div>
+                                                                    <button onClick={() => handleRemoveSelectedItem(idx)} className="p-2.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 rounded-xl opacity-0 group-hover/item:opacity-100 transition-all">
+                                                                        <Trash2 className="size-4" />
+                                                                    </button>
+                                                                </div>
+
+                                                                <div className="grid grid-cols-2 gap-4">
+                                                                    <div className="p-4 bg-white/[0.02] border border-white/5 rounded-2xl flex flex-col gap-1">
+                                                                        <span className="text-[9px] font-black uppercase tracking-widest text-brand-muted">Quant.</span>
+                                                                        <div className="flex items-center gap-3">
+                                                                            <button onClick={() => handleSelectedItemChange(idx, "qty", Math.max(1, item.qty - 1))} className="size-6 bg-white/5 hover:bg-white/10 rounded-lg flex items-center justify-center text-white">-</button>
+                                                                            <input type="number" value={item.qty} onChange={e => handleSelectedItemChange(idx, "qty", e.target.value)} className="w-8 bg-transparent text-center text-sm font-black text-white outline-none" />
+                                                                            <button onClick={() => handleSelectedItemChange(idx, "qty", item.qty + 1)} className="size-6 bg-white/5 hover:bg-white/10 rounded-lg flex items-center justify-center text-white">+</button>
+                                                                        </div>
+                                                                    </div>
+                                                                    <div className="p-4 bg-white/[0.02] border border-white/5 rounded-2xl flex flex-col gap-1 text-right">
+                                                                        <span className="text-[9px] font-black uppercase tracking-widest text-brand-muted">Preço Unit.</span>
+                                                                        <input type="number" value={item.unitPrice} onChange={e => handleSelectedItemChange(idx, "unitPrice", e.target.value)} className="w-full bg-transparent text-right text-sm font-black text-emerald-400 outline-none" />
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                    <div className="px-8 py-6 bg-brand-primary/10 border-t border-brand-primary/20 flex items-center justify-between">
+                                                        <span className="text-[11px] font-black uppercase tracking-[0.3em] text-brand-primary">Valor Total Bruto</span>
+                                                        <span className="text-3xl font-black text-brand-primary tracking-tighter">{formatCurrency(calcTotal(selectedOrder.items))}</span>
+                                                    </div>
+                                                </div>
+                                            </section>
+
+                                            <section>
+                                                <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-brand-muted mb-6 flex items-center gap-3">
+                                                    <div className="size-1.5 rounded-full bg-brand-primary" /> Gestão Financeira
+                                                </h4>
+                                                <div className="grid grid-cols-2 gap-4">
+                                                    <div className="p-5 bg-white/[0.02] border border-white/5 rounded-3xl">
+                                                        <p className="text-[9px] font-black uppercase tracking-widest text-brand-muted mb-3">Método</p>
+                                                        <select value={selectedOrder.paymentMethod} onChange={e => setSelectedOrder({ ...selectedOrder, paymentMethod: e.target.value })}
+                                                            className="w-full bg-transparent text-xs font-black text-white outline-none appearance-none cursor-pointer">
+                                                            <option className="bg-[#161925]">PIX</option><option className="bg-[#161925]">Cartão</option><option className="bg-[#161925]">Dinheiro</option><option className="bg-[#161925]">Faturado</option>
+                                                        </select>
+                                                    </div>
+                                                    <div className="p-5 bg-white/[0.02] border border-white/5 rounded-3xl">
+                                                        <p className="text-[9px] font-black uppercase tracking-widest text-brand-muted mb-3">Status Atual</p>
+                                                        <select value={selectedOrder.paymentStatus} onChange={e => setSelectedOrder({ ...selectedOrder, paymentStatus: e.target.value })}
+                                                            className="w-full bg-transparent text-xs font-black text-white outline-none appearance-none cursor-pointer">
+                                                            {PAYMENT_STATUSES.map(p => <option key={p} className="bg-[#161925]">{p}</option>)}
+                                                        </select>
+                                                    </div>
+                                                </div>
+                                            </section>
+                                        </div>
+                                    </div>
+
+                                    {/* Observações e Timeline */}
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-12 pt-4">
+                                        <section>
+                                            <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-brand-muted mb-6 flex items-center gap-3">
+                                                <div className="size-1.5 rounded-full bg-brand-primary" /> Notas do Operador
+                                            </h4>
+                                            <textarea 
+                                                rows={4} 
+                                                placeholder="Adicionar detalhes técnicos..." 
+                                                value={selectedOrder.observations}
+                                                onChange={e => setSelectedOrder({ ...selectedOrder, observations: e.target.value })}
+                                                className="w-full p-6 bg-white/[0.03] border border-white/5 rounded-[2rem] text-sm font-medium text-white placeholder:text-brand-muted focus:bg-white/[0.05] focus:border-brand-primary/50 outline-none transition-all resize-none shadow-inner" 
+                                            />
+                                        </section>
+
+                                        <section>
+                                            <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-brand-muted mb-6 flex items-center gap-3">
+                                                <div className="size-1.5 rounded-full bg-brand-primary" /> Histórico de Eventos
+                                            </h4>
+                                            <div className="space-y-5 max-h-[160px] overflow-y-auto px-2 custom-scrollbar">
+                                                {selectedOrder.history.map((h: HistoryEntry, idx: number) => (
+                                                    <div key={idx} className="relative pl-8 pb-5 last:pb-0">
+                                                        <div className="absolute left-0 top-1.5 w-px h-full bg-white/5" />
+                                                        <div className="absolute left-[-4px] top-2 size-2.5 rounded-full border-2 border-brand-primary bg-[#0f111a] shadow-[0_0_10px_rgba(139,92,246,0.6)]" />
+                                                        <div className="flex flex-col">
+                                                            <div className="flex items-center justify-between">
+                                                                <span className="text-xs font-black text-white uppercase tracking-wider">{h.status}</span>
+                                                                <span className="text-[9px] text-brand-muted font-black bg-white/5 px-2.5 py-1 rounded-full">{h.time}</span>
+                                                            </div>
+                                                            {h.note && <p className="text-[10px] text-brand-muted mt-2 font-medium leading-relaxed italic">"{h.note}"</p>}
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </section>
                                     </div>
                                 </div>
-                                <div className="p-5 border-t border-brand-darkBorder">
-                                    <button onClick={handleSaveOrder}
-                                        className="w-full py-3 bg-brand-primary text-white rounded-xl font-bold hover:bg-brand-primaryHover transition-all shadow-lg shadow-brand-primary/20 flex items-center justify-center gap-2">
-                                        <CheckCircle2 className="size-4" /> Salvar Alterações
+
+                                <div className="p-10 bg-white/[0.02] border-t border-white/5">
+                                    <button 
+                                        onClick={handleSaveOrder}
+                                        className="w-full group relative py-6 bg-brand-primary text-white rounded-[1.75rem] font-black text-sm tracking-[0.3em] uppercase overflow-hidden transition-all hover:scale-[1.01] active:scale-[0.99] shadow-[0_24px_48px_-12px_rgba(139,92,246,0.5)]"
+                                    >
+                                        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
+                                        <span className="relative flex items-center justify-center gap-4">
+                                            <CheckCircle2 className="size-6" />
+                                            Salvar Alterações do Pedido
+                                        </span>
                                     </button>
                                 </div>
                             </motion.div>
@@ -754,10 +1257,10 @@ export default function OrdersPage() {
 
                 </AnimatePresence>
                 <style jsx global>{`
-                .custom-scrollbar::-webkit-scrollbar { width: 5px; }
-                .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-                .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.06); border-radius: 10px; }
-                .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.12); }
+                .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+                .custom-scrollbar::-webkit-scrollbar-track { background: transparent; margin: 8px; }
+                .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 10px; border: 2px solid transparent; background-clip: content-box; }
+                .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.15); border: 2px solid transparent; background-clip: content-box; }
             `}</style>
             </div>
         </AccessGuard>

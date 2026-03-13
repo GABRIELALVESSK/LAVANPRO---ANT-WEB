@@ -70,11 +70,13 @@ export async function middleware(request: NextRequest) {
     }
 
     // If user is signed in and trying to access login page, redirect to dashboard
+    /* 
     if (session && request.nextUrl.pathname === '/login') {
         const redirectUrl = request.nextUrl.clone()
         redirectUrl.pathname = '/dashboard'
         return NextResponse.redirect(redirectUrl)
     }
+    */
 
     return response
 }
