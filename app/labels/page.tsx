@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useMemo, useEffect, useCallback, Suspense, useRef } from "react";
-import { BrowserMultiFormatReader } from "@zxing/library";
+import { BrowserQRCodeReader } from "@zxing/library";
 import Webcam from "react-webcam";
 import { useSearchParams, useRouter } from "next/navigation";
 import QRCodeLib from "qrcode";
@@ -339,9 +339,10 @@ function LabelsContent() {
     const [isCameraActive, setIsCameraActive] = useState(false);
     const [isGenerating, setIsGenerating] = useState(false);
     const [genQty, setGenQty] = useState(5);
-    const readerRef = useRef<any>(null);
+    const readerRef = useRef<BrowserQRCodeReader | null>(null);
     const webcamRef = useRef<any>(null);
     const scanLogicRef = useRef<any>(null);
+    const [scannerReady, setScannerReady] = useState(false);
 
     // ── Limpeza do hardware da câmera ──
     useEffect(() => {
@@ -575,27 +576,52 @@ function LabelsContent() {
 
     // ── Camera Reader Initialization and Management ──
     useEffect(() => {
-        if (isCameraActive) {
-            const codeReader = new BrowserMultiFormatReader();
-            readerRef.current = codeReader;
-            
-            // Wait for video element to be available
-            const timer = setTimeout(() => {
-                const videoElement = webcamRef.current?.video;
-                if (videoElement) {
-                    (codeReader as any).decodeFromVideoElement(videoElement, (result: any, err: any) => {
-                        if (result && scanLogicRef.current) {
-                            scanLogicRef.current(result.getText());
+        if (!isCameraActive) {
+            setScannerReady(false);
+            return;
+        }
+
+        const codeReader = new BrowserQRCodeReader();
+        readerRef.current = codeReader;
+        
+        const startScanning = async () => {
+            try {
+                // Wait until the video is actually playing and ready
+                let video = webcamRef.current?.video;
+                let attempts = 0;
+                while ((!video || video.readyState < 2) && attempts < 50 && isCameraActive) {
+                    await new Promise(r => setTimeout(r, 100));
+                    video = webcamRef.current?.video;
+                    attempts++;
+                }
+
+                if (video && isCameraActive) {
+                    setScannerReady(true);
+                    console.log("Scanner pronto e capturando...");
+                    
+                    // decodeFromVideoElement is stable for QR codes
+                    await (codeReader as any).decodeFromVideoElement(video, (result: any, err: any) => {
+                        if (result && isCameraActive) {
+                            const foundText = result.getText();
+                            if (foundText && scanLogicRef.current) {
+                                console.log("Código detectado:", foundText);
+                                scanLogicRef.current(foundText);
+                            }
                         }
                     });
                 }
-            }, 500);
+            } catch (err) {
+                console.error("Erro no scanner:", err);
+            }
+        };
 
-            return () => {
-                clearTimeout(timer);
-                codeReader.reset();
-            };
-        }
+        startScanning();
+
+        return () => {
+            codeReader.reset();
+            readerRef.current = null;
+            setScannerReady(false);
+        };
     }, [isCameraActive]);
 
     // ── Scan Mode Listener (USB Scanner) ──
@@ -1181,9 +1207,11 @@ function LabelsContent() {
                                                 <div className="absolute top-[-4px] right-[-4px] size-12 border-t-8 border-r-8 border-brand-primary rounded-tr-xl" />
                                                 <div className="absolute bottom-[-4px] left-[-4px] size-12 border-b-8 border-l-8 border-brand-primary rounded-bl-xl" />
                                                 <div className="absolute bottom-[-4px] right-[-4px] size-12 border-b-8 border-r-8 border-brand-primary rounded-br-xl" />
-                                                <div className="absolute top-1/2 left-0 right-0 h-0.5 bg-brand-primary/50 animate-[scan_2s_linear_infinite]" />
+                                            <div className="absolute top-1/2 left-0 right-0 h-0.5 bg-brand-primary/50 animate-[scan_2s_linear_infinite]" />
                                             </div>
-                                            <p className="mt-8 text-white/70 text-sm font-bold bg-black/40 px-4 py-2 rounded-full backdrop-blur-md">Aponte para o QR Code</p>
+                                            <p className={`mt-8 text-white/70 text-sm font-bold bg-black/40 px-4 py-2 rounded-full backdrop-blur-md transition-all ${scannerReady ? 'opacity-100 scale-100' : 'opacity-50 scale-95'}`}>
+                                                {scannerReady ? "Buscando QR Code..." : "Iniciando câmera..."}
+                                            </p>
                                         </div>
                                     </div>
 
