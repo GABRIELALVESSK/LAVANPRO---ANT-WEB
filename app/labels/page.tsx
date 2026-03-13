@@ -133,7 +133,10 @@ function PrintModal({ label, order, onClose }: { label: ReusableLabel; order: Mo
     useEffect(() => {
         const generateQRs = async () => {
             try {
-                const tagUrl = await QRCodeLib.toDataURL(label.code, { 
+                const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://lavanpro.com';
+                
+                // TAG QR Code - Now points to a resolver URL so it works with standard cameras too
+                const tagUrl = await QRCodeLib.toDataURL(`${baseUrl}/labels?tag=${label.code}`, { 
                     width: 400, 
                     margin: 1,
                     color: { dark: '#000000', light: '#ffffff' }
@@ -379,6 +382,11 @@ function LabelsContent() {
         return () => window.removeEventListener("storage", syncOrders);
     }, []);
 
+    const showToast = useCallback((msg: string, type: "success" | "error" = "success") => {
+        setToast({ msg, type });
+        setTimeout(() => setToast(null), 3000);
+    }, []);
+
     // ── Persistir labels e histórico no localStorage ──
     useEffect(() => {
         localStorage.setItem("lavanpro_labels", JSON.stringify(labels));
@@ -389,30 +397,41 @@ function LabelsContent() {
 
     const searchParams = useSearchParams();
 
-    // Ler query param ?order= vindo da página de Pedidos
+    // Ler query params ?order= ou ?tag=
     useEffect(() => {
         const orderId = searchParams.get("order");
-        if (!orderId) return;
-        const cleanId = String(orderId).replace("#", "");
-        // Verifica se já existe etiqueta vinculada a este pedido
-        const linked = labels.find(l => l.currentOrderId === cleanId);
-        if (linked) {
-            setSelectedLabel(linked);
-            showToast(`Etiqueta ${linked.code} está vinculada ao pedido ${cleanId}.`);
-        } else {
-            // Sem etiqueta vinculada: selecionar primeira disponível e pré-preencher o campo
-            const first = labels.find(l => l.status === "available");
-            if (first) setSelectedLabel(first);
-            setLinkOrderId(cleanId);
-            showToast(`Pedido ${cleanId} ainda não tem etiqueta. Selecione uma e vincule!`, "error");
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [searchParams, labels]);
+        const tagFromUrl = searchParams.get("tag");
 
-    const showToast = useCallback((msg: string, type: "success" | "error" = "success") => {
-        setToast({ msg, type });
-        setTimeout(() => setToast(null), 3000);
-    }, []);
+        if (tagFromUrl) {
+            const found = labels.find(l => l.code === tagFromUrl.toUpperCase());
+            if (found) {
+                if (found.status === "assigned" && found.currentOrderId) {
+                    router.push(`/pedido/${found.currentOrderId.replace("#", "")}`);
+                    return;
+                }
+                setSelectedLabel(found);
+                showToast(`Etiqueta ${found.code} selecionada.`);
+            }
+        }
+
+        if (orderId) {
+            const cleanId = String(orderId).replace("#", "");
+            // Verifica se já existe etiqueta vinculada a este pedido
+            const linked = labels.find(l => l.currentOrderId === cleanId);
+            if (linked) {
+                setSelectedLabel(linked);
+                showToast(`Etiqueta ${linked.code} está vinculada ao pedido ${cleanId}.`);
+            } else {
+                // Sem etiqueta vinculada: selecionar primeira disponível e pré-preencher o campo
+                const first = labels.find(l => l.status === "available");
+                if (first) setSelectedLabel(first);
+                setLinkOrderId(cleanId);
+                showToast(`Pedido ${cleanId} ainda não tem etiqueta. Selecione uma e vincule!`, "error");
+            }
+        }
+    }, [searchParams, labels, router, showToast]);
+
+
 
     // ── Generate More Labels ────────────────
     const generateMoreLabels = (qty: number) => {
@@ -466,21 +485,43 @@ function LabelsContent() {
     const handleCameraScan = useCallback((code: string) => {
         if (!code) return;
 
-        // 1. Detect if it's a LavanPro Tracking URL
-        if (code.toLowerCase().includes("/pedido/")) {
+        // 1. Detect if it's a LavanPro Tracking URL or Label URL
+        if (code.toLowerCase().includes("/pedido/") || code.toLowerCase().includes("/labels")) {
             try {
                 const url = new URL(code.startsWith("http") ? code : `http://${code}`);
-                const pathParts = url.pathname.split("/").filter(Boolean);
-                const orderIdIndex = pathParts.findIndex(p => p === "pedido");
-                const orderId = orderIdIndex !== -1 ? pathParts[orderIdIndex + 1] : null;
+                
+                // Case A: Link to order tracking
+                if (url.pathname.includes("/pedido/")) {
+                    const pathParts = url.pathname.split("/").filter(Boolean);
+                    const orderIdIndex = pathParts.findIndex(p => p === "pedido");
+                    const orderId = orderIdIndex !== -1 ? pathParts[orderIdIndex + 1] : null;
 
-                if (orderId) {
-                    setIsCameraActive(false);
-                    showToast("Pedido identificado! Abrindo acompanhamento...", "success");
-                    setTimeout(() => {
-                        router.push(`/pedido/${orderId.toUpperCase().replace("#", "")}`);
-                    }, 600);
-                    return;
+                    if (orderId) {
+                        setIsCameraActive(false);
+                        showToast("Pedido identificado! Abrindo acompanhamento...", "success");
+                        setTimeout(() => {
+                            router.push(`/pedido/${orderId.toUpperCase().replace("#", "")}`);
+                        }, 600);
+                        return;
+                    }
+                }
+
+                // Case B: Link to dynamic label (TAG)
+                const tagParam = url.searchParams.get("tag");
+                if (tagParam) {
+                    const cleanTag = tagParam.toUpperCase();
+                    const labelObj = labels.find(l => l.code === cleanTag);
+                    if (labelObj) {
+                        setIsCameraActive(false);
+                        if (labelObj.status === "assigned" && labelObj.currentOrderId) {
+                            showToast(`TAG identificada vinculada ao pedido ${labelObj.currentOrderId}.`);
+                            router.push(`/pedido/${labelObj.currentOrderId.replace("#", "")}`);
+                        } else {
+                            setScanModal(labelObj);
+                            showToast(`TAG ${cleanTag} identificada (Disponível).`);
+                        }
+                        return;
+                    }
                 }
             } catch (e) {
                 console.error("Erro ao processar URL do QR Code:", e);
@@ -505,14 +546,25 @@ function LabelsContent() {
             return;
         }
 
-        // 3. Fallback to Labels logic (TAG-001 etc)
-        const found = labels.find(l => l.code === cleanCode);
-        if (found) {
-            setScanModal(found);
+        // 3. Labels logic (TAG-001 etc)
+        const foundLabel = labels.find(l => l.code === cleanCode);
+        if (foundLabel) {
             setIsCameraActive(false);
-            showToast(`Etiqueta ${cleanCode} identificada com sucesso!`);
+            
+            // If label is assigned to an order, go directly to the order report
+            if (foundLabel.status === "assigned" && foundLabel.currentOrderId) {
+                showToast(`Etiqueta ${cleanCode} vinculada ao pedido ${foundLabel.currentOrderId}. Abrindo relatório...`);
+                setTimeout(() => {
+                    const cleanOrderId = foundLabel.currentOrderId?.replace("#", "");
+                    router.push(`/pedido/${cleanOrderId}`);
+                }, 600);
+            } else {
+                // If available, open management modal to link it
+                setScanModal(foundLabel);
+                showToast(`Etiqueta ${cleanCode} identificada. Disponível para vínculo.`);
+            }
         } else {
-            showToast(`Código "${cleanCode.slice(0, 20)}${cleanCode.length > 20 ? '...' : ''}" não reconhecido.`, "error");
+            showToast(`Código "${cleanCode.slice(0, 20)}${cleanCode.length > 20 ? '...' : ''}" não reconhecido no sistema.`, "error");
         }
     }, [labels, globalOrders, showToast, router]);
 
