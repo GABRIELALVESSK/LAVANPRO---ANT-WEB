@@ -4,7 +4,7 @@ import { Sidebar } from "@/components/sidebar";
 import { AccessGuard } from "@/components/access-guard";
 import { PlanGuard } from "@/components/plan-guard";
 import { Filters } from "@/components/filters";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Download, Wallet, Activity, Users } from "lucide-react";
 import {
   AreaChart,
@@ -99,6 +99,30 @@ export default function ReportsPage() {
   });
 
   const [activeTab, setActiveTab] = useState("financeiro");
+  const [stockAlerts, setStockAlerts] = useState<any[]>([]);
+
+  useEffect(() => {
+    const savedProducts = localStorage.getItem("lavanpro_stock_products_v2");
+    if (savedProducts) {
+      try {
+        const products = JSON.parse(savedProducts);
+        const alerts = products
+          .filter((p: any) => p.currentStock <= (p.minStock || 0))
+          .map((p: any) => ({
+            name: p.name,
+            current: p.currentStock,
+            min: p.minStock,
+            status: p.currentStock === 0 ? "Esgotado" : "Crítico",
+            percent: p.minStock > 0 ? (p.currentStock / p.minStock) * 100 : 0,
+            unit: p.unit || "un"
+          }))
+          .sort((a: any, b: any) => a.percent - b.percent);
+        setStockAlerts(alerts);
+      } catch (e) {
+        console.error("Erro ao ler estoque para relatórios:", e);
+      }
+    }
+  }, []);
 
   const tabs = [
     { id: "financeiro", label: "Financeiro e Vendas", icon: Wallet },
@@ -295,17 +319,45 @@ export default function ReportsPage() {
                       </div>
                     </div>
 
-                    {/* Consumo de Estoque Placeholder */}
+                    {/* Alerta de Estoque Dinâmico */}
                     <div className="bg-brand-card rounded-2xl border border-brand-darkBorder p-6 shadow-xl">
-                      <div className="mb-6 flex justify-between items-center">
-                        <div>
-                          <h3 className="text-base font-bold text-brand-text">Alerta de Consumo de Estoque</h3>
-                          <p className="text-xs text-brand-muted">Itens com giro rápido no período</p>
+                      <div className="mb-6">
+                        <h3 className="text-base font-bold text-brand-text">Alerta de Consumo de Estoque</h3>
+                        <p className="text-xs text-brand-muted">Itens com nível crítico ou abaixo do mínimo</p>
+                      </div>
+                      
+                      {stockAlerts.length > 0 ? (
+                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                          {stockAlerts.map((alert, i) => (
+                            <div key={i} className="p-4 bg-brand-bg rounded-xl border border-brand-darkBorder flex flex-col gap-3">
+                              <div className="flex justify-between items-start">
+                                <p className="font-bold text-sm text-white">{alert.name}</p>
+                                <span className={`text-[9px] font-black uppercase px-2 py-1 rounded-md ${
+                                  alert.status === "Esgotado" ? "bg-rose-500/20 text-rose-500" : "bg-amber-500/20 text-amber-500"
+                                }`}>
+                                  {alert.status}
+                                </span>
+                              </div>
+                              
+                              <div className="flex justify-between text-xs text-brand-muted">
+                                <span>Atual: <b className="text-white">{alert.current} {alert.unit}</b></span>
+                                <span>Mínimo: <b>{alert.min} {alert.unit}</b></span>
+                              </div>
+
+                              <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
+                                <div 
+                                  className={`h-full rounded-full ${alert.status === "Esgotado" ? "bg-rose-500" : "bg-brand-primary"}`} 
+                                  style={{ width: `${Math.min(100, Math.max(5, alert.percent))}%` }} 
+                                />
+                              </div>
+                            </div>
+                          ))}
                         </div>
-                      </div>
-                      <div className="flex items-center justify-center p-8 bg-brand-bg rounded-xl border border-brand-darkBorder border-dashed">
-                        <p className="text-sm text-brand-muted">Os dados de estoque serão conectados em breve.</p>
-                      </div>
+                      ) : (
+                        <div className="flex items-center justify-center p-8 bg-brand-bg rounded-xl border border-brand-darkBorder border-dashed">
+                          <p className="text-sm text-brand-muted">Todos os itens de estoque estão em níveis normais.</p>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}

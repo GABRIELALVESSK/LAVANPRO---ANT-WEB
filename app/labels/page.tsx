@@ -10,10 +10,10 @@ import {
     AlertCircle, CheckCheck, Clock, Trash2
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useState, useMemo, useEffect, useCallback, Suspense } from "react";
+import { useState, useMemo, useEffect, useCallback, Suspense, useRef } from "react";
 import { BrowserMultiFormatReader } from "@zxing/library";
 import Webcam from "react-webcam";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import QRCodeLib from "qrcode";
 import ReactQRCode from "react-qr-code";
 
@@ -141,7 +141,9 @@ function PrintModal({ label, order, onClose }: { label: ReusableLabel; order: Mo
                 setQrCodeDataUrl(tagUrl);
 
                 if (order) {
-                    const orderUrl = await QRCodeLib.toDataURL(`https://lavanpro.com/pedido/${order.id}`, { 
+                    const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://lavanpro.com';
+                    const orderIdClean = order.id.replace("#", "");
+                    const orderUrl = await QRCodeLib.toDataURL(`${baseUrl}/pedido/${orderIdClean}`, { 
                         width: 400, 
                         margin: 1,
                         color: { dark: '#000000', light: '#ffffff' }
@@ -308,6 +310,7 @@ export default function ReusableLabelsPage() {
 }
 
 function LabelsContent() {
+    const router = useRouter();
     const [labels, setLabels] = useState<ReusableLabel[]>(() => {
         if (typeof window === "undefined") return INITIAL_LABELS;
         try {
@@ -333,6 +336,21 @@ function LabelsContent() {
     const [isCameraActive, setIsCameraActive] = useState(false);
     const [isGenerating, setIsGenerating] = useState(false);
     const [genQty, setGenQty] = useState(5);
+    const readerRef = useRef<any>(null);
+
+    // ── Limpeza do hardware da câmera ──
+    useEffect(() => {
+        return () => {
+            if (readerRef.current) readerRef.current.reset();
+        };
+    }, []);
+
+    useEffect(() => {
+        if (!isCameraActive && readerRef.current) {
+            readerRef.current.reset();
+            readerRef.current = null;
+        }
+    }, [isCameraActive]);
 
     // ── Sincronizar com Banco de Pedidos Global ──
     useEffect(() => {
@@ -444,30 +462,62 @@ function LabelsContent() {
 
     // ── Camera Scan Handler ──────────────────
     const handleCameraScan = useCallback((code: string) => {
+        if (!code) return;
+
+        // 1. Detect if it's a LavanPro Tracking URL
+        if (code.includes("/pedido/")) {
+            const parts = code.split("/pedido/");
+            const orderId = parts[parts.length - 1];
+            setIsCameraActive(false);
+            showToast("Redirecionando para o acompanhamento do pedido...");
+            setTimeout(() => {
+                router.push(`/pedido/${orderId}`);
+            }, 800);
+            return;
+        }
+
         const cleanCode = code.toUpperCase().trim();
+
+        // 2. Check if it's a raw Order ID (e.g. ORD-001 or #ORD-001)
+        const orderIdFromRaw = cleanCode.replace("#", "");
+        const matchedOrder = globalOrders.find(o => 
+            String(o.id).toUpperCase() === orderIdFromRaw || 
+            `#${String(o.id).toUpperCase()}` === cleanCode
+        );
+
+        if (matchedOrder) {
+            setIsCameraActive(false);
+            showToast(`Pedido ${matchedOrder.id} identificado. Abrindo relatório...`);
+            setTimeout(() => {
+                router.push(`/pedido/${matchedOrder.id}`);
+            }, 800);
+            return;
+        }
+
+        // 3. Fallback to Labels logic (TAG-001 etc)
         const found = labels.find(l => l.code === cleanCode);
         if (found) {
             setScanModal(found);
             setIsCameraActive(false);
             showToast(`Etiqueta ${cleanCode} identificada com sucesso!`);
         } else {
-            showToast(`Código ${cleanCode} não reconhecido no sistema.`, "error");
+            showToast(`Código "${cleanCode.slice(0, 20)}${cleanCode.length > 20 ? '...' : ''}" não reconhecido.`, "error");
         }
-    }, [labels, showToast]);
+    }, [labels, globalOrders, showToast, router]);
 
-    // ── Scan Mode Listener ──────────────────
+    // ── Scan Mode Listener (USB Scanner) ──
     useEffect(() => {
         let buf = "";
         let last = Date.now();
         const handler = (e: KeyboardEvent) => {
             if (["INPUT", "TEXTAREA", "SELECT"].includes((e.target as HTMLElement).tagName)) return;
             const now = Date.now();
-            if (now - last > 80) buf = "";
+            if (now - last > 50) buf = ""; // USB scanners are fast, 50ms is enough
             last = now;
+            
             if (e.key === "Enter") {
                 if (buf.length > 0) {
-                    const found = labels.find(l => l.code === buf.toUpperCase());
-                    if (found) setScanModal(found);
+                    handleCameraScan(buf);
                     buf = "";
                 }
             } else if (e.key.length === 1) {
@@ -476,7 +526,7 @@ function LabelsContent() {
         };
         window.addEventListener("keydown", handler);
         return () => window.removeEventListener("keydown", handler);
-    }, [labels]);
+    }, [handleCameraScan]);
 
     // ── Assign label to order ───────────────
     const assignLabel = (label: ReusableLabel, orderId: string) => {
@@ -1030,10 +1080,14 @@ function LabelsContent() {
                                         className="w-full h-full object-cover"
                                         onUserMedia={() => {
                                             const codeReader = new BrowserMultiFormatReader();
+                                            readerRef.current = codeReader;
                                             const videoElement = document.querySelector('video');
                                             if (videoElement) {
-                                                (codeReader as any).decodeFromVideoElement(videoElement, (result: any) => {
-                                                    if (result) handleCameraScan(result.getText());
+                                                (codeReader as any).decodeFromVideoElement(videoElement, (result: any, err: any) => {
+                                                    if (result && isCameraActive) {
+                                                        const text = result.getText();
+                                                        if (text) handleCameraScan(text);
+                                                    }
                                                 });
                                             }
                                         }}
