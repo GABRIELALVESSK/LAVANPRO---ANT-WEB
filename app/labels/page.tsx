@@ -482,14 +482,17 @@ function LabelsContent() {
         }
     };
 
-    // ── Camera Scan Handler ──────────────────
+    // ── Camera Scan Handler (Fuzzy Matching) ──
     const handleCameraScan = useCallback((code: string) => {
         if (!code) return;
-
+        const rawCode = code.trim();
+        
         // 1. Detect if it's a LavanPro Tracking URL or Label URL
-        if (code.toLowerCase().includes("/pedido/") || code.toLowerCase().includes("/labels")) {
+        if (rawCode.toLowerCase().includes("/pedido/") || rawCode.toLowerCase().includes("/labels")) {
             try {
-                const url = new URL(code.startsWith("http") ? code : `http://${code}`);
+                // Remove spaces and handle potential malformed URLs from some scanners
+                const cleanUrl = rawCode.replace(/\s/g, "");
+                const url = new URL(cleanUrl.startsWith("http") ? cleanUrl : `http://${cleanUrl}`);
                 
                 // Case A: Link to order tracking
                 if (url.pathname.includes("/pedido/")) {
@@ -499,10 +502,9 @@ function LabelsContent() {
 
                     if (orderId) {
                         setIsCameraActive(false);
-                        showToast("Pedido identificado! Abrindo acompanhamento...", "success");
-                        setTimeout(() => {
-                            router.push(`/pedido/${orderId.toUpperCase().replace("#", "")}`);
-                        }, 600);
+                        const finalId = orderId.toUpperCase().replace("#", "");
+                        showToast(`Pedido ${finalId} identificado!`, "success");
+                        router.push(`/pedido/${finalId}`);
                         return;
                     }
                 }
@@ -511,15 +513,23 @@ function LabelsContent() {
                 const tagParam = url.searchParams.get("tag");
                 if (tagParam) {
                     const cleanTag = tagParam.toUpperCase();
-                    const labelObj = labels.find(l => l.code === cleanTag);
+                    // Fuzzy match TAG-001, TAG-01 etc
+                    const tagMatch = cleanTag.match(/TAG-(\d+)/);
+                    const tagNum = tagMatch ? parseInt(tagMatch[1]) : null;
+                    
+                    const labelObj = labels.find(l => 
+                        l.code === cleanTag || 
+                        (tagNum !== null && l.displayNumber === tagNum)
+                    );
+
                     if (labelObj) {
                         setIsCameraActive(false);
                         if (labelObj.status === "assigned" && labelObj.currentOrderId) {
-                            showToast(`TAG identificada vinculada ao pedido ${labelObj.currentOrderId}.`);
+                            showToast(`TAG ${labelObj.code} vinculada ao pedido ${labelObj.currentOrderId}.`);
                             router.push(`/pedido/${labelObj.currentOrderId.replace("#", "")}`);
                         } else {
                             setScanModal(labelObj);
-                            showToast(`TAG ${cleanTag} identificada (Disponível).`);
+                            showToast(`TAG ${labelObj.code} disponível para vínculo.`);
                         }
                         return;
                     }
@@ -529,43 +539,43 @@ function LabelsContent() {
             }
         }
 
-        const cleanCode = code.toUpperCase().trim();
+        const cleanCode = rawCode.toUpperCase();
 
         // 2. Check if it's a raw Order ID (e.g. ORD-001 or #ORD-001)
-        const orderIdFromRaw = cleanCode.replace("#", "");
+        const orderIdFromRaw = cleanCode.replace("#", "").trim();
         const matchedOrder = globalOrders.find(o => 
             String(o.id).toUpperCase() === orderIdFromRaw || 
-            `#${String(o.id).toUpperCase()}` === cleanCode
+            `#${String(o.id).toUpperCase()}` === cleanCode ||
+            String(o.id).toUpperCase().includes(orderIdFromRaw)
         );
 
         if (matchedOrder) {
             setIsCameraActive(false);
-            showToast(`Pedido ${matchedOrder.id} identificado. Abrindo relatório...`);
-            setTimeout(() => {
-                router.push(`/pedido/${matchedOrder.id}`);
-            }, 800);
+            showToast(`Pedido ${matchedOrder.id} identificado.`, "success");
+            router.push(`/pedido/${matchedOrder.id}`);
             return;
         }
 
-        // 3. Labels logic (TAG-001 etc)
-        const foundLabel = labels.find(l => l.code === cleanCode);
+        // 3. Fallback to Labels logic with Fuzzy Matching (accepts TAG-1, TAG-01, TAG-001)
+        const tagMatchRaw = cleanCode.match(/TAG-(\d+)/);
+        const tagNumRaw = tagMatchRaw ? parseInt(tagMatchRaw[1]) : null;
+
+        const foundLabel = labels.find(l => 
+            l.code === cleanCode || 
+            (tagNumRaw !== null && l.displayNumber === tagNumRaw)
+        );
+
         if (foundLabel) {
             setIsCameraActive(false);
-            
-            // If label is assigned to an order, go directly to the order report
             if (foundLabel.status === "assigned" && foundLabel.currentOrderId) {
-                showToast(`Etiqueta ${cleanCode} vinculada ao pedido ${foundLabel.currentOrderId}. Abrindo relatório...`);
-                setTimeout(() => {
-                    const cleanOrderId = foundLabel.currentOrderId?.replace("#", "");
-                    router.push(`/pedido/${cleanOrderId}`);
-                }, 600);
+                showToast(`Etiqueta ${foundLabel.code} vinculada ao pedido ${foundLabel.currentOrderId}.`);
+                router.push(`/pedido/${foundLabel.currentOrderId.replace("#", "")}`);
             } else {
-                // If available, open management modal to link it
                 setScanModal(foundLabel);
-                showToast(`Etiqueta ${cleanCode} identificada. Disponível para vínculo.`);
+                showToast(`Etiqueta ${foundLabel.code} disponível.`);
             }
         } else {
-            showToast(`Código "${cleanCode.slice(0, 20)}${cleanCode.length > 20 ? '...' : ''}" não reconhecido no sistema.`, "error");
+            showToast(`Código não identificado no sistema.`, "error");
         }
     }, [labels, globalOrders, showToast, router]);
 
@@ -573,6 +583,8 @@ function LabelsContent() {
     useEffect(() => {
         scanLogicRef.current = handleCameraScan;
     }, [handleCameraScan]);
+
+
 
     // ── Camera Reader Initialization and Management ──
     useEffect(() => {
@@ -583,41 +595,51 @@ function LabelsContent() {
 
         const codeReader = new BrowserQRCodeReader();
         readerRef.current = codeReader;
+        let isScanning = true;
         
         const startScanning = async () => {
             try {
-                // Wait until the video is actually playing and ready
+                // Wait for video element
                 let video = webcamRef.current?.video;
                 let attempts = 0;
-                while ((!video || video.readyState < 2) && attempts < 50 && isCameraActive) {
+                while ((!video || video.readyState < 2) && attempts < 50 && isCameraActive && isScanning) {
                     await new Promise(r => setTimeout(r, 100));
                     video = webcamRef.current?.video;
                     attempts++;
                 }
 
-                if (video && isCameraActive) {
+                if (video && isCameraActive && isScanning) {
                     setScannerReady(true);
-                    console.log("Scanner pronto e capturando...");
                     
-                    // decodeFromVideoElement is stable for QR codes
-                    await (codeReader as any).decodeFromVideoElement(video, (result: any, err: any) => {
-                        if (result && isCameraActive) {
-                            const foundText = result.getText();
-                            if (foundText && scanLogicRef.current) {
-                                console.log("Código detectado:", foundText);
-                                scanLogicRef.current(foundText);
+                    const decodeLoop = async () => {
+                        if (!isScanning || !isCameraActive) return;
+                        try {
+                            const result = await (codeReader as any).decodeOnceFromVideoElement(video!);
+                            if (result && isScanning) {
+                                const foundText = result.getText();
+                                if (foundText && scanLogicRef.current) {
+                                    scanLogicRef.current(foundText);
+                                }
+                            }
+                        } catch (e) {
+                            // No QR found in this frame, wait and retry
+                            if (isScanning && isCameraActive) {
+                                setTimeout(decodeLoop, 250);
                             }
                         }
-                    });
+                    };
+                    
+                    decodeLoop();
                 }
             } catch (err) {
-                console.error("Erro no scanner:", err);
+                console.error("Erro fatal no scanner:", err);
             }
         };
 
         startScanning();
 
         return () => {
+            isScanning = false;
             codeReader.reset();
             readerRef.current = null;
             setScannerReady(false);
@@ -631,7 +653,7 @@ function LabelsContent() {
         const handler = (e: KeyboardEvent) => {
             if (["INPUT", "TEXTAREA", "SELECT"].includes((e.target as HTMLElement).tagName)) return;
             const now = Date.now();
-            if (now - last > 50) buf = ""; // USB scanners are fast, 50ms is enough
+            if (now - last > 200) buf = ""; // Increased tolerance for USB scanners
             last = now;
             
             if (e.key === "Enter") {
@@ -1197,7 +1219,11 @@ function LabelsContent() {
                                             ref={webcamRef}
                                             audio={false}
                                             screenshotFormat="image/jpeg"
-                                            videoConstraints={{ facingMode: "environment" }}
+                                            videoConstraints={{ 
+                                                facingMode: "environment",
+                                                width: { ideal: 1280 },
+                                                height: { ideal: 720 }
+                                            }}
                                             className="w-full h-full object-cover"
                                         />
                                         {/* Overlay for scan area */}
