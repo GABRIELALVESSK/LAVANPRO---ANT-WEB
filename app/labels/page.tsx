@@ -337,6 +337,8 @@ function LabelsContent() {
     const [isGenerating, setIsGenerating] = useState(false);
     const [genQty, setGenQty] = useState(5);
     const readerRef = useRef<any>(null);
+    const webcamRef = useRef<any>(null);
+    const scanLogicRef = useRef<any>(null);
 
     // ── Limpeza do hardware da câmera ──
     useEffect(() => {
@@ -465,15 +467,24 @@ function LabelsContent() {
         if (!code) return;
 
         // 1. Detect if it's a LavanPro Tracking URL
-        if (code.includes("/pedido/")) {
-            const parts = code.split("/pedido/");
-            const orderId = parts[parts.length - 1];
-            setIsCameraActive(false);
-            showToast("Redirecionando para o acompanhamento do pedido...");
-            setTimeout(() => {
-                router.push(`/pedido/${orderId}`);
-            }, 800);
-            return;
+        if (code.toLowerCase().includes("/pedido/")) {
+            try {
+                const url = new URL(code.startsWith("http") ? code : `http://${code}`);
+                const pathParts = url.pathname.split("/").filter(Boolean);
+                const orderIdIndex = pathParts.findIndex(p => p === "pedido");
+                const orderId = orderIdIndex !== -1 ? pathParts[orderIdIndex + 1] : null;
+
+                if (orderId) {
+                    setIsCameraActive(false);
+                    showToast("Pedido identificado! Abrindo acompanhamento...", "success");
+                    setTimeout(() => {
+                        router.push(`/pedido/${orderId.toUpperCase().replace("#", "")}`);
+                    }, 600);
+                    return;
+                }
+            } catch (e) {
+                console.error("Erro ao processar URL do QR Code:", e);
+            }
         }
 
         const cleanCode = code.toUpperCase().trim();
@@ -504,6 +515,36 @@ function LabelsContent() {
             showToast(`Código "${cleanCode.slice(0, 20)}${cleanCode.length > 20 ? '...' : ''}" não reconhecido.`, "error");
         }
     }, [labels, globalOrders, showToast, router]);
+
+    // ── Update Logic Ref to avoid stale closures ──
+    useEffect(() => {
+        scanLogicRef.current = handleCameraScan;
+    }, [handleCameraScan]);
+
+    // ── Camera Reader Initialization and Management ──
+    useEffect(() => {
+        if (isCameraActive) {
+            const codeReader = new BrowserMultiFormatReader();
+            readerRef.current = codeReader;
+            
+            // Wait for video element to be available
+            const timer = setTimeout(() => {
+                const videoElement = webcamRef.current?.video;
+                if (videoElement) {
+                    (codeReader as any).decodeFromVideoElement(videoElement, (result: any, err: any) => {
+                        if (result && scanLogicRef.current) {
+                            scanLogicRef.current(result.getText());
+                        }
+                    });
+                }
+            }, 500);
+
+            return () => {
+                clearTimeout(timer);
+                codeReader.reset();
+            };
+        }
+    }, [isCameraActive]);
 
     // ── Scan Mode Listener (USB Scanner) ──
     useEffect(() => {
@@ -1072,41 +1113,47 @@ function LabelsContent() {
                                     </button>
                                 </div>
 
-                                <div className="aspect-square relative overflow-hidden bg-black">
-                                    <Webcam
-                                        audio={false}
-                                        screenshotFormat="image/jpeg"
-                                        videoConstraints={{ facingMode: "environment" }}
-                                        className="w-full h-full object-cover"
-                                        onUserMedia={() => {
-                                            const codeReader = new BrowserMultiFormatReader();
-                                            readerRef.current = codeReader;
-                                            const videoElement = document.querySelector('video');
-                                            if (videoElement) {
-                                                (codeReader as any).decodeFromVideoElement(videoElement, (result: any, err: any) => {
-                                                    if (result && isCameraActive) {
-                                                        const text = result.getText();
-                                                        if (text) handleCameraScan(text);
-                                                    }
-                                                });
-                                            }
-                                        }}
-                                    />
-                                    {/* Overlay for scan area */}
-                                    <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                                        <div className="size-64 border-4 border-brand-primary/50 rounded-3xl relative">
-                                            <div className="absolute top-[-4px] left-[-4px] size-12 border-t-8 border-l-8 border-brand-primary rounded-tl-xl" />
-                                            <div className="absolute top-[-4px] right-[-4px] size-12 border-t-8 border-r-8 border-brand-primary rounded-tr-xl" />
-                                            <div className="absolute bottom-[-4px] left-[-4px] size-12 border-b-8 border-l-8 border-brand-primary rounded-bl-xl" />
-                                            <div className="absolute bottom-[-4px] right-[-4px] size-12 border-b-8 border-r-8 border-brand-primary rounded-br-xl" />
-                                            <div className="absolute top-1/2 left-0 right-0 h-0.5 bg-brand-primary/50 animate-[scan_2s_linear_infinite]" />
+                                <div className="p-6 space-y-4">
+                                    <div className="aspect-square relative overflow-hidden bg-black rounded-2xl border border-brand-darkBorder">
+                                        <Webcam
+                                            ref={webcamRef}
+                                            audio={false}
+                                            screenshotFormat="image/jpeg"
+                                            videoConstraints={{ facingMode: "environment" }}
+                                            className="w-full h-full object-cover"
+                                        />
+                                        {/* Overlay for scan area */}
+                                        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                                            <div className="size-64 border-4 border-brand-primary/50 rounded-3xl relative">
+                                                <div className="absolute top-[-4px] left-[-4px] size-12 border-t-8 border-l-8 border-brand-primary rounded-tl-xl" />
+                                                <div className="absolute top-[-4px] right-[-4px] size-12 border-t-8 border-r-8 border-brand-primary rounded-tr-xl" />
+                                                <div className="absolute bottom-[-4px] left-[-4px] size-12 border-b-8 border-l-8 border-brand-primary rounded-bl-xl" />
+                                                <div className="absolute bottom-[-4px] right-[-4px] size-12 border-b-8 border-r-8 border-brand-primary rounded-br-xl" />
+                                                <div className="absolute top-1/2 left-0 right-0 h-0.5 bg-brand-primary/50 animate-[scan_2s_linear_infinite]" />
+                                            </div>
+                                            <p className="mt-8 text-white/70 text-sm font-bold bg-black/40 px-4 py-2 rounded-full backdrop-blur-md">Aponte para o QR Code</p>
                                         </div>
-                                        <p className="mt-8 text-white/70 text-sm font-bold bg-black/40 px-4 py-2 rounded-full backdrop-blur-md">Posicione o QR Code da TAG no centro</p>
                                     </div>
-                                </div>
 
-                                <div className="p-6 text-center text-brand-muted text-xs">
-                                    Use a câmera do celular ou leitor USB. O sistema detecta o código automaticamente ao identificar o padrão LavanPro.
+                                    {/* Fallback Manual Input */}
+                                    <div className="relative">
+                                        <input 
+                                            autoFocus
+                                            placeholder="Digite o código manualmente (TAG-000 ou ORD-000)..."
+                                            className="w-full bg-brand-bg border border-brand-darkBorder rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-brand-primary/50 transition-colors pl-11"
+                                            onKeyDown={(e) => {
+                                                if (e.key === "Enter") {
+                                                    handleCameraScan((e.target as HTMLInputElement).value);
+                                                    (e.target as HTMLInputElement).value = "";
+                                                }
+                                            }}
+                                        />
+                                        <SearchCode className="absolute left-4 top-1/2 -translate-y-1/2 size-4 text-brand-muted" />
+                                    </div>
+
+                                    <div className="text-center text-brand-muted text-[10px] uppercase font-black tracking-widest opacity-50">
+                                        Ou use um leitor USB externo
+                                    </div>
                                 </div>
                             </motion.div>
                         </div>
