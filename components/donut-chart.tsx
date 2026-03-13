@@ -2,47 +2,26 @@
 
 interface DonutChartProps {
   activeRange?: string;
-  customDates?: { start: string; end: string };
+  data?: { label: string; value: number }[];
 }
 
-const mockData: Record<string, { label: string; percent: number; val: string; color: string }[]> = {
-  hoje: [
-    { label: "Lavagem Completa", percent: 55, val: "R$ 465", color: "#8b5cf6" },
-    { label: "Dry Clean", percent: 25, val: "R$ 211", color: "#6366f1" },
-    { label: "Apenas Passar", percent: 12, val: "R$ 101", color: "#a78bfa" },
-    { label: "Enxoval/Outros", percent: 8, val: "R$ 68", color: "#ddd6fe" },
-  ],
-  "7d": [
-    { label: "Lavagem Completa", percent: 50, val: "R$ 2.960", color: "#8b5cf6" },
-    { label: "Dry Clean", percent: 28, val: "R$ 1.658", color: "#6366f1" },
-    { label: "Apenas Passar", percent: 14, val: "R$ 829", color: "#a78bfa" },
-    { label: "Enxoval/Outros", percent: 8, val: "R$ 474", color: "#ddd6fe" },
-  ],
-  "30d": [
-    { label: "Lavagem Completa", percent: 45, val: "R$ 11.002", color: "#8b5cf6" },
-    { label: "Dry Clean", percent: 28, val: "R$ 6.846", color: "#6366f1" },
-    { label: "Apenas Passar", percent: 17, val: "R$ 4.157", color: "#a78bfa" },
-    { label: "Enxoval/Outros", percent: 10, val: "R$ 2.445", color: "#ddd6fe" },
-  ],
-  custom: [
-    { label: "Lavagem Completa", percent: 48, val: "R$ 6.854", color: "#8b5cf6" },
-    { label: "Dry Clean", percent: 27, val: "R$ 3.856", color: "#6366f1" },
-    { label: "Apenas Passar", percent: 16, val: "R$ 2.285", color: "#a78bfa" },
-    { label: "Enxoval/Outros", percent: 9, val: "R$ 1.285", color: "#ddd6fe" },
-  ],
-};
+const COLORS = ["#8b5cf6", "#6366f1", "#a78bfa", "#ddd6fe", "#7c3aed", "#4f46e5"];
 
-const totals: Record<string, string> = {
-  hoje: "R$ 845",
-  "7d": "R$ 5.920",
-  "30d": "R$ 24.450",
-  custom: "R$ 14.280",
-};
+export function DonutChart({ data: propData }: DonutChartProps) {
+  const data = (propData && propData.length > 0) ? propData.slice(0, 5).map((item, i) => {
+    const total = propData.reduce((s, curr) => s + curr.value, 0);
+    return {
+      ...item,
+      percent: total > 0 ? Math.round((item.value / total) * 100) : 0,
+      val: `R$ ${item.value.toLocaleString("pt-BR")}`,
+      color: COLORS[i % COLORS.length]
+    };
+  }) : [
+    { label: "Sem dados", percent: 0, val: "R$ 0", color: "#2d2d42" }
+  ];
 
-export function DonutChart({ activeRange }: DonutChartProps) {
-  const key = activeRange || "30d";
-  const data = mockData[key] || mockData["30d"];
-  const total = totals[key] || totals["30d"];
+  const totalValue = propData ? propData.reduce((s, curr) => s + curr.value, 0) : 0;
+  const total = `R$ ${totalValue.toLocaleString("pt-BR")}`;
 
   // Build SVG donut segments
   const radius = 16;

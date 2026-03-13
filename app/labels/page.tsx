@@ -11,10 +11,11 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useMemo, useEffect, useCallback, Suspense } from "react";
-import QRCode from "react-qr-code";
-import { useSearchParams } from "next/navigation";
 import { BrowserMultiFormatReader } from "@zxing/library";
 import Webcam from "react-webcam";
+import { useSearchParams } from "next/navigation";
+import QRCodeLib from "qrcode";
+import ReactQRCode from "react-qr-code";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type OrderStatus = "Recebido" | "Em Triagem" | "Em Lavagem" | "Em Secagem" | "Em Finalização" | "Pronto" | "Entregue" | "Cancelado";
@@ -121,23 +122,52 @@ function formatDate(iso: string) {
 }
 
 // ─── Print Modal ──────────────────────────────────────────────────────────────
+// ─── Print Modal ──────────────────────────────────────────────────────────────
 function PrintModal({ label, order, onClose }: { label: ReusableLabel; order: MockOrder | null; onClose: () => void }) {
     const [printing, setPrinting] = useState(false);
     const [printType, setPrintType] = useState<"label" | "order">("label");
+    const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string>("");
+    const [orderQrDataUrl, setOrderQrDataUrl] = useState<string>("");
+
+    // Gearar QR Codes como imagem antes da impressão
+    useEffect(() => {
+        const generateQRs = async () => {
+            try {
+                const tagUrl = await QRCodeLib.toDataURL(label.code, { 
+                    width: 400, 
+                    margin: 1,
+                    color: { dark: '#000000', light: '#ffffff' }
+                });
+                setQrCodeDataUrl(tagUrl);
+
+                if (order) {
+                    const orderUrl = await QRCodeLib.toDataURL(`https://lavanpro.com/pedido/${order.id}`, { 
+                        width: 400, 
+                        margin: 1,
+                        color: { dark: '#000000', light: '#ffffff' }
+                    });
+                    setOrderQrDataUrl(orderUrl);
+                }
+            } catch (err) {
+                console.error("Erro ao gerar QR Code:", err);
+            }
+        };
+        generateQRs();
+    }, [label, order]);
 
     const handlePrint = () => {
+        if (printing || !qrCodeDataUrl) return;
         setPrinting(true);
-        // Pequeno delay para garantir que o DOM está pronto com as classes de impressão
         setTimeout(() => {
             window.print();
             setPrinting(false);
-        }, 100);
+        }, 500);
     };
 
     return (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm print:bg-white print:p-0 print:backdrop-blur-none">
+        <div id="print-modal-container" className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm print:bg-white print:p-0 print:backdrop-blur-none print:static print:block">
             <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                className="bg-brand-card w-full max-w-sm rounded-2xl border border-brand-darkBorder shadow-2xl flex flex-col overflow-hidden relative print:border-none print:shadow-none print:w-auto print:max-w-none print:rounded-none">
+                className="bg-brand-card w-full max-w-sm rounded-2xl border border-brand-darkBorder shadow-2xl flex flex-col overflow-hidden relative print:border-none print:shadow-none print:w-full print:max-w-none print:rounded-none print:bg-white print:static">
 
                 {/* Header - Hidden on print */}
                 <div className="p-4 border-b border-brand-darkBorder bg-white/5 space-y-4 print:hidden">
@@ -166,17 +196,21 @@ function PrintModal({ label, order, onClose }: { label: ReusableLabel; order: Mo
                     )}
                 </div>
 
-                {/* Preview Area - Visible on print */}
-                <div className="p-6 flex justify-center bg-zinc-950 overflow-y-auto max-h-[500px] custom-scrollbar print:bg-white print:p-0 print:overflow-visible print:max-h-none">
-                    <div id="printable-content" className="bg-white text-black p-6 w-[80mm] min-h-[80mm] shadow-sm text-center space-y-4 font-mono uppercase print:shadow-none print:w-[80mm] print:p-5 print:m-0">
+                {/* Preview Area */}
+                <div className="p-6 flex justify-center bg-zinc-950 overflow-y-auto max-h-[500px] custom-scrollbar print:bg-white print:p-0 print:overflow-visible print:max-h-none print:block">
+                    <div id="printable-content" className="bg-white text-black p-6 w-[80mm] min-h-[80mm] shadow-sm text-center space-y-4 font-mono uppercase print:shadow-none print:w-[58mm] print:mx-auto print:p-2">
                         {printType === "label" ? (
-                            <div className="space-y-4 py-4 border-2 border-black p-4 print:border-2">
+                            <div className="space-y-4 py-4 border-2 border-black p-4 print:border-2 print:p-3">
                                 <h4 className="font-black text-2xl leading-none italic">LavanPro</h4>
                                 <div className="bg-black text-white rounded-lg py-3 border-4 border-black print:bg-black print:text-white">
                                     <span className="text-6xl font-black tracking-tighter">{label.displayNumber}</span>
                                 </div>
-                                <div className="flex items-center justify-center p-2">
-                                    <QRCode value={label.code} size={140} />
+                                <div className="flex items-center justify-center p-2 min-h-[140px]">
+                                    {qrCodeDataUrl ? (
+                                        <img src={qrCodeDataUrl} alt="QR Code" className="w-[180px] h-[180px] mx-auto" />
+                                    ) : (
+                                        <div className="size-[140px] bg-zinc-100 flex items-center justify-center text-[10px]">Gerando...</div>
+                                    )}
                                 </div>
                                 <p className="font-black text-xl tracking-[0.2em] bg-zinc-100 py-2 border-t border-b border-black">{label.code}</p>
                                 {order && (
@@ -187,8 +221,8 @@ function PrintModal({ label, order, onClose }: { label: ReusableLabel; order: Mo
                                 )}
                             </div>
                         ) : order && (
-                            <div className="space-y-4 text-[12px]">
-                                <div className="border-b-4 border-double border-black pb-4">
+                            <div className="space-y-4 text-[12px] print:space-y-3">
+                                <div className="border-b-4 border-double border-black pb-4 text-center">
                                     <h4 className="font-black text-3xl leading-none italic">LavanPro</h4>
                                     <p className="text-[10px] font-black mt-2 tracking-widest border border-black inline-block px-4 py-1">COMPROVANTE DE PEDIDO</p>
                                 </div>
@@ -212,7 +246,7 @@ function PrintModal({ label, order, onClose }: { label: ReusableLabel; order: Mo
                                     <p className="text-[11px] font-black mb-3 underline">ITENS DE LAVANDERIA</p>
                                     <div className="space-y-2">
                                         {order.items.map((item, i) => (
-                                            <div key={i} className="flex justify-between font-black items-start leading-tight">
+                                            <div key={i} className="flex justify-between font-black items-start leading-tight text-[11px]">
                                                 <span className="flex-1 pr-4">{item.name}</span>
                                                 <span className="whitespace-nowrap">[{item.qty}]</span>
                                             </div>
@@ -225,13 +259,19 @@ function PrintModal({ label, order, onClose }: { label: ReusableLabel; order: Mo
                                 </div>
 
                                 <div className="flex flex-col items-center gap-3 pt-2">
-                                    <QRCode value={`https://lavanpro.com/track/${order.id}`} size={120} />
-                                    <p className="text-[10px] font-black tracking-tighter">RASTREAMENTO ONLINE</p>
+                                    <div className="min-h-[120px]">
+                                        {orderQrDataUrl ? (
+                                            <img src={orderQrDataUrl} alt="Rastreamento" className="w-[180px] h-[180px] mx-auto" />
+                                        ) : (
+                                            <div className="size-[120px] bg-zinc-100 flex items-center justify-center text-[10px]">Gerando...</div>
+                                        )}
+                                    </div>
+                                    <p className="text-[10px] font-black tracking-tighter text-center">RASTREAMENTO PELO QR CODE</p>
                                 </div>
 
-                                <div className="pt-6 border-t-4 border-double border-black">
-                                    <p className="font-black text-xs mb-2">TAG VINCULADA: {label.code}</p>
-                                    <p className="text-[10px] font-black leading-tight">
+                                <div className="pt-6 border-t-4 border-double border-black text-center">
+                                    <p className="font-black text-xs mb-2 text-center uppercase">TAG VINCULADA: {label.code}</p>
+                                    <p className="text-[10px] font-black leading-tight text-center">
                                         CONFIRA SUAS PEÇAS NO ATO DA ENTREGA.<br />
                                         OBRIGADO PELA PREFERÊNCIA!
                                     </p>
@@ -241,12 +281,12 @@ function PrintModal({ label, order, onClose }: { label: ReusableLabel; order: Mo
                     </div>
                 </div>
 
-                {/* Footer - Hidden on print */}
+                {/* Footer */}
                 <div className="p-4 border-t border-brand-darkBorder bg-white/5 print:hidden">
-                    <button onClick={handlePrint} disabled={printing}
-                        className="w-full py-3 bg-brand-primary text-white rounded-xl font-bold hover:opacity-90 transition-all shadow-lg flex items-center justify-center gap-2">
+                    <button onClick={handlePrint} disabled={printing || !qrCodeDataUrl}
+                        className="w-full py-3 bg-brand-primary text-white rounded-xl font-bold hover:opacity-90 transition-all shadow-lg flex items-center justify-center gap-2 disabled:opacity-50">
                         {printing ? (
-                            <><motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1, ease: "linear" }} className="size-4 border-2 border-white/30 border-t-white rounded-full" /> Enviando...</>
+                            <><div className="size-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Imprimindo...</>
                         ) : (
                             <><Printer className="size-4" /> Imprimir Agora</>
                         )}
@@ -254,31 +294,6 @@ function PrintModal({ label, order, onClose }: { label: ReusableLabel; order: Mo
                     <p className="text-[10px] text-center text-brand-muted mt-3 font-medium">Compatível com impressoras térmicas de 58mm/80mm.</p>
                 </div>
             </motion.div>
-
-            <style jsx global>{`
-                @media print {
-                    @page { margin: 0; size: auto; }
-                    html, body {
-                        background: #fff !important;
-                        height: auto !important;
-                        overflow: visible !important;
-                    }
-                    /* Esconde TUDO que não é o modal de impressão */
-                    body > *:not(.fixed.inset-0.z-50) {
-                        display: none !important;
-                    }
-                    #__next > *:not(.fixed.inset-0.z-50) {
-                        display: none !important;
-                    }
-                    /* Garante que o backdrop do modal fique branco no print e não oculte seus filhos */
-                    .fixed.inset-0.z-50 {
-                        background: white !important;
-                        position: absolute !important;
-                        display: block !important;
-                        overflow: visible !important;
-                    }
-                }
-            `}</style>
         </div>
     );
 }
@@ -705,7 +720,7 @@ function LabelsContent() {
                                                                 </div>
                                                                 {/* QR */}
                                                                 <div className="bg-white p-1.5 rounded-lg">
-                                                                    <QRCode value={label.code} size={56} />
+                                                                    <ReactQRCode value={label.code} size={56} />
                                                                 </div>
                                                                 <p className="text-[10px] font-black tracking-widest text-brand-muted">{label.code}</p>
                                                                 {ord && (
@@ -747,7 +762,7 @@ function LabelsContent() {
                                                         </div>
                                                         <div className="flex flex-col items-end gap-3 shrink-0">
                                                             <div className="bg-white p-2 rounded-2xl shadow-inner">
-                                                                <QRCode value={selectedLabelState.code} size={60} />
+                                                                <ReactQRCode value={selectedLabelState.code} size={60} />
                                                             </div>
                                                             <div className="flex gap-2">
                                                                 {selectedLabelState.status === "available" && (
@@ -905,7 +920,7 @@ function LabelsContent() {
                                         <h3 className="font-black text-lg text-white leading-tight">{scanLabelState.code}</h3>
                                     </div>
                                     <div className="bg-white p-1 rounded-lg shrink-0">
-                                        <QRCode value={scanLabelState.code} size={48} />
+                                        <ReactQRCode value={scanLabelState.code} size={48} />
                                     </div>
                                 </div>
 
@@ -1061,6 +1076,7 @@ function LabelsContent() {
                     .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
                     .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.06); border-radius: 10px; }
                     body { overflow-x: hidden; }
+
                     @media print {
                         @page { margin: 0; size: auto; }
                         html, body {
@@ -1069,25 +1085,39 @@ function LabelsContent() {
                             overflow: visible !important;
                             -webkit-print-color-adjust: exact !important;
                             print-color-adjust: exact !important;
+                            visibility: hidden !important;
                         }
-                        body > *:not(.fixed.inset-0.z-[200]) { display: none !important; }
-                        #__next > *:not(.fixed.inset-0.z-[200]) { display: none !important; }
-                        .fixed.inset-0.z-[200] {
-                            position: absolute !important;
+                        #print-modal-container {
+                            visibility: visible !important;
+                            position: fixed !important;
                             top: 0 !important;
                             left: 0 !important;
                             width: 100% !important;
+                            height: auto !important;
                             background: white !important;
-                            display: block !important;
-                            overflow: visible !important;
+                            padding: 0 !important;
+                            margin: 0 !important;
                             z-index: 99999 !important;
                         }
-                        #printable-content {
-                            width: 80mm !important;
-                            margin: 0 auto !important;
-                            padding: 5mm !important;
-                            display: block !important;
+                        #print-modal-container * {
+                            visibility: visible !important;
                         }
+                        #printable-content {
+                            display: block !important;
+                            width: 58mm !important;
+                            margin: 0 auto !important;
+                            padding: 4mm !important;
+                            background: white !important;
+                            color: black !important;
+                            box-shadow: none !important;
+                        }
+                        img { 
+                            display: block !important; 
+                            margin: 4mm auto !important; 
+                            max-width: 100% !important;
+                            page-break-inside: avoid !important;
+                        }
+                        .noprint, button, .close-button { display: none !important; }
                     }
                 `}</style>
             </div>

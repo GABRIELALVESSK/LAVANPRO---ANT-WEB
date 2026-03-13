@@ -158,10 +158,10 @@ export default function Page() {
                   </div>
                 )}
 
-                <div className={`grid grid-cols-1 lg:grid-cols-2 gap-8 ${!isEnterprise ? 'opacity-20 pointer-events-none grayscale' : ''}`}>
-                  <DonutChart activeRange={activeRange} customDates={customDates} />
-                  <BarChart activeRange={activeRange} customDates={customDates} />
-                </div>
+                  <div className={`grid grid-cols-1 lg:grid-cols-2 gap-8 ${!isEnterprise ? 'opacity-20 pointer-events-none grayscale' : ''}`}>
+                    <DonutChart activeRange={activeRange} data={metrics.categoryRevenue} />
+                    <BarChart activeRange={activeRange} data={metrics.paymentMethodRevenue} />
+                  </div>
               </div>
             </section>
 

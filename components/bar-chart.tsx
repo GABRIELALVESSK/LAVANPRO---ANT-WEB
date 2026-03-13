@@ -2,39 +2,34 @@
 
 interface BarChartProps {
   activeRange?: string;
-  customDates?: { start: string; end: string };
+  data?: { method: string; value: number }[];
 }
 
-const mockData: Record<string, { method: string; percent: number; value: string; color: string; icon: string }[]> = {
-  hoje: [
-    { method: "PIX", percent: 75, value: "R$ 634", color: "#10b981", icon: "⚡" },
-    { method: "Cartão de Crédito", percent: 14, value: "R$ 118", color: "#8b5cf6", icon: "💳" },
-    { method: "Cartão de Débito", percent: 8, value: "R$ 68", color: "#6366f1", icon: "💳" },
-    { method: "Dinheiro / Outros", percent: 3, value: "R$ 25", color: "#f59e0b", icon: "💵" },
-  ],
-  "7d": [
-    { method: "PIX", percent: 68, value: "R$ 4.026", color: "#10b981", icon: "⚡" },
-    { method: "Cartão de Crédito", percent: 18, value: "R$ 1.066", color: "#8b5cf6", icon: "💳" },
-    { method: "Cartão de Débito", percent: 9, value: "R$ 533", color: "#6366f1", icon: "💳" },
-    { method: "Dinheiro / Outros", percent: 5, value: "R$ 296", color: "#f59e0b", icon: "💵" },
-  ],
-  "30d": [
-    { method: "PIX", percent: 65, value: "R$ 15.893", color: "#10b981", icon: "⚡" },
-    { method: "Cartão de Crédito", percent: 20, value: "R$ 4.890", color: "#8b5cf6", icon: "💳" },
-    { method: "Cartão de Débito", percent: 10, value: "R$ 2.445", color: "#6366f1", icon: "💳" },
-    { method: "Dinheiro / Outros", percent: 5, value: "R$ 1.222", color: "#f59e0b", icon: "💵" },
-  ],
-  custom: [
-    { method: "PIX", percent: 70, value: "R$ 9.996", color: "#10b981", icon: "⚡" },
-    { method: "Cartão de Crédito", percent: 18, value: "R$ 2.570", color: "#8b5cf6", icon: "💳" },
-    { method: "Cartão de Débito", percent: 8, value: "R$ 1.142", color: "#6366f1", icon: "💳" },
-    { method: "Dinheiro / Outros", percent: 4, value: "R$ 571", color: "#f59e0b", icon: "💵" },
-  ],
+const COLORS: Record<string, { color: string; icon: string }> = {
+  "PIX": { color: "#10b981", icon: "⚡" },
+  "Cartão de Crédito": { color: "#8b5cf6", icon: "💳" },
+  "Cartão de Débito": { color: "#6366f1", icon: "💳" },
+  "Dinheiro": { color: "#f59e0b", icon: "💵" },
+  "Dinheiro / Outros": { color: "#f59e0b", icon: "💵" },
+  "Boleto": { color: "#3b82f6", icon: "📄" },
+  "Faturado": { color: "#6366f1", icon: "📊" },
+  "Outros": { color: "#94a3b8", icon: "✨" },
 };
 
-export function BarChart({ activeRange }: BarChartProps) {
-  const key = activeRange || "30d";
-  const data = mockData[key] || mockData["30d"];
+export function BarChart({ data: propData }: BarChartProps) {
+  const data = (propData && propData.length > 0) ? propData.slice(0, 4).map((item) => {
+    const totalValue = propData.reduce((s, curr) => s + curr.value, 0);
+    const config = COLORS[item.method] || COLORS["Outros"];
+    return {
+      ...item,
+      percent: totalValue > 0 ? Math.round((item.value / totalValue) * 100) : 0,
+      value: `R$ ${item.value.toLocaleString("pt-BR")}`,
+      color: config.color,
+      icon: config.icon
+    };
+  }) : [
+    { method: "Sem dados", percent: 0, value: "R$ 0", color: "#2d2d42", icon: "∅" }
+  ];
 
   return (
     <div className="bg-brand-card rounded-2xl border border-brand-darkBorder shadow-xl overflow-hidden">
@@ -79,12 +74,12 @@ export function BarChart({ activeRange }: BarChartProps) {
           <div className="bg-brand-bg rounded-xl p-3 border border-brand-darkBorder text-center">
             <p className="text-[10px] font-bold text-brand-muted uppercase tracking-wider">Digital</p>
             <p className="text-base font-black text-brand-text mt-0.5">
-              {data[0].percent + data[1].percent + data[2].percent}%
+              {((data[0]?.percent || 0) + (data[1]?.percent || 0) + (data[2]?.percent || 0))}%
             </p>
           </div>
           <div className="bg-brand-bg rounded-xl p-3 border border-brand-darkBorder text-center">
             <p className="text-[10px] font-bold text-brand-muted uppercase tracking-wider">Físico</p>
-            <p className="text-base font-black text-brand-text mt-0.5">{data[3].percent}%</p>
+            <p className="text-base font-black text-brand-text mt-0.5">{(data[3]?.percent || 0)}%</p>
           </div>
         </div>
       </div>

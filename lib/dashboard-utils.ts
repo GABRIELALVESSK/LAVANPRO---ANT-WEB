@@ -8,6 +8,8 @@ export interface DashboardMetrics {
   taxaEntrega: number;
   taxaBalcao: number;
   statusCounts: Record<string, number>;
+  categoryRevenue: { label: string; value: number }[];
+  paymentMethodRevenue: { method: string; value: number }[];
   chartData: { date: string; atual: number; anterior: number }[];
 }
 
@@ -73,6 +75,32 @@ export function calculateDashboardMetrics(orders: Order[] = [], range: string, c
     }
   });
 
+  const catMap: Record<string, number> = {};
+  const payMap: Record<string, number> = {};
+
+  filteredOrders.forEach(o => {
+    // Payment Method
+    const pMethod = o.paymentMethod || "Outros";
+    const items = Array.isArray(o.items) ? o.items : [];
+    const oTotal = items.reduce((sum, i) => sum + ((Number(i.qty) || 0) * (Number(i.unitPrice) || 0)), 0);
+    payMap[pMethod] = (payMap[pMethod] || 0) + oTotal;
+
+    // Categories (Services)
+    items.forEach(item => {
+      const cat = item.service || "Geral";
+      const itemTotal = (Number(item.qty) || 0) * (Number(item.unitPrice) || 0);
+      catMap[cat] = (catMap[cat] || 0) + itemTotal;
+    });
+  });
+
+  const categoryRevenue = Object.entries(catMap)
+    .map(([label, value]) => ({ label, value }))
+    .sort((a, b) => b.value - a.value);
+
+  const paymentMethodRevenue = Object.entries(payMap)
+    .map(([method, value]) => ({ method, value }))
+    .sort((a, b) => b.value - a.value);
+
   // Simple chart daily data for the range
   const chartData: { date: string; atual: number; anterior: number }[] = [];
   const days = range === "hoje" ? 12 : range === "7d" ? 7 : 30;
@@ -114,6 +142,8 @@ export function calculateDashboardMetrics(orders: Order[] = [], range: string, c
     taxaEntrega,
     taxaBalcao,
     statusCounts,
+    categoryRevenue,
+    paymentMethodRevenue,
     chartData
   };
 }
