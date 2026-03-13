@@ -131,7 +131,7 @@ export default function OrderTrackingPage() {
                 
                 {/* Header Tracking */}
                 <div className="flex items-center justify-between">
-                    <Link href="/" className="p-2 bg-brand-card border border-brand-darkBorder rounded-xl hover:border-brand-primary transition-all">
+                    <Link href="/dashboard" className="p-2 bg-brand-card border border-brand-darkBorder rounded-xl hover:border-brand-primary transition-all">
                         <ChevronLeft className="size-4" />
                     </Link>
                     <div className="text-center">
