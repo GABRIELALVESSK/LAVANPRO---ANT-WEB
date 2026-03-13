@@ -134,20 +134,20 @@ function PrintModal({ label, order, onClose }: { label: ReusableLabel; order: Mo
     useEffect(() => {
         const generateQRs = async () => {
             try {
-                const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://lavanpro.com';
+                const PRODUCTION_URL = "https://lavanpro-ant-web.vercel.app";
                 
-                // TAG QR Code - Now points to a resolver URL so it works with standard cameras too
-                const tagUrl = await QRCodeLib.toDataURL(`${baseUrl}/labels?tag=${label.code}`, { 
-                    width: 600, // Aumentado para mais densidade
-                    margin: 4,  // Quiet Zone padrão ISO
+                // TAG QR Code - Now points to a production resolver URL
+                const tagUrl = await QRCodeLib.toDataURL(`${PRODUCTION_URL}/q/tag/${label.code}`, { 
+                    width: 600, 
+                    margin: 4, 
                     color: { dark: '#000000', light: '#ffffff' },
-                    errorCorrectionLevel: 'H' // Alta tolerância a erros (sujeira na etiqueta)
+                    errorCorrectionLevel: 'H'
                 });
                 setQrCodeDataUrl(tagUrl);
 
                 if (order) {
                     const orderIdClean = order.id.replace("#", "");
-                    const orderUrl = await QRCodeLib.toDataURL(`${baseUrl}/pedido/${orderIdClean}`, { 
+                    const orderUrl = await QRCodeLib.toDataURL(`${PRODUCTION_URL}/q/order/${orderIdClean}`, { 
                         width: 600,
                         margin: 4,
                         color: { dark: '#000000', light: '#ffffff' },
@@ -341,6 +341,7 @@ function LabelsContent() {
     const [isCameraActive, setIsCameraActive] = useState(false);
     const [isGenerating, setIsGenerating] = useState(false);
     const [genQty, setGenQty] = useState(5);
+    const [manualCode, setManualCode] = useState("");
     const readerRef = useRef<BrowserQRCodeReader | null>(null);
     const webcamRef = useRef<any>(null);
     const scanLogicRef = useRef<any>(null);
@@ -357,7 +358,21 @@ function LabelsContent() {
     const frameCountRef = useRef(0);
     const lastFpsUpdateRef = useRef(Date.now());
 
-    // ── Limpeza do hardware da câmera ──
+    // ── Manual Resolve Handler ──
+    const handleManualResolve = useCallback((code: string) => {
+        if (!code) return;
+        const clean = code.trim().toUpperCase();
+        
+        // Match TAG-001 or ORD-2856
+        if (clean.startsWith("TAG") || /^\d+$/.test(clean)) {
+            router.push(`/q/tag/${clean}`);
+        } else if (clean.startsWith("ORD") || clean.startsWith("#ORD")) {
+            router.push(`/q/order/${clean.replace("#", "")}`);
+        } else {
+            // Generic attempt
+            router.push(`/q/order/${clean}`);
+        }
+    }, [router]);
     useEffect(() => {
         return () => {
             if (readerRef.current) readerRef.current.reset();
@@ -877,11 +892,27 @@ function LabelsContent() {
                                                 Gerar Etiquetas
                                             </button>
                                         </div>
+                                        <div className="flex items-center bg-brand-bg border border-brand-darkBorder rounded-xl overflow-hidden focus-within:border-brand-primary transition-all">
+                                            <input
+                                                type="text"
+                                                placeholder="TAG ou Pedido..."
+                                                value={manualCode}
+                                                onChange={e => setManualCode(e.target.value)}
+                                                onKeyDown={e => e.key === "Enter" && handleManualResolve(manualCode)}
+                                                className="w-32 px-3 py-2 bg-transparent text-xs font-bold border-r border-brand-darkBorder focus:outline-none"
+                                            />
+                                            <button
+                                                onClick={() => handleManualResolve(manualCode)}
+                                                className="bg-brand-bg border-none text-brand-primary px-3 py-2 text-xs font-black hover:bg-white/5 transition-all"
+                                            >
+                                                ABRIR
+                                            </button>
+                                        </div>
                                         <button
                                             onClick={() => setIsCameraActive(true)}
-                                            className="flex items-center gap-2 bg-brand-bg border border-brand-darkBorder text-brand-text px-4 py-2 rounded-xl text-xs font-bold hover:border-brand-primary transition-all"
+                                            className="flex items-center gap-2 bg-brand-bg border border-brand-darkBorder text-brand-text px-4 py-2 rounded-xl text-xs font-bold hover:border-brand-primary transition-all shadow-sm"
                                         >
-                                            <Cpu className="size-3.5 text-brand-primary" /> Scan com Câmera
+                                            <Camera className="size-3.5 text-brand-primary" /> Scan
                                         </button>
                                         <div className="hidden md:flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 px-3 py-2 rounded-xl text-xs font-bold">
                                             <CheckCheck className="size-3.5" /> {availableCount} Livre

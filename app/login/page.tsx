@@ -85,9 +85,10 @@ export default function LoginPage() {
                     throw error;
                 }
 
+const nextParam = new URLSearchParams(window.location.search).get('next');
                 showToast("Bem-vindo de volta!", "success");
                 router.refresh(); // Refresh to sync cookies for middleware
-                router.push('/dashboard');
+                router.push(nextParam || '/dashboard');
             }
         } catch (error: any) {
             showToast(error.message || "Erro ao processar solicitação", "error");
