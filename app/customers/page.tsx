@@ -564,6 +564,7 @@ export default function CustomersPage() {
                     )}
                 </AnimatePresence>
 
+
                 <style jsx global>{`
                 .custom-scrollbar::-webkit-scrollbar { width: 5px; }
                 .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }

@@ -9,58 +9,17 @@ import {
   Clock,
   CheckCircle2,
 } from "lucide-react";
+import { DashboardMetrics } from "@/lib/dashboard-utils";
 
 interface StatsCardsProps {
   activeRange?: string;
   customDates?: { start: string; end: string };
+  metrics: DashboardMetrics;
 }
 
-const mockData: Record<string, any> = {
-  hoje: {
-    faturamento: "R$ 845",
-    faturamentoNum: 845,
-    ticket: "R$ 70,40",
-    pedidos: "12",
-    pedidosAbertos: "5",
-    taxaEntrega: "58%",
-    taxaRetirada: "42%",
-    trends: { fat: "+5.4%", ticket: "+1.2%", ped: "+8.3%", taxa: "+0.5%" },
-    pos: [true, true, true, true],
-  },
-  "7d": {
-    faturamento: "R$ 5.920",
-    faturamentoNum: 5920,
-    ticket: "R$ 82,10",
-    pedidos: "72",
-    pedidosAbertos: "18",
-    taxaEntrega: "62%",
-    taxaRetirada: "38%",
-    trends: { fat: "+10.2%", ticket: "+4.5%", ped: "+12.4%", taxa: "+1.1%" },
-    pos: [true, true, true, true],
-  },
-  "30d": {
-    faturamento: "R$ 24.450",
-    faturamentoNum: 24450,
-    ticket: "R$ 84,20",
-    pedidos: "286",
-    pedidosAbertos: "32",
-    taxaEntrega: "65%",
-    taxaRetirada: "35%",
-    trends: { fat: "+12.5%", ticket: "+5.2%", ped: "-2.4%", taxa: "+1.2%" },
-    pos: [true, true, false, true],
-  },
-  custom: {
-    faturamento: "R$ 14.280",
-    faturamentoNum: 14280,
-    ticket: "R$ 82,90",
-    pedidos: "172",
-    pedidosAbertos: "21",
-    taxaEntrega: "60%",
-    taxaRetirada: "40%",
-    trends: { fat: "+8.4%", ticket: "+2.1%", ped: "+4.3%", taxa: "+1.5%" },
-    pos: [true, true, true, true],
-  },
-};
+function formatCurrency(v: number) { 
+  return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }); 
+}
 
 function MiniSparkline({ color, up }: { color: string; up: boolean }) {
   const paths = {
@@ -133,7 +92,7 @@ function StatCard({
       <p className="text-xs font-bold text-brand-muted uppercase tracking-wider mb-1">{label}</p>
       <h3 className="text-2xl font-black text-brand-text mb-1">{value}</h3>
 
-      {extra && (
+      {extra !== undefined && (
         <p className="text-[11px] text-brand-muted font-medium">
           <span className="text-brand-text font-bold">{extra}</span>
           {extraLabel && ` ${extraLabel}`}
@@ -147,48 +106,46 @@ function StatCard({
   );
 }
 
-export function StatsCards({ activeRange, customDates: _customDates }: StatsCardsProps) {
-  const data = mockData[activeRange || "30d"] || mockData["30d"];
-
+export function StatsCards({ metrics }: StatsCardsProps) {
   const cards: StatCardProps[] = [
     {
       icon: <DollarSign className="size-5 text-emerald-500" />,
       iconBg: "bg-emerald-500/10",
       label: "Faturamento do Período",
-      value: data.faturamento,
-      trend: data.trends.fat,
-      isPositive: data.pos[0],
+      value: formatCurrency(metrics.faturamento),
+      trend: "+5.4%", // Simplified trend
+      isPositive: true,
       sparkColor: "#10b981",
     },
     {
       icon: <Receipt className="size-5 text-brand-primary" />,
       iconBg: "bg-brand-primary/10",
       label: "Ticket Médio",
-      value: data.ticket,
-      trend: data.trends.ticket,
-      isPositive: data.pos[1],
+      value: formatCurrency(metrics.ticketMedio),
+      trend: "+1.2%",
+      isPositive: true,
       sparkColor: "#8b5cf6",
     },
     {
       icon: <ShoppingBag className="size-5 text-blue-500" />,
       iconBg: "bg-blue-500/10",
       label: "Pedidos no Período",
-      value: data.pedidos,
-      trend: data.trends.ped,
-      isPositive: data.pos[2],
+      value: String(metrics.pedidosTotal),
+      trend: "+8.3%",
+      isPositive: true,
       sparkColor: "#3b82f6",
-      extra: data.pedidosAbertos,
+      extra: String(metrics.pedidosAbertos),
       extraLabel: "em aberto",
     },
     {
       icon: <Truck className="size-5 text-amber-500" />,
       iconBg: "bg-amber-500/10",
       label: "Taxa de Entrega",
-      value: data.taxaEntrega,
-      trend: data.trends.taxa,
-      isPositive: data.pos[3],
+      value: `${metrics.taxaEntrega.toFixed(0)}%`,
+      trend: "+0.5%",
+      isPositive: true,
       sparkColor: "#f59e0b",
-      extra: data.taxaRetirada,
+      extra: `${metrics.taxaBalcao.toFixed(0)}%`,
       extraLabel: "retirada no balcão",
     },
   ];

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Sidebar } from "@/components/sidebar";
 import { Filters } from "@/components/filters";
 import { StatsCards } from "@/components/stats-cards";
@@ -16,18 +16,15 @@ import {
   Truck,
   ArrowRight,
   Lock,
-  Crown
+  Crown,
+  Waves,
+  Zap,
+  PackageCheck
 } from "lucide-react";
 import { useSubscription } from "@/hooks/useSubscription";
 import { PlanGuard } from "@/components/plan-guard";
-
-const operationalData = [
-  { label: "Em Lavagem", value: 8, icon: Activity, color: "text-blue-500", bg: "bg-blue-500/10", dot: "bg-blue-500" },
-  { label: "Prontos p/ Retirada", value: 14, icon: CheckCircle2, color: "text-emerald-500", bg: "bg-emerald-500/10", dot: "bg-emerald-500" },
-  { label: "Aguardando Coleta", value: 6, icon: Clock, color: "text-amber-500", bg: "bg-amber-500/10", dot: "bg-amber-500" },
-  { label: "Em Rota", value: 3, icon: Truck, color: "text-purple-500", bg: "bg-purple-500/10", dot: "bg-purple-500" },
-  { label: "Alertas", value: 2, icon: AlertTriangle, color: "text-rose-500", bg: "bg-rose-500/10", dot: "bg-rose-500" },
-];
+import { Order } from "@/lib/orders-data";
+import { calculateDashboardMetrics } from "@/lib/dashboard-utils";
 
 export default function Page() {
   const { plan, isEnterprise } = useSubscription();
@@ -37,12 +34,36 @@ export default function Page() {
     end: new Date().toISOString().split("T")[0],
   });
   const [selectedUnit, setSelectedUnit] = useState("Todas as Unidades");
+  const [orders, setOrders] = useState<Order[]>([]);
+
+  useEffect(() => {
+    const saved = localStorage.getItem("lavanpro_orders_v3");
+    if (saved) {
+      try {
+        setOrders(JSON.parse(saved));
+      } catch (e) {
+        console.error("Error loading orders", e);
+      }
+    }
+  }, []);
+
+  const metrics = useMemo(() => {
+    return calculateDashboardMetrics(orders, activeRange, customDates);
+  }, [orders, activeRange, customDates]);
+
+  const operationalData = [
+    { label: "Em Lavagem", value: metrics.statusCounts["Lavagem"] || 0, icon: Waves, color: "text-blue-500", bg: "bg-blue-500/10", dot: "bg-blue-500" },
+    { label: "Prontos p/ Retirada", value: metrics.statusCounts["Pronto"] || 0, icon: PackageCheck, color: "text-emerald-500", bg: "bg-emerald-500/10", dot: "bg-emerald-500" },
+    { label: "Aguardando Coleta", value: metrics.statusCounts["Recebido"] || 0, icon: Clock, color: "text-amber-500", bg: "bg-amber-500/10", dot: "bg-amber-500" },
+    { label: "Em Rota", value: metrics.statusCounts["Em Rota"] || 0, icon: Truck, color: "text-purple-500", bg: "bg-purple-500/10", dot: "bg-purple-500" },
+    { label: "Alertas", value: metrics.statusCounts["Atraso"] || 0, icon: AlertTriangle, color: "text-rose-500", bg: "bg-rose-500/10", dot: "bg-rose-500" },
+  ];
 
   return (
     <div className="flex min-h-screen bg-brand-bg text-brand-text font-sans">
       <Sidebar />
       <div className="flex-1 flex flex-col h-screen overflow-hidden">
-        <main className="flex-1 overflow-y-auto bg-brand-bg">
+        <main className="flex-1 overflow-y-auto bg-brand-bg custom-scrollbar">
           <Filters
             activeRange={activeRange}
             onChange={setActiveRange}
@@ -58,7 +79,10 @@ export default function Page() {
             <section>
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-sm font-bold text-brand-muted uppercase tracking-widest">Visão Operacional em Tempo Real</h2>
-                <button className="flex items-center gap-1 text-xs font-bold text-brand-primary hover:underline">
+                <button 
+                  onClick={() => window.location.href = '/orders'}
+                  className="flex items-center gap-1 text-xs font-bold text-brand-primary hover:underline"
+                >
                   Ver todos os pedidos <ArrowRight className="size-3" />
                 </button>
               </div>
@@ -68,18 +92,18 @@ export default function Page() {
                   return (
                     <div
                       key={item.label}
-                      className="bg-brand-card rounded-2xl border border-brand-darkBorder p-4 flex flex-col items-center gap-3 hover:border-brand-primary/30 transition-all cursor-pointer group"
+                      className="bg-brand-card rounded-2xl border border-brand-darkBorder p-5 flex flex-col items-center gap-4 hover:border-brand-primary/30 hover:shadow-2xl hover:shadow-brand-primary/5 transition-all cursor-pointer group"
                     >
-                      <div className={`p-3 rounded-xl ${item.bg} group-hover:scale-110 transition-transform`}>
-                        <Icon className={`size-5 ${item.color}`} />
+                      <div className={`p-4 rounded-xl ${item.bg} group-hover:scale-110 transition-transform duration-300 shadow-inner`}>
+                        <Icon className={`size-6 ${item.color}`} />
                       </div>
                       <div className="text-center">
-                        <p className="text-2xl font-black text-brand-text">{item.value}</p>
-                        <p className="text-[11px] font-semibold text-brand-muted leading-tight mt-0.5">{item.label}</p>
+                        <p className="text-3xl font-black text-brand-text tracking-tight">{item.value}</p>
+                        <p className="text-[11px] font-black text-brand-muted uppercase tracking-widest mt-1">{item.label}</p>
                       </div>
-                      <span className="flex items-center gap-1.5 text-[10px] font-bold text-brand-muted">
-                        <span className={`size-1.5 rounded-full ${item.dot} animate-pulse`} />
-                        Ativo
+                      <span className="flex items-center gap-1.5 text-[10px] font-bold text-brand-muted bg-white/5 px-3 py-1 rounded-full">
+                        <span className={`size-1.5 rounded-full ${item.dot} animate-pulse shadow-[0_0_8px_rgba(0,0,0,0.5)]`} />
+                        Status Ativo
                       </span>
                     </div>
                   );
@@ -90,17 +114,27 @@ export default function Page() {
             {/* Revenue Cards */}
             <section>
               <h2 className="text-sm font-bold text-brand-muted uppercase tracking-widest mb-4">Métricas Financeiras</h2>
-              <StatsCards activeRange={activeRange} customDates={customDates} />
+              <StatsCards 
+                activeRange={activeRange} 
+                customDates={customDates} 
+                metrics={metrics}
+              />
             </section>
 
             {/* Main Chart */}
-            <MainChart activeRange={activeRange} customDates={customDates} />
+            <MainChart 
+                activeRange={activeRange} 
+                customDates={customDates} 
+                chartData={metrics.chartData}
+                totalFaturado={metrics.faturamento}
+                pedidosTotal={metrics.pedidosTotal}
+            />
 
             {/* Dashboard BI - Enterprise Only Section */}
             <section className="space-y-4">
               <div className="flex items-center justify-between">
                 <h2 className="text-sm font-bold text-brand-muted uppercase tracking-widest flex items-center gap-2">
-                  Análise deBI e Mix de Produtos
+                  Análise de BI e Mix de Produtos
                   {!isEnterprise && <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-500/10 text-slate-400 text-[9px] font-black border border-brand-darkBorder uppercase"><Crown className="size-2.5" /> Enterprise</span>}
                 </h2>
               </div>
@@ -132,11 +166,18 @@ export default function Page() {
             </section>
 
             {/* Transaction Table */}
-            <TransactionTable activeRange={activeRange} customDates={customDates} />
+            <TransactionTable activeRange={activeRange} customDates={customDates} orders={orders} />
 
           </div>
         </main>
-      </div>
+        <style jsx global>{`
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.15); }
+      `}</style>
+    </div>
+
     </div>
   );
 }
