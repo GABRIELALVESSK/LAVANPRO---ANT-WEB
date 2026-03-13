@@ -4,10 +4,11 @@ import { Sidebar } from "@/components/sidebar";
 import { AccessGuard } from "@/components/access-guard";
 import { PlanGuard } from "@/components/plan-guard";
 import {
-    QrCode, Search, Printer, Tag, History,
-    CheckCircle2, ChevronRight, SearchCode,
-    PackageX, User, Cpu, X, Link2, Unlink2,
-    AlertCircle, CheckCheck, Clock, Trash2
+    Activity, AlertCircle, ArrowRight, BarChart3, Calendar, Camera, CheckCheck, CheckCircle, 
+    ChevronRight, ClipboardList, Clock, CreditCard, Cpu, Filter, History, Info, 
+    LayoutDashboard, Link2, LogOut, Mail, MapPin, Package, PackageX, Phone, Plus, 
+    Printer, QrCode, RefreshCw, Search, SearchCode, Settings, ShieldCheck, 
+    ShoppingBag, Tag, Trash2, TrendingUp, Truck, Unlink2, Users, X
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useMemo, useEffect, useCallback, Suspense, useRef } from "react";
@@ -344,6 +345,17 @@ function LabelsContent() {
     const webcamRef = useRef<any>(null);
     const scanLogicRef = useRef<any>(null);
     const [scannerReady, setScannerReady] = useState(false);
+    const [diagnostics, setDiagnostics] = useState({
+        device: "Carregando...",
+        res: "0x0",
+        fps: 0,
+        attempts: 0,
+        lastError: "",
+        lastRead: "",
+        status: "Iniciando..."
+    });
+    const frameCountRef = useRef(0);
+    const lastFpsUpdateRef = useRef(Date.now());
 
     // ── Limpeza do hardware da câmera ──
     useEffect(() => {
@@ -616,10 +628,11 @@ function LabelsContent() {
 
 
 
-    // ── Camera Reader Initialization and Management ──
+    // ── Camera Reader Initialization and Management (Optimized for Safari/iOS) ──
     useEffect(() => {
         if (!isCameraActive) {
             setScannerReady(false);
+            setDiagnostics(prev => ({ ...prev, status: "Desligado", res: "0x0" }));
             return;
         }
 
@@ -629,40 +642,72 @@ function LabelsContent() {
         
         const startScanning = async () => {
             try {
+                setDiagnostics(prev => ({ ...prev, status: "Preparando hardware..." }));
+                
                 // Wait for video element
-                let video = webcamRef.current?.video;
+                let video = webcamRef.current?.video as HTMLVideoElement;
                 let attempts = 0;
-                while ((!video || video.readyState < 2) && attempts < 50 && isCameraActive && isScanning) {
+                while ((!video || video.readyState < 2) && attempts < 100 && isCameraActive && isScanning) {
                     await new Promise(r => setTimeout(r, 100));
                     video = webcamRef.current?.video;
                     attempts++;
                 }
 
                 if (video && isCameraActive && isScanning) {
+                    // Update diagnostics with real stream info
+                    const stream = video.srcObject as MediaStream;
+                    const track = stream?.getVideoTracks()[0];
+                    const settings = track?.getSettings();
+                    
+                    setDiagnostics(prev => ({ 
+                        ...prev, 
+                        status: "Decoder Ativo",
+                        device: track?.label || "Câmera Padrão",
+                        res: `${video.videoWidth}x${video.videoHeight}`,
+                        lastError: "Nenhum"
+                    }));
+                    
                     setScannerReady(true);
                     
-                    const decodeLoop = async () => {
+                    // Continuous decoding loop using ZXing's built-in observer
+                    (codeReader as any).decodeFromVideoElement(video, (result: any, error: any) => {
                         if (!isScanning || !isCameraActive) return;
-                        try {
-                            const result = await (codeReader as any).decodeOnceFromVideoElement(video!);
-                            if (result && isScanning) {
-                                const foundText = result.getText();
-                                if (foundText && scanLogicRef.current) {
-                                    scanLogicRef.current(foundText);
-                                }
-                            }
-                        } catch (e) {
-                            // No QR found in this frame, wait and retry
-                            if (isScanning && isCameraActive) {
-                                setTimeout(decodeLoop, 250);
+                        
+                        // Increment frame attempt counter
+                        frameCountRef.current++;
+                        
+                        // Update FPS every second
+                        const now = Date.now();
+                        if (now - lastFpsUpdateRef.current > 1000) {
+                            const fps = Math.round((frameCountRef.current * 1000) / (now - lastFpsUpdateRef.current));
+                            setDiagnostics(prev => ({ ...prev, fps: fps, attempts: prev.attempts + frameCountRef.current }));
+                            frameCountRef.current = 0;
+                            lastFpsUpdateRef.current = now;
+                            
+                            // Also update real resolution again just in case it changed (Safari sometimes does this)
+                            if (video) {
+                                setDiagnostics(prev => ({ ...prev, res: `${video.videoWidth}x${video.videoHeight}` }));
                             }
                         }
-                    };
-                    
-                    decodeLoop();
+
+                        if (result) {
+                            const foundText = result.getText();
+                            if (foundText && scanLogicRef.current) {
+                                setDiagnostics(prev => ({ ...prev, lastRead: foundText, lastError: "Sucesso!" }));
+                                scanLogicRef.current(foundText);
+                            }
+                        }
+                        
+                        if (error && error.name !== 'NotFoundException') {
+                            setDiagnostics(prev => ({ ...prev, lastError: error.message || "Erro de decodificação" }));
+                        }
+                    });
+                } else {
+                    setDiagnostics(prev => ({ ...prev, status: "Erro: Timeout de vídeo", lastError: "Câmera não respondeu" }));
                 }
-            } catch (err) {
+            } catch (err: any) {
                 console.error("Erro fatal no scanner:", err);
+                setDiagnostics(prev => ({ ...prev, status: "Erro Crítico", lastError: err.message }));
             }
         };
 
@@ -673,6 +718,7 @@ function LabelsContent() {
             codeReader.reset();
             readerRef.current = null;
             setScannerReady(false);
+            setDiagnostics(prev => ({ ...prev, status: "Fechado" }));
         };
     }, [isCameraActive]);
 
@@ -848,7 +894,7 @@ function LabelsContent() {
                                     className="grid grid-cols-2 md:grid-cols-4 gap-4">
                                     {[
                                         { label: "Total de Etiquetas", value: labels.length, icon: Tag, color: "text-brand-primary" },
-                                        { label: "Disponíveis", value: availableCount, icon: CheckCircle2, color: "text-emerald-400" },
+                                        { label: "Disponíveis", value: availableCount, icon: CheckCircle, color: "text-emerald-400" },
                                         { label: "Em Uso", value: assignedCount, icon: Link2, color: "text-brand-primary" },
                                         { label: "Ciclos Históricos", value: history.filter(h => h.releasedAt).length, icon: History, color: "text-amber-400" },
                                     ].map(s => (
@@ -978,7 +1024,7 @@ function LabelsContent() {
                                                         <div className="flex-1 min-w-0">
                                                             <h2 className="font-black text-xl text-brand-text">{selectedLabelState.code}</h2>
                                                             <div className={`inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full border mt-1 ${selectedLabelState.status === "available" ? "text-emerald-400 bg-emerald-500/10 border-emerald-500/20" : "text-brand-primary bg-brand-primary/10 border-brand-primary/20"}`}>
-                                                                {selectedLabelState.status === "available" ? <><CheckCircle2 className="size-3" /> Disponível</> : <><Link2 className="size-3" /> Em Uso</>}
+                                                                {selectedLabelState.status === "available" ? <><CheckCircle className="size-3" /> Disponível</> : <><Link2 className="size-3" /> Em Uso</>}
                                                             </div>
                                                         </div>
                                                         <div className="flex flex-col items-end gap-3 shrink-0">
@@ -1018,7 +1064,7 @@ function LabelsContent() {
                                                                 </div>
                                                                 <div className="space-y-1 text-sm">
                                                                     <p className="font-black text-brand-primary text-base">{selectedOrder.id}</p>
-                                                                    <p className="flex items-center gap-2 text-brand-muted"><User className="size-3.5" /> {selectedOrder.clientName}</p>
+                                                                    <p className="flex items-center gap-2 text-brand-muted"><Users className="size-3.5" /> {selectedOrder.clientName}</p>
                                                                     <p className="text-xs text-brand-muted">{selectedOrder.clientPhone}</p>
                                                                 </div>
                                                                 <div className="border-t border-brand-darkBorder pt-3">
@@ -1058,7 +1104,7 @@ function LabelsContent() {
                                                         /* If available — show link form */
                                                         <div className="space-y-4">
                                                             <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-2xl p-4 text-center">
-                                                                <CheckCircle2 className="size-8 text-emerald-400 mx-auto mb-2" />
+                                                                <CheckCircle className="size-8 text-emerald-400 mx-auto mb-2" />
                                                                 <p className="font-bold text-emerald-400 text-sm">Etiqueta Disponível</p>
                                                                 <p className="text-xs text-brand-muted mt-1">Pronta para ser vinculada a um novo pedido.</p>
                                                             </div>
@@ -1150,7 +1196,7 @@ function LabelsContent() {
                                     {scanLabelState.status === "available" ? (
                                         <>
                                             <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-4 text-center">
-                                                <CheckCircle2 className="size-6 text-emerald-400 mx-auto mb-1" />
+                                                <CheckCircle className="size-6 text-emerald-400 mx-auto mb-1" />
                                                 <p className="font-bold text-emerald-400">Etiqueta Disponível</p>
                                                 <p className="text-xs text-brand-muted mt-1">Esta etiqueta está livre. Vincule-a a um pedido.</p>
                                             </div>
@@ -1180,7 +1226,7 @@ function LabelsContent() {
                                                     <p className="font-black text-brand-primary">{scanOrder.id}</p>
                                                     <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${getStatusColor(scanOrder.status)}`}>{scanOrder.status}</span>
                                                 </div>
-                                                <p className="text-sm flex items-center gap-2 text-brand-muted"><User className="size-3.5" /> {scanOrder.clientName}</p>
+                                                <p className="text-sm flex items-center gap-2 text-brand-muted"><Users className="size-3.5" /> {scanOrder.clientName}</p>
                                                 <div className="border-t border-brand-darkBorder pt-2 mt-2">
                                                     {scanOrder.items.map((item, i) => (
                                                         <div key={i} className="flex justify-between text-xs py-0.5">
@@ -1244,16 +1290,20 @@ function LabelsContent() {
                                 </div>
 
                                 <div className="p-6 space-y-4">
-                                    <div className="aspect-square relative overflow-hidden bg-black rounded-2xl border border-brand-darkBorder">
+                                    <div className="aspect-square relative overflow-hidden bg-black rounded-2xl border border-brand-darkBorder shadow-2xl">
                                         <Webcam
                                             ref={webcamRef}
                                             audio={false}
+                                            playsInline
+                                            muted
                                             screenshotFormat="image/jpeg"
                                             videoConstraints={{ 
                                                 facingMode: "environment",
-                                                width: { ideal: 1920 }, // Tentando Full HD para mais detalhe no QR
-                                                height: { ideal: 1080 }
+                                                width: { ideal: 1280 }, 
+                                                height: { ideal: 720 }
                                             }}
+                                            onUserMedia={() => setDiagnostics(prev => ({ ...prev, status: "Vídeo Recebido" }))}
+                                            onUserMediaError={(err) => setDiagnostics(prev => ({ ...prev, status: "Erro Permissão", lastError: String(err) }))}
                                             className="w-full h-full object-cover"
                                         />
                                         {/* Overlay for scan area */}
@@ -1265,26 +1315,82 @@ function LabelsContent() {
                                                 <div className="absolute bottom-[-4px] right-[-4px] size-12 border-b-8 border-r-8 border-brand-primary rounded-br-xl" />
                                             <div className="absolute top-1/2 left-0 right-0 h-0.5 bg-brand-primary/50 animate-[scan_2s_linear_infinite]" />
                                             </div>
-                                            <p className={`mt-8 text-white/70 text-sm font-bold bg-black/40 px-4 py-2 rounded-full backdrop-blur-md transition-all ${scannerReady ? 'opacity-100 scale-100' : 'opacity-50 scale-95'}`}>
-                                                {scannerReady ? "Buscando QR Code..." : "Iniciando câmera..."}
-                                            </p>
+                                            <div className="mt-8 flex flex-col items-center gap-2">
+                                                <p className={`text-white/70 text-sm font-bold bg-black/40 px-4 py-2 rounded-full backdrop-blur-md transition-all ${scannerReady ? 'opacity-100 scale-100' : 'opacity-50 scale-95'}`}>
+                                                    {diagnostics.status === "Decoder Ativo" ? "Buscando QR Code..." : diagnostics.status}
+                                                </p>
+                                                {diagnostics.fps > 0 && (
+                                                    <span className="text-[10px] text-brand-primary/60 font-mono tracking-widest">{diagnostics.fps} FPS</span>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
 
-                                    {/* Debug Log (Visible for operation diagnostics) */}
-                                    <div className="bg-brand-bg/50 border border-brand-darkBorder rounded-xl p-2 font-mono text-[9px] text-brand-muted h-12 overflow-y-auto custom-scrollbar">
-                                        <div className="flex justify-between items-center opacity-50 mb-1">
-                                            <span>DIAGNÓSTICO:</span>
-                                            <span className="text-[8px]">{new Date().toLocaleTimeString()}</span>
+                                    {/* Real-time Diagnostics HUD (iPhone/Safe Debug) */}
+                                    <div className="bg-brand-bg/80 backdrop-blur-sm border border-brand-darkBorder rounded-2xl p-4 font-mono text-[10px] space-y-3 shadow-inner overflow-hidden">
+                                        <div className="flex justify-between items-center border-b border-white/5 pb-2">
+                                            <span className="font-black text-brand-primary flex items-center gap-2 underline decoration-brand-primary/30">
+                                                <Activity className="size-3" /> HUD DIAGNÓSTICO
+                                            </span>
+                                            <span className={`px-2 py-0.5 rounded text-[8px] font-bold tracking-tighter uppercase ${diagnostics.status === "Decoder Ativo" ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-500'}`}>
+                                                {diagnostics.status}
+                                            </span>
                                         </div>
-                                        <p className="text-brand-primary truncate">Última leitura: {scanLogicRef.current?.lastRead || "Nenhum dado lido ainda"}</p>
+                                        
+                                        <div className="grid grid-cols-2 gap-x-2 gap-y-1.5 text-[9px]">
+                                            <div className="flex flex-col">
+                                                <span className="text-brand-muted uppercase text-[8px]">Câmera</span>
+                                                <span className="text-white truncate">{diagnostics.device}</span>
+                                            </div>
+                                            <div className="flex flex-col">
+                                                <span className="text-brand-muted uppercase text-[8px]">Resolução</span>
+                                                <span className="text-white">{diagnostics.res}</span>
+                                            </div>
+                                            <div className="flex flex-col">
+                                                <span className="text-brand-muted uppercase text-[8px]">Frames Analisados</span>
+                                                <span className="text-white">{diagnostics.attempts}</span>
+                                            </div>
+                                            <div className="flex flex-col">
+                                                <span className="text-brand-muted uppercase text-[8px]">Última Leitura</span>
+                                                <span className="text-emerald-400 font-bold truncate">{diagnostics.lastRead || "—"}</span>
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="pt-2 border-t border-white/5 flex flex-col gap-1">
+                                            <span className="text-[8px] text-brand-muted uppercase">Status do Decoder</span>
+                                            <p className={`text-[9px] break-words ${diagnostics.lastError === 'Sucesso!' ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                                {diagnostics.lastError || "Aguardando frames..."}
+                                            </p>
+                                        </div>
+                                        
+                                        {/* Simulation Buttons (To test parser flow) */}
+                                        <div className="grid grid-cols-2 gap-2 pt-1">
+                                            <button 
+                                                onClick={() => {
+                                                    setDiagnostics(prev => ({ ...prev, lastRead: "TESTE123", lastError: "Simulação" }));
+                                                    handleCameraScan("TESTE123");
+                                                }}
+                                                className="bg-brand-primary/5 hover:bg-brand-primary/10 border border-brand-primary/10 rounded-lg py-2 text-[8px] font-bold text-brand-primary transition-all active:scale-95"
+                                            >
+                                                Simular 'TESTE123'
+                                            </button>
+                                            <button 
+                                                onClick={() => {
+                                                    setDiagnostics(prev => ({ ...prev, lastRead: "TAG-001", lastError: "Simulação" }));
+                                                    handleCameraScan("TAG-001");
+                                                }}
+                                                className="bg-brand-primary/5 hover:bg-brand-primary/10 border border-brand-primary/10 rounded-lg py-2 text-[8px] font-bold text-brand-primary transition-all active:scale-95"
+                                            >
+                                                Simular 'TAG-001'
+                                            </button>
+                                        </div>
                                     </div>
 
                                     {/* Fallback Manual Input */}
                                     <div className="relative">
                                         <input 
                                             autoFocus
-                                            placeholder="Digite manualmente (TAG ou Pedido)..."
+                                            placeholder="Digite manualmente se falhar..."
                                             className="w-full bg-brand-bg border border-brand-darkBorder rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-brand-primary/50 transition-colors pl-11 shadow-inner"
                                             onKeyDown={(e) => {
                                                 if (e.key === "Enter") {
