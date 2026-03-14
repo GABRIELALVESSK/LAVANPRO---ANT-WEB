@@ -169,12 +169,14 @@ export function UnitSelector({ onUnitChange, showAllOption = true }: UnitSelecto
               {units.length === 0 && (
                 <div className="p-4 text-center">
                     <p className="text-xs text-brand-muted">Nenhuma unidade cadastrada.</p>
-                    <button 
-                        onClick={() => window.location.href = '/settings?tab=unit'}
-                        className="mt-2 text-[10px] font-bold text-brand-primary hover:underline"
-                    >
-                        Configurar agora
-                    </button>
+                    {isOwner && (
+                      <button 
+                          onClick={() => window.location.href = '/settings?tab=unit'}
+                          className="mt-2 text-[10px] font-bold text-brand-primary hover:underline"
+                      >
+                          Configurar agora
+                      </button>
+                    )}
                 </div>
               )}
             </div>
