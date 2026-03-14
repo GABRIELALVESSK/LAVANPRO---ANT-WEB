@@ -51,12 +51,70 @@ export default function Page() {
     return calculateDashboardMetrics(orders, activeRange, customDates);
   }, [orders, activeRange, customDates]);
 
+  const handleNavigate = (route: string, filters?: Record<string, string>) => {
+    const params = new URLSearchParams();
+    if (filters) {
+      Object.entries(filters).forEach(([key, value]) => params.append(key, value));
+    }
+    // Context persistence
+    params.append("range", activeRange);
+    params.append("unit", selectedUnit);
+    
+    const queryString = params.toString();
+    window.location.href = `${route}${queryString ? `?${queryString}` : ""}`;
+  };
+
   const operationalData = [
-    { label: "Em Lavagem", value: metrics.statusCounts["Lavagem"] || 0, icon: Waves, color: "text-blue-500", bg: "bg-blue-500/10", dot: "bg-blue-500" },
-    { label: "Prontos p/ Retirada", value: metrics.statusCounts["Pronto"] || 0, icon: PackageCheck, color: "text-emerald-500", bg: "bg-emerald-500/10", dot: "bg-emerald-500" },
-    { label: "Aguardando Coleta", value: metrics.statusCounts["Recebido"] || 0, icon: Clock, color: "text-amber-500", bg: "bg-amber-500/10", dot: "bg-amber-500" },
-    { label: "Em Rota", value: metrics.statusCounts["Em Rota"] || 0, icon: Truck, color: "text-purple-500", bg: "bg-purple-500/10", dot: "bg-purple-500" },
-    { label: "Alertas", value: metrics.statusCounts["Atraso"] || 0, icon: AlertTriangle, color: "text-rose-500", bg: "bg-rose-500/10", dot: "bg-rose-500" },
+    { 
+      label: "Em Lavagem", 
+      value: metrics.statusCounts["Lavagem"] || 0, 
+      icon: Waves, 
+      color: "text-blue-500", 
+      bg: "bg-blue-500/10", 
+      dot: "bg-blue-500",
+      route: "/orders",
+      filters: { status: "Em Lavagem" }
+    },
+    { 
+      label: "Prontos p/ Retirada", 
+      value: metrics.statusCounts["Pronto"] || 0, 
+      icon: PackageCheck, 
+      color: "text-emerald-500", 
+      bg: "bg-emerald-500/10", 
+      dot: "bg-emerald-500",
+      route: "/orders",
+      filters: { status: "Pronto" }
+    },
+    { 
+      label: "Aguardando Coleta", 
+      value: metrics.statusCounts["Recebido"] || 0, 
+      icon: Clock, 
+      color: "text-amber-500", 
+      bg: "bg-amber-500/10", 
+      dot: "bg-amber-500",
+      route: "/orders",
+      filters: { status: "Recebido" }
+    },
+    { 
+      label: "Em Rota", 
+      value: metrics.statusCounts["Em Rota"] || 0, 
+      icon: Truck, 
+      color: "text-purple-500", 
+      bg: "bg-purple-500/10", 
+      dot: "bg-purple-500",
+      route: "/orders",
+      filters: { status: "Em Rota" }
+    },
+    { 
+      label: "Alertas", 
+      value: metrics.statusCounts["Atraso"] || 0, 
+      icon: AlertTriangle, 
+      color: "text-rose-500", 
+      bg: "bg-rose-500/10", 
+      dot: "bg-rose-500",
+      route: "/orders",
+      filters: { status: "Atraso" }
+    },
   ];
 
   return (
@@ -81,7 +139,7 @@ export default function Page() {
                 <h2 className="text-sm font-bold text-brand-muted uppercase tracking-widest">Visão Operacional em Tempo Real</h2>
                 <button 
                   onClick={() => window.location.href = '/orders'}
-                  className="flex items-center gap-1 text-xs font-bold text-brand-primary hover:underline"
+                  className="flex items-center gap-1 text-xs font-bold text-brand-primary hover:underline transition-all"
                 >
                   Ver todos os pedidos <ArrowRight className="size-3" />
                 </button>
@@ -92,16 +150,20 @@ export default function Page() {
                   return (
                     <div
                       key={item.label}
-                      className="bg-brand-card rounded-2xl border border-brand-darkBorder p-5 flex flex-col items-center gap-4 hover:border-brand-primary/30 hover:shadow-2xl hover:shadow-brand-primary/5 transition-all cursor-pointer group"
+                      onClick={() => handleNavigate(item.route, item.filters)}
+                      className="bg-brand-card rounded-2xl border border-brand-darkBorder p-5 flex flex-col items-center gap-4 hover:border-brand-primary/40 hover:shadow-2xl hover:shadow-brand-primary/5 hover:-translate-y-1 transition-all cursor-pointer group relative overflow-hidden"
                     >
-                      <div className={`p-4 rounded-xl ${item.bg} group-hover:scale-110 transition-transform duration-300 shadow-inner`}>
+                      {/* Interactive glow */}
+                      <div className="absolute inset-0 bg-gradient-to-br from-brand-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
+                      
+                      <div className={`p-4 rounded-xl ${item.bg} group-hover:scale-110 transition-transform duration-300 shadow-inner relative z-10`}>
                         <Icon className={`size-6 ${item.color}`} />
                       </div>
-                      <div className="text-center">
-                        <p className="text-3xl font-black text-brand-text tracking-tight">{item.value}</p>
+                      <div className="text-center relative z-10">
+                        <p className="text-3xl font-black text-brand-text tracking-tight group-hover:text-brand-primary transition-colors">{item.value}</p>
                         <p className="text-[11px] font-black text-brand-muted uppercase tracking-widest mt-1">{item.label}</p>
                       </div>
-                      <span className="flex items-center gap-1.5 text-[10px] font-bold text-brand-muted bg-white/5 px-3 py-1 rounded-full">
+                      <span className="flex items-center gap-1.5 text-[10px] font-bold text-brand-muted bg-white/5 px-3 py-1 rounded-full relative z-10 group-hover:bg-brand-primary/10 transition-colors">
                         <span className={`size-1.5 rounded-full ${item.dot} animate-pulse shadow-[0_0_8px_rgba(0,0,0,0.5)]`} />
                         Status Ativo
                       </span>

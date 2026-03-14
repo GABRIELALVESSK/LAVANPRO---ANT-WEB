@@ -9,6 +9,7 @@ import {
   YAxis,
   CartesianGrid,
 } from "recharts";
+import { ArrowUpRight } from "lucide-react";
 
 interface MainChartProps {
   activeRange?: string;
@@ -44,14 +45,17 @@ function CustomTooltip({ active, payload }: any) {
 
 export function MainChart({ chartData, totalFaturado, pedidosTotal }: MainChartProps) {
   return (
-    <div className="bg-brand-card rounded-2xl border border-brand-darkBorder shadow-xl overflow-hidden">
-      <div className="p-6 border-b border-brand-darkBorder flex flex-wrap items-center justify-between gap-4">
+    <div className="bg-brand-card rounded-2xl border border-brand-darkBorder shadow-xl overflow-hidden group">
+      <div 
+        onClick={() => window.location.href = '/reports'}
+        className="p-6 border-b border-brand-darkBorder flex flex-wrap items-center justify-between gap-4 cursor-pointer hover:bg-white/5 transition-all group/header"
+      >
         <div>
-          <h4 className="text-lg font-bold text-brand-text">
+          <h4 className="text-lg font-bold text-brand-text group-hover/header:text-brand-primary transition-colors">
             Evolução do Faturamento
           </h4>
           <p className="text-sm text-brand-muted mt-0.5">
-            Acompanhamento de receita em tempo real
+            Acompanhamento de receita em tempo real <ArrowUpRight className="inline size-3 opacity-0 group-hover/header:opacity-100 transition-all ml-1" />
           </p>
         </div>
         <div className="flex items-center gap-5">

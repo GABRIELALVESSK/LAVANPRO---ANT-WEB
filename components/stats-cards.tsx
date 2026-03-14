@@ -51,6 +51,7 @@ interface StatCardProps {
   sparkColor: string;
   extra?: string;
   extraLabel?: string;
+  onClick?: () => void;
 }
 
 function StatCard({
@@ -63,15 +64,19 @@ function StatCard({
   sparkColor,
   extra,
   extraLabel,
+  onClick,
 }: StatCardProps) {
   return (
-    <div className="bg-brand-card p-6 rounded-2xl border border-brand-darkBorder shadow-xl hover:border-brand-primary/30 hover:shadow-brand-primary/5 transition-all duration-300 group relative overflow-hidden">
+    <div 
+      onClick={onClick}
+      className={`bg-brand-card p-6 rounded-2xl border border-brand-darkBorder shadow-xl hover:border-brand-primary/40 hover:shadow-brand-primary/5 hover:-translate-y-1 transition-all duration-300 group relative overflow-hidden ${onClick ? 'cursor-pointer' : ''}`}
+    >
       {/* Glow accent */}
       <div className="absolute top-0 right-0 w-32 h-32 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"
-        style={{ background: `radial-gradient(circle at top right, ${isPositive ? "rgba(16,185,129,0.06)" : "rgba(244,63,94,0.06)"} 0%, transparent 70%)` }} />
+        style={{ background: `radial-gradient(circle at top right, ${isPositive ? "rgba(16,185,129,0.08)" : "rgba(244,63,94,0.08)"} 0%, transparent 70%)` }} />
 
-      <div className="flex items-start justify-between mb-4">
-        <div className={`p-3 rounded-xl ${iconBg}`}>
+      <div className="flex items-start justify-between mb-4 relative z-10">
+        <div className={`p-3 rounded-xl ${iconBg} group-hover:scale-110 transition-transform`}>
           {icon}
         </div>
         <span
@@ -89,17 +94,17 @@ function StatCard({
         </span>
       </div>
 
-      <p className="text-xs font-bold text-brand-muted uppercase tracking-wider mb-1">{label}</p>
-      <h3 className="text-2xl font-black text-brand-text mb-1">{value}</h3>
+      <p className="text-xs font-bold text-brand-muted uppercase tracking-wider mb-1 relative z-10">{label}</p>
+      <h3 className="text-2xl font-black text-brand-text mb-1 relative z-10 group-hover:text-brand-primary transition-colors">{value}</h3>
 
       {extra !== undefined && (
-        <p className="text-[11px] text-brand-muted font-medium">
+        <p className="text-[11px] text-brand-muted font-medium relative z-10">
           <span className="text-brand-text font-bold">{extra}</span>
           {extraLabel && ` ${extraLabel}`}
         </p>
       )}
 
-      <div className="w-full h-10 mt-3">
+      <div className="w-full h-10 mt-3 opacity-60 group-hover:opacity-100 transition-opacity">
         <MiniSparkline color={sparkColor} up={isPositive} />
       </div>
     </div>
@@ -107,15 +112,20 @@ function StatCard({
 }
 
 export function StatsCards({ metrics }: StatsCardsProps) {
+  const handleNavigate = (route: string) => {
+    window.location.href = route;
+  };
+
   const cards: StatCardProps[] = [
     {
       icon: <DollarSign className="size-5 text-emerald-500" />,
       iconBg: "bg-emerald-500/10",
       label: "Faturamento do Período",
       value: formatCurrency(metrics.faturamento),
-      trend: "+5.4%", // Simplified trend
+      trend: "+5.4%", 
       isPositive: true,
       sparkColor: "#10b981",
+      onClick: () => handleNavigate("/finance"),
     },
     {
       icon: <Receipt className="size-5 text-brand-primary" />,
@@ -125,6 +135,7 @@ export function StatsCards({ metrics }: StatsCardsProps) {
       trend: "+1.2%",
       isPositive: true,
       sparkColor: "#8b5cf6",
+      onClick: () => handleNavigate("/reports"),
     },
     {
       icon: <ShoppingBag className="size-5 text-blue-500" />,
@@ -136,6 +147,7 @@ export function StatsCards({ metrics }: StatsCardsProps) {
       sparkColor: "#3b82f6",
       extra: String(metrics.pedidosAbertos),
       extraLabel: "em aberto",
+      onClick: () => handleNavigate("/orders"),
     },
     {
       icon: <Truck className="size-5 text-amber-500" />,
@@ -147,6 +159,7 @@ export function StatsCards({ metrics }: StatsCardsProps) {
       sparkColor: "#f59e0b",
       extra: `${metrics.taxaBalcao.toFixed(0)}%`,
       extraLabel: "retirada no balcão",
+      onClick: () => handleNavigate("/reports"),
     },
   ];
 

@@ -1,4 +1,5 @@
 "use client";
+import { ArrowUpRight } from "lucide-react";
 
 interface DonutChartProps {
   activeRange?: string;
@@ -37,9 +38,15 @@ export function DonutChart({ data: propData }: DonutChartProps) {
   });
 
   return (
-    <div className="bg-brand-card rounded-2xl border border-brand-darkBorder shadow-xl overflow-hidden">
-      <div className="p-6 border-b border-brand-darkBorder">
-        <h4 className="text-lg font-bold text-brand-text">Faturamento por Categoria</h4>
+    <div className="bg-brand-card rounded-2xl border border-brand-darkBorder shadow-xl overflow-hidden group">
+      <div 
+        onClick={() => window.location.href = '/reports'}
+        className="p-6 border-b border-brand-darkBorder cursor-pointer hover:bg-white/5 transition-all group/header"
+      >
+        <h4 className="text-lg font-bold text-brand-text group-hover/header:text-brand-primary transition-colors flex items-center justify-between">
+          Faturamento por Categoria
+          <ArrowUpRight className="size-4 opacity-0 group-hover/header:opacity-100 transition-all" />
+        </h4>
         <p className="text-sm text-brand-muted mt-0.5">Distribuição por tipo de serviço</p>
       </div>
 

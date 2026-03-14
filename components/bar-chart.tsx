@@ -16,6 +16,8 @@ const COLORS: Record<string, { color: string; icon: string }> = {
   "Outros": { color: "#94a3b8", icon: "✨" },
 };
 
+import { ArrowUpRight } from "lucide-react";
+
 export function BarChart({ data: propData }: BarChartProps) {
   const data = (propData && propData.length > 0) ? propData.slice(0, 4).map((item) => {
     const totalValue = propData.reduce((s, curr) => s + curr.value, 0);
@@ -32,9 +34,15 @@ export function BarChart({ data: propData }: BarChartProps) {
   ];
 
   return (
-    <div className="bg-brand-card rounded-2xl border border-brand-darkBorder shadow-xl overflow-hidden">
-      <div className="p-6 border-b border-brand-darkBorder">
-        <h4 className="text-lg font-bold text-brand-text">Formas de Pagamento</h4>
+    <div className="bg-brand-card rounded-2xl border border-brand-darkBorder shadow-xl overflow-hidden group">
+      <div 
+        onClick={() => window.location.href = '/finance'}
+        className="p-6 border-b border-brand-darkBorder cursor-pointer hover:bg-white/5 transition-all group/header"
+      >
+        <h4 className="text-lg font-bold text-brand-text group-hover/header:text-brand-primary transition-colors flex items-center justify-between">
+          Formas de Pagamento
+          <ArrowUpRight className="size-4 opacity-0 group-hover/header:opacity-100 transition-all" />
+        </h4>
         <p className="text-sm text-brand-muted mt-0.5">Distribuição por método de pagamento</p>
       </div>
 

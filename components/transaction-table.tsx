@@ -64,12 +64,13 @@ export function TransactionTable({ orders }: TransactionTableProps) {
               return (
                 <tr
                   key={tx.id}
-                  className={`hover:bg-brand-primary/5 transition-colors border-b border-brand-darkBorder last:border-0 ${i % 2 === 0 ? "" : "bg-brand-bg/20"}`}
+                  onClick={() => window.location.href = `/orders?search=${tx.id.replace('#', '')}`}
+                  className={`hover:bg-brand-primary/10 transition-all border-b border-brand-darkBorder last:border-0 cursor-pointer group/row ${i % 2 === 0 ? "" : "bg-brand-bg/20"}`}
                 >
-                  <td className="px-6 py-4 font-mono text-xs font-bold text-brand-muted">{tx.id}</td>
+                  <td className="px-6 py-4 font-mono text-xs font-bold text-brand-muted group-hover/row:text-brand-primary transition-colors">{tx.id}</td>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
-                      <div className={`size-8 rounded-full flex items-center justify-center font-bold text-xs shrink-0 bg-brand-primary/20 text-brand-primary`}>
+                      <div className={`size-8 rounded-full flex items-center justify-center font-bold text-xs shrink-0 bg-brand-primary/20 text-brand-primary group-hover/row:scale-110 transition-transform`}>
                         {getInitials(tx.client)}
                       </div>
                       <span className="text-sm font-semibold text-brand-text whitespace-nowrap">{tx.client}</span>
@@ -89,8 +90,8 @@ export function TransactionTable({ orders }: TransactionTableProps) {
                     {new Date(tx.createdAt).toLocaleDateString("pt-BR")}
                   </td>
                   <td className="px-6 py-4 text-right">
-                    <button className="text-brand-muted hover:text-brand-primary transition-colors p-1 rounded-lg hover:bg-brand-primary/5">
-                      <MoreVertical className="size-4" />
+                    <button className="text-brand-muted group-hover/row:text-brand-primary transition-colors p-1 rounded-lg hover:bg-brand-primary/10">
+                      <ArrowUpRight className="size-4" />
                     </button>
                   </td>
                 </tr>

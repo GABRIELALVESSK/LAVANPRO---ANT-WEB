@@ -90,6 +90,15 @@ export default function OrdersPage() {
         if (isLoaded) localStorage.setItem("lavanpro_orders_v3", JSON.stringify(orders));
     }, [orders, isLoaded]);
 
+    // Init filters from URL
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        const status = params.get("status");
+        const search = params.get("search");
+        if (status) setFilterStatus(status);
+        if (search) setSearchQuery(search);
+    }, []);
+
     const filteredOrders = useMemo(() => {
         const q = searchQuery.toLowerCase();
         return orders.filter(o => {
