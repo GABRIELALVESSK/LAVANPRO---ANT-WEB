@@ -15,6 +15,7 @@ export interface Staff {
     processed_orders: number
     join_date: string
     user_id: string | null
+    owner_id: string | null
     created_at: string
     updated_at: string
 }
@@ -27,19 +28,55 @@ export const blankStaff = (): StaffFormData => ({
     name: '', email: '', phone: '', role: 'Atendente', unit: '', active: true, has_system_access: false
 })
 
+// ─── Helper: Get current user's effective owner_id ────────────────────────────
+async function getEffectiveOwnerId(): Promise<string> {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user) throw new Error('Usuário não autenticado');
+
+    const userId = session.user.id;
+
+    // Check if this user is a collaborator (has an owner_id in staff table)
+    const { data: staffRecord } = await supabase
+        .from('staff')
+        .select('owner_id')
+        .eq('user_id', userId)
+        .maybeSingle();
+
+    // If they're a collaborator, return their owner_id; otherwise they ARE the owner
+    return staffRecord?.owner_id || userId;
+}
+
 // ─── CRUD ─────────────────────────────────────────────────────────────────────
 
-export async function fetchStaff(): Promise<Staff[]> {
-    const { data, error } = await supabase
+export async function fetchStaff(unit?: string): Promise<Staff[]> {
+    let query = supabase
         .from('staff')
         .select('*')
         .order('created_at', { ascending: false })
 
-    if (error) throw error
+    if (unit && unit !== 'all') {
+        query = query.eq('unit', unit);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+        console.error('[staffService] fetchStaff error:', error.code, error.message);
+        // If RLS is blocking (PGRST116, 42501) return empty array gracefully
+        // The user needs to run the SQL migration in Supabase
+        if (error.code === 'PGRST116' || error.code === '42501' || error.message?.includes('policy')) {
+            console.warn('[staffService] RLS may be blocking. Run the SQL migration in Supabase.');
+            return [];
+        }
+        throw error;
+    }
     return (data as Staff[]) || []
 }
 
 export async function createStaff(form: StaffFormData): Promise<Staff> {
+    // Get the owner_id: the admin creating this staff member
+    const ownerId = await getEffectiveOwnerId();
+
     const { data, error } = await supabase
         .from('staff')
         .insert({
@@ -50,6 +87,7 @@ export async function createStaff(form: StaffFormData): Promise<Staff> {
             unit: form.unit,
             active: form.active,
             has_system_access: form.has_system_access,
+            owner_id: ownerId,
         })
         .select()
         .single()

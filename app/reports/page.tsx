@@ -6,6 +6,7 @@ import { PlanGuard } from "@/components/plan-guard";
 import { Filters } from "@/components/filters";
 import { UnitSelector } from "@/components/unit-selector";
 import { useEffect, useState, useMemo } from "react";
+import { useUnit } from "@/hooks/useUnit";
 import { Download, Wallet, Activity, Users } from "lucide-react";
 import {
   AreaChart,
@@ -55,12 +56,13 @@ function CustomTooltip({ active, payload, label, prefix = "R$ " }: any) {
 
 export default function ReportsPage() {
   const [activeRange, setActiveRange] = useState("30d");
-  const [selectedUnit, setSelectedUnit] = useState("all");
+  const { unitId: selectedUnit } = useUnit();
   const [customDates, setCustomDates] = useState({
     start: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
     end: new Date().toISOString().split("T")[0],
   });
 
+  const [units, setUnits] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState("financeiro");
   const [stockAlerts, setStockAlerts] = useState<any[]>([]);
   const [orders, setOrders] = useState<any[]>([]);
@@ -68,6 +70,12 @@ export default function ReportsPage() {
   const [financeTransactions, setFinanceTransactions] = useState<any[]>([]);
 
   useEffect(() => {
+    // Load Units
+    const savedUnits = localStorage.getItem("lavanpro_units");
+    if (savedUnits) {
+      try { setUnits(JSON.parse(savedUnits)); } catch (e) {}
+    }
+
     // Load Orders
     const savedOrders = localStorage.getItem("lavanpro_orders_v3");
     if (savedOrders) {
@@ -85,13 +93,6 @@ export default function ReportsPage() {
     if (savedFinance) {
         try { setFinanceTransactions(JSON.parse(savedFinance)); } catch(e) {}
     }
-
-    // Load initial unit preference and listen for changes
-    const savedUnit = localStorage.getItem("lavanpro_selected_unit");
-    if (savedUnit) setSelectedUnit(savedUnit);
-
-    const handleUnitChange = (e: any) => setSelectedUnit(e.detail);
-    window.addEventListener("unit-changed", handleUnitChange);
 
     // Stock Alerts (Existing)
     const savedProducts = localStorage.getItem("lavanpro_stock_products_v2");
@@ -115,7 +116,6 @@ export default function ReportsPage() {
       }
     }
 
-    return () => window.removeEventListener("unit-changed", handleUnitChange);
   }, []);
 
   // ─── Filtered Data ────────────────────────────────────────────────────────
@@ -138,6 +138,16 @@ export default function ReportsPage() {
   }, [orders, selectedUnit, customDates]);
 
   // ─── Metrics Calculation ──────────────────────────────────────────────────
+  
+  const filteredFinance = useMemo(() => {
+    if (!selectedUnit || selectedUnit === "all") return financeTransactions;
+    return financeTransactions.filter(t => t.unitId === selectedUnit);
+  }, [financeTransactions, selectedUnit]);
+
+  const filteredCustomers = useMemo(() => {
+    if (!selectedUnit || selectedUnit === "all") return customers;
+    return customers.filter(c => c.unitId === selectedUnit);
+  }, [customers, selectedUnit]);
   
   // 1. Faturamento vs Ticket Médio (Daily)
   const faturamentoData = useMemo(() => {
@@ -201,7 +211,7 @@ export default function ReportsPage() {
     });
 
     // Add real expenses if available
-    financeTransactions.forEach(t => {
+    filteredFinance.forEach(t => {
         if (t.type === "DESPESA" && t.status !== "PAGO") {
             // Very simple mapping for now
             result[2].aPagar += t.value; 
@@ -209,7 +219,7 @@ export default function ReportsPage() {
     });
 
     return result;
-  }, [filteredOrders, financeTransactions]);
+  }, [filteredOrders, filteredFinance]);
 
   // 4. Status de Pedidos
   const statusData = useMemo(() => {
@@ -274,8 +284,14 @@ export default function ReportsPage() {
         const unit = o.unitId || "Default";
         map[unit] = (map[unit] || 0) + o.items.reduce((s: number, i: any) => s + (Number(i.qty) || 0), 0);
     });
-    return Object.entries(map).map(([name, pecas]) => ({ name, pecas }));
-  }, [filteredOrders]);
+    
+    return Object.entries(map).map(([id, pecas]) => {
+        const unit = units.find(u => u.id === id);
+        // Map to unit.responsible or unit.name or "Default/Admin"
+        const displayName = unit ? (unit.responsible || unit.name) : (id === "default" || id === "Default" ? "Gabriel Alves" : id);
+        return { name: displayName, pecas };
+    });
+  }, [filteredOrders, units]);
 
   const tabs = [
     { id: "financeiro", label: "Financeiro e Vendas", icon: Wallet },

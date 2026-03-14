@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { ChevronDown, MapPin, Globe } from "lucide-react";
 import { getUnits, Unit } from "@/lib/units-data";
 import { motion, AnimatePresence } from "framer-motion";
+import { usePermissions } from "@/hooks/usePermissions";
 
 interface UnitSelectorProps {
   onUnitChange?: (unitId: string) => void;
@@ -14,34 +15,80 @@ export function UnitSelector({ onUnitChange, showAllOption = true }: UnitSelecto
   const [units, setUnits] = useState<Unit[]>([]);
   const [selectedUnit, setSelectedUnit] = useState<string>("all");
   const [isOpen, setIsOpen] = useState(false);
+  const { isOwner, staffUnit, loading: permsLoading } = usePermissions();
 
-  // Load units and sync with localStorage ONCE on mount
+  // Load units and sync with localStorage ONCE on mount or when permissions change
   useEffect(() => {
+    if (permsLoading) return;
+
     const loadedUnits = getUnits();
-    setUnits(loadedUnits);
+    let filteredUnits = loadedUnits;
+
+    const isSpecificUnit = staffUnit && staffUnit.toLowerCase() !== "todas as unidades" && staffUnit.toLowerCase() !== "todas";
+    if (!isOwner && isSpecificUnit) {
+      const staffUnitNormalized = staffUnit.trim().toLowerCase();
+      filteredUnits = loadedUnits.filter(u => u.name.trim().toLowerCase() === staffUnitNormalized);
+    }
     
-    // Check if there's a selected unit in localStorage
-    try {
-      const saved = localStorage.getItem("lavanpro_selected_unit");
-      if (saved) {
-          setSelectedUnit(saved);
-          if (onUnitChange) onUnitChange(saved);
-      } else if (!showAllOption && loadedUnits.length > 0) {
-          const firstUnitId = loadedUnits[0].id;
-          setSelectedUnit(firstUnitId);
-          localStorage.setItem("lavanpro_selected_unit", firstUnitId);
-          if (onUnitChange) onUnitChange(firstUnitId);
+    setUnits(filteredUnits);
+    
+    if (!isOwner && isSpecificUnit && filteredUnits.length > 0) {
+      const forcedUnitId = filteredUnits[0].id;
+      if (selectedUnit !== forcedUnitId) {
+        setSelectedUnit(forcedUnitId);
+        localStorage.setItem("lavanpro_selected_unit", forcedUnitId);
+        if (onUnitChange) onUnitChange(forcedUnitId);
+        // Ensure other components know
+        window.dispatchEvent(new CustomEvent("unit-changed", { detail: forcedUnitId }));
       }
-    } catch (e) {
-      console.error("Error accessing localStorage in UnitSelector:", e);
+    } else {
+      try {
+        const saved = localStorage.getItem("lavanpro_selected_unit");
+        if (saved) {
+            setSelectedUnit(saved);
+            if (onUnitChange) onUnitChange(saved);
+        } else if (!showAllOption && filteredUnits.length > 0) {
+            const firstUnitId = filteredUnits[0].id;
+            setSelectedUnit(firstUnitId);
+            localStorage.setItem("lavanpro_selected_unit", firstUnitId);
+            if (onUnitChange) onUnitChange(firstUnitId);
+        } else if (showAllOption) {
+            setSelectedUnit("all");
+            localStorage.setItem("lavanpro_selected_unit", "all");
+            if (onUnitChange) onUnitChange("all");
+        }
+      } catch (e) {
+        console.error("Error accessing localStorage in UnitSelector:", e);
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showAllOption]); 
+  }, [showAllOption, isOwner, staffUnit, permsLoading]); 
 
   // Sync state when custom event occurs (e.g. unit added/deleted in settings)
   useEffect(() => {
     const handleRefresh = () => {
-        setUnits(getUnits());
+        const loadedUnits = getUnits();
+        let filteredUnits = loadedUnits;
+
+        const isSpecificUnit = staffUnit && staffUnit.toLowerCase() !== "todas as unidades" && staffUnit.toLowerCase() !== "todas";
+        if (!isOwner && isSpecificUnit) {
+            const staffUnitNormalized = staffUnit.trim().toLowerCase();
+            filteredUnits = loadedUnits.filter(u => u.name.trim().toLowerCase() === staffUnitNormalized);
+        }
+        setUnits(filteredUnits);
+
+        if (!isOwner && isSpecificUnit && filteredUnits.length > 0) {
+            const forcedUnitId = filteredUnits[0].id;
+            setSelectedUnit((prevSelected) => {
+                if (prevSelected !== forcedUnitId) {
+                    localStorage.setItem("lavanpro_selected_unit", forcedUnitId);
+                    if (onUnitChange) setTimeout(() => onUnitChange(forcedUnitId), 0);
+                    setTimeout(() => window.dispatchEvent(new CustomEvent("unit-changed", { detail: forcedUnitId })), 0);
+                    return forcedUnitId;
+                }
+                return prevSelected;
+            });
+        }
     };
     window.addEventListener("refresh-units", handleRefresh);
     return () => window.removeEventListener("refresh-units", handleRefresh);
@@ -93,7 +140,7 @@ export function UnitSelector({ onUnitChange, showAllOption = true }: UnitSelecto
             className="absolute top-full left-0 mt-2 w-full bg-brand-card border border-brand-darkBorder rounded-2xl shadow-2xl z-50 overflow-hidden"
           >
             <div className="p-2 space-y-1">
-              {showAllOption && (
+              {showAllOption && (isOwner || !staffUnit || staffUnit.toLowerCase() === "todas as unidades" || staffUnit.toLowerCase() === "todas") && (
                 <button
                   onClick={() => handleSelect("all")}
                   className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all ${selectedUnit === "all" ? "bg-brand-primary text-white" : "hover:bg-white/5 text-brand-text"}`}

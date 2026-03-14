@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect, useMemo } from "react";
+import { useUnit } from "@/hooks/useUnit";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Product {
@@ -20,6 +21,7 @@ interface Product {
     minStock: number;
     currentStock: number;
     unitCost: number;
+    unitId: string;
 }
 
 type MovementType = "ENTRADA" | "SAIDA";
@@ -33,6 +35,7 @@ interface Movement {
     unitCost: number; // Cost at the time of movement
     reason: string;
     user: string;
+    unitId: string;
 }
 
 type ProductFormData = Omit<Product, "id">;
@@ -49,8 +52,8 @@ const seedMovements: Movement[] = [];
 function formatCurrency(v: number) { return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }); }
 function formatDate(d: string) { return d.split("-").reverse().join("/"); }
 
-const blankProduct = (): ProductFormData => ({
-    name: "", category: CATEGORIES[0], unit: UNITS[0], minStock: 0, currentStock: 0, unitCost: 0
+const blankProduct = (unitId: string): ProductFormData & { unitId: string } => ({
+    name: "", category: CATEGORIES[0], unit: UNITS[0], minStock: 0, currentStock: 0, unitCost: 0, unitId
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -154,9 +157,10 @@ interface MovementModalProps {
     preselectProductId: string | null;
     onSave: (mov: Omit<Movement, "id">) => void;
     onCancel: () => void;
+    unitId: string;
 }
 
-function MovementModal({ products, preselectProductId, onSave, onCancel }: MovementModalProps) {
+function MovementModal({ products, preselectProductId, onSave, onCancel, unitId }: MovementModalProps) {
     const [type, setType] = useState<MovementType>("ENTRADA");
     const [productId, setProductId] = useState(preselectProductId || (products.length > 0 ? products[0].id : ""));
     const [quantity, setQuantity] = useState(1);
@@ -174,7 +178,8 @@ function MovementModal({ products, preselectProductId, onSave, onCancel }: Movem
             date: new Date().toISOString().slice(0, 10),
             reason,
             user: "Gabriel (Admin)", // Mock user
-            unitCost: selectedProd?.unitCost || 0
+            unitCost: selectedProd?.unitCost || 0,
+            unitId: unitId !== "all" ? unitId : "default"
         });
     };
 
@@ -240,8 +245,9 @@ function MovementModal({ products, preselectProductId, onSave, onCancel }: Movem
 
 // ─── Main Component ────────────────────────────────────────────────────────────
 export default function StockPage() {
-    const [products, setProducts] = useState<Product[]>(seedProducts);
-    const [movements, setMovements] = useState<Movement[]>(seedMovements);
+    const { unitId: activeUnit } = useUnit();
+    const [products, setProducts] = useState<Product[]>([]);
+    const [movements, setMovements] = useState<Movement[]>([]);
 
     // State
     const [activeTab, setActiveTab] = useState<"ESTOQUE" | "MOVIMENTACOES">("ESTOQUE");
@@ -253,8 +259,13 @@ export default function StockPage() {
     const [isMovementModalOpen, setIsMovementModalOpen] = useState(false);
     const [selectedProductIdForMove, setSelectedProductIdForMove] = useState<string | null>(null);
 
-    const [productForm, setProductForm] = useState<ProductFormData>(blankProduct());
+    const [productForm, setProductForm] = useState<ProductFormData & { unitId: string }>(() => blankProduct(activeUnit));
     const [editingProductId, setEditingProductId] = useState<string | null>(null);
+
+    // Sync form with activeUnit
+    useEffect(() => {
+        setProductForm(prev => ({ ...prev, unitId: activeUnit !== "all" ? activeUnit : "default" }));
+    }, [activeUnit]);
 
     useEffect(() => {
         const savedProducts = localStorage.getItem("lavanpro_stock_products_v2");
@@ -276,7 +287,7 @@ export default function StockPage() {
             setProducts(prev => prev.map(p => p.id === editingProductId ? { ...productForm, id: p.id } as Product : p));
         } else {
             const id = `PROD-${String(Date.now()).slice(-6)}`;
-            setProducts(prev => [...prev, { ...productForm, id } as Product]);
+            setProducts(prev => [...prev, { ...productForm, id, unitId: activeUnit !== "all" ? activeUnit : "default" } as Product]);
         }
         setIsProductModalOpen(false);
     };
@@ -313,20 +324,22 @@ export default function StockPage() {
     const filteredProducts = useMemo(() => {
         const q = search.toLowerCase();
         return products.filter(p => {
+            const matchesUnit = !activeUnit || activeUnit === "all" || p.unitId === activeUnit;
             const matchSearch = !q || p.name.toLowerCase().includes(q);
             const matchCat = filterCategory === "Todos" || p.category === filterCategory;
-            return matchSearch && matchCat;
+            return matchesUnit && matchSearch && matchCat;
         });
-    }, [products, search, filterCategory]);
+    }, [products, search, filterCategory, activeUnit]);
 
     const filteredMovements = useMemo(() => {
         const q = search.toLowerCase();
         return movements.filter(m => {
+            const matchesUnit = !activeUnit || activeUnit === "all" || m.unitId === activeUnit;
             const product = products.find(p => p.id === m.productId);
             const productName = product ? product.name.toLowerCase() : "";
-            return !q || productName.includes(q) || m.reason.toLowerCase().includes(q);
+            return matchesUnit && (!q || productName.includes(q) || m.reason.toLowerCase().includes(q));
         });
-    }, [movements, products, search]);
+    }, [movements, products, search, activeUnit]);
 
     const stats = {
         totalItems: products.length,
@@ -358,7 +371,7 @@ export default function StockPage() {
                                             <Archive className="size-4" /> Registrar Movimentação
                                         </button>
                                         <button
-                                            onClick={() => { setProductForm(blankProduct()); setEditingProductId(null); setIsProductModalOpen(true); }}
+                                            onClick={() => { setProductForm(blankProduct(activeUnit)); setEditingProductId(null); setIsProductModalOpen(true); }}
                                             className="px-5 py-2.5 bg-brand-primary text-white rounded-xl text-sm font-bold hover:bg-brand-primaryHover transition-all shadow-lg shadow-brand-primary/20 flex items-center gap-2"
                                         >
                                             <Plus className="size-4" /> Novo Produto
@@ -593,6 +606,7 @@ export default function StockPage() {
                             preselectProductId={selectedProductIdForMove}
                             onSave={handleSaveMovement}
                             onCancel={() => setIsMovementModalOpen(false)}
+                            unitId={activeUnit}
                         />
                     )}
                 </AnimatePresence>

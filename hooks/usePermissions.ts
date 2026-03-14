@@ -30,7 +30,6 @@ const ROUTE_PERMISSION_MAP: Record<string, PermissionKey> = {
 };
 
 const ALWAYS_ALLOWED_ROUTES = ["/dashboard"];
-const OWNER_EMAIL = "gabriel23900@gmail.com";
 
 function normaliseRole(role: string | null | undefined): RoleName {
     if (!role) return "Atendente";
@@ -48,6 +47,8 @@ export function usePermissions() {
 
     const [matrix, setMatrix] = useState<PermissionMatrix>(DEFAULT_MATRIX);
     const [staffRole, setStaffRole] = useState<RoleName | "owner" | null>(null);
+    const [ownerId, setOwnerId] = useState<string | null>(null);
+    const [staffUnit, setStaffUnit] = useState<string | null>(null);
     const [dataLoaded, setDataLoaded] = useState(false);
 
     useEffect(() => {
@@ -58,36 +59,56 @@ export function usePermissions() {
 
         async function loadAll() {
             try {
-                // ── 1. Owner shortcut ─────────────────────────────────────────
-                const isOwner = user!.email?.toLowerCase() === OWNER_EMAIL.toLowerCase();
-                if (isOwner) {
-                    if (!cancelled) setStaffRole("owner");
-                } else {
-                    // ── 2. Call RPC function (server-side, bypasses RLS issues) ──
-                    const { data: rpcData, error: rpcError } = await supabase
-                        .rpc("get_my_staff_role");
+                // ── 1. Load staff record for current user ─────────────────────
+                // First try RPC (server-side, bypasses RLS issues)
+                let staffRole: string | null = null;
+                let staffOwnerId: string | null = null;
+                let currentStaffUnit: string | null = null;
 
-                    if (rpcError) {
-                        console.error("[usePermissions] RPC get_my_staff_role error:", rpcError);
-                        // Fallback: direct query by user_id
-                        const { data: directData } = await supabase
-                            .from("staff")
-                            .select("role")
-                            .eq("user_id", user!.id)
-                            .maybeSingle();
-                        if (!cancelled) {
-                            setStaffRole(normaliseRole(directData?.role));
-                        }
+                const { data: rpcData, error: rpcError } = await supabase
+                    .rpc("get_my_staff_role");
+
+                if (rpcError) {
+                    console.error("[usePermissions] RPC get_my_staff_role error:", rpcError);
+                    // Fallback: direct query by user_id
+                    const { data: directData } = await supabase
+                        .from("staff")
+                        .select("role, owner_id, unit")
+                        .eq("user_id", user!.id)
+                        .maybeSingle();
+                    
+                    staffRole = directData?.role || null;
+                    staffOwnerId = directData?.owner_id || null;
+                    currentStaffUnit = directData?.unit || null;
+                } else {
+                    const row = Array.isArray(rpcData) ? rpcData[0] : rpcData;
+                    console.log("[usePermissions] RPC result:", row);
+                    staffRole = row?.role || null;
+                    staffOwnerId = row?.owner_id || null;
+                    currentStaffUnit = row?.unit || null;
+                }
+
+                if (!cancelled) {
+                    setOwnerId(staffOwnerId);
+                    setStaffUnit(currentStaffUnit);
+
+                    // Determine if user is the owner:
+                    // - owner_id matches their own user id, OR
+                    // - they are an Administrador with no owner (legacy), OR
+                    // - metadata says is_owner
+                    const isOwnerUser = 
+                        (staffOwnerId === user!.id) ||
+                        (user!.user_metadata?.is_owner === true) ||
+                        (!staffOwnerId && staffRole === 'Administrador');
+
+                    if (isOwnerUser) {
+                        setStaffRole("owner");
                     } else {
-                        const row = Array.isArray(rpcData) ? rpcData[0] : rpcData;
-                        console.log("[usePermissions] RPC result:", row);
-                        if (!cancelled) {
-                            setStaffRole(normaliseRole(row?.role));
-                        }
+                        setStaffRole(normaliseRole(staffRole));
                     }
                 }
 
-                // ── 3. Load permission matrix ─────────────────────────────────
+                // ── 2. Load permission matrix ─────────────────────────────────
                 const { data: settingsData, error: settingsError } = await supabase
                     .from("app_settings")
                     .select("value")
@@ -155,6 +176,8 @@ export function usePermissions() {
         userRole,
         isOwner,
         isAdmin,
+        ownerId,
+        staffUnit,
         loading: authLoading || !dataLoaded,
         hasPermission,
         canAccessRoute,

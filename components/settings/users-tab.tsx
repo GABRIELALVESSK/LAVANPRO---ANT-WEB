@@ -55,6 +55,10 @@ export function UsersTab({ user, showToast }: UsersTabProps) {
             return;
         }
         setIsSavingUser(true);
+
+        // Get the current admin's user_id to set as owner_id
+        const ownerId = user?.id;
+
         const { error } = await supabase.from("staff").insert([
             {
                 name: newUserForm.name,
@@ -62,7 +66,8 @@ export function UsersTab({ user, showToast }: UsersTabProps) {
                 role: newUserForm.role,
                 active: true,
                 has_system_access: true,
-                unit: "Matriz Centro" // default for now, editable in Team page
+                unit: "Matriz Centro", // default for now, editable in Team page
+                owner_id: ownerId,
             },
         ]);
         if (error) {

@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useMemo, useEffect } from "react";
+import { useUnit } from "@/hooks/useUnit";
 // ─── Types ────────────────────────────────────────────────────────────────────
 type TransactionType = "RECEITA" | "DESPESA";
 type TransactionStatus = "PAGO" | "PENDENTE" | "ATRASADO";
@@ -186,9 +187,9 @@ function TransactionModal({ data, onChange, onSave, onCancel }: TransactionModal
 
 // ─── Main Component ────────────────────────────────────────────────────────────
 export default function FinancePage() {
+    const { unitId: activeUnit } = useUnit();
     const [transactions, setTransactions] = useState<Transaction[]>([]);
     const [isLoaded, setIsLoaded] = useState(false);
-    const [activeUnit, setActiveUnit] = useState("all");
 
     // Load from localStorage
     useEffect(() => {
@@ -201,13 +202,6 @@ export default function FinancePage() {
             }
         }
         setIsLoaded(true);
-
-        const savedUnit = localStorage.getItem("lavanpro_selected_unit");
-        if (savedUnit) setActiveUnit(savedUnit);
-
-        const handleUnitChange = (e: any) => setActiveUnit(e.detail);
-        window.addEventListener("unit-changed", handleUnitChange);
-        return () => window.removeEventListener("unit-changed", handleUnitChange);
     }, []);
 
     // Save to localStorage

@@ -27,6 +27,7 @@ import { PlanGuard } from "@/components/plan-guard";
 import { Order } from "@/lib/orders-data";
 import { calculateDashboardMetrics } from "@/lib/dashboard-utils";
 import { UnitSelector } from "@/components/unit-selector";
+import { useUnit } from "@/hooks/useUnit";
 
 // Dynamic imports to avoid SSR issues with heavy/DOM-based components
 const MainChart = dynamic(() => import("@/components/main-chart").then(mod => mod.MainChart), { 
@@ -42,7 +43,7 @@ export default function Page() {
     start: "",
     end: "",
   });
-  const [activeUnit, setActiveUnit] = useState("all");
+  const { unitId: activeUnit } = useUnit();
   const [orders, setOrders] = useState<Order[]>([]);
 
   useEffect(() => {
@@ -50,10 +51,6 @@ export default function Page() {
     const start = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
     const end = new Date().toISOString().split("T")[0];
     setCustomDates({ start, end });
-
-    // Load initial unit preference
-    const savedUnit = localStorage.getItem("lavanpro_selected_unit");
-    if (savedUnit) setActiveUnit(savedUnit);
 
     const loadAndPurge = () => {
       const saved = localStorage.getItem("lavanpro_orders_v3");
@@ -93,13 +90,6 @@ export default function Page() {
             if (filtered.length !== parsed.length) localStorage.setItem("lavanpro_customers", JSON.stringify(filtered));
         } catch(e) {}
     }
-
-    // Listener for sidebar unit changes
-    const handleUnitChange = (e: any) => {
-      setActiveUnit(e.detail);
-    };
-    window.addEventListener("unit-changed", handleUnitChange);
-    return () => window.removeEventListener("unit-changed", handleUnitChange);
   }, []);
 
   const metrics = useMemo(() => {
@@ -112,6 +102,12 @@ export default function Page() {
     }
     return calculateDashboardMetrics(orders, activeRange, customDates, activeUnit);
   }, [orders, activeRange, customDates, activeUnit]);
+
+  // Explicitly filter orders for the TransactionTable based on activeUnit
+  const filteredOrders = useMemo(() => {
+    if (!activeUnit || activeUnit === "all") return orders;
+    return orders.filter(o => o.unitId === activeUnit);
+  }, [orders, activeUnit]);
 
   const handleNavigate = (route: string, filters?: Record<string, string>) => {
     const params = new URLSearchParams();
@@ -300,7 +296,7 @@ export default function Page() {
             </section>
 
             {/* Transaction Table */}
-            <TransactionTable activeRange={activeRange} customDates={customDates} orders={orders} />
+            <TransactionTable activeRange={activeRange} customDates={customDates} orders={filteredOrders} />
 
           </div>
         </main>

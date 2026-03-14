@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect, useMemo } from "react";
+import { useUnit } from "@/hooks/useUnit";
 
 // --- Types ---
 type ChargeType = "UNIDADE" | "QUILO" | "PECA" | "FIXO";
@@ -32,6 +33,7 @@ interface Service {
     recipe: RecipeItem[];
     executionTime?: string;
     description?: string;
+    unitId: string;
 }
 
 type ServiceFormData = Omit<Service, "id">;
@@ -54,7 +56,7 @@ const MOCK_STOCK_PRODUCTS = [
     { id: "PROD-105", name: "Saco Plástico G", unit: "un", cost: 0.80 },
 ];
 
-const blankService = (): ServiceFormData => ({
+const blankService = (unitId: string): ServiceFormData & { unitId: string } => ({
     name: "",
     category: "Lavanderia",
     chargeType: "UNIDADE",
@@ -62,16 +64,18 @@ const blankService = (): ServiceFormData => ({
     recipe: [],
     executionTime: "",
     description: "",
+    unitId: unitId !== "all" ? unitId : "default"
 });
 
 // --- Component ---
 export default function ServicesPage() {
+    const { unitId: activeUnit } = useUnit();
     const [services, setServices] = useState<Service[]>([]);
     const [activeCategory, setActiveCategory] = useState("Todas");
     const [search, setSearch] = useState("");
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingId, setEditingId] = useState<string | null>(null);
-    const [formData, setFormData] = useState<ServiceFormData>(blankService());
+    const [formData, setFormData] = useState<ServiceFormData & { unitId: string }>(blankService(activeUnit));
     const [activeTab, setActiveTab] = useState<"geral" | "receita">("geral");
 
     // Load from LocalStorage
@@ -97,7 +101,8 @@ export default function ServicesPage() {
                         { id: "r3", productId: "PROD-105", name: "Saco Plástico G", quantity: 1, unit: "un", unitCost: 0.80 },
                     ],
                     executionTime: "72h",
-                    description: "Tratamento profundo com secagem industrial."
+                    description: "Tratamento profundo com secagem industrial.",
+                    unitId: "default"
                 },
                 {
                     id: "2",
@@ -108,7 +113,8 @@ export default function ServicesPage() {
                     recipe: [
                         { id: "r4", productId: "PROD-101", name: "Sabão Líquido Omo Pro", quantity: 0.05, unit: "L", unitCost: 14.50 },
                     ],
-                    executionTime: "48h"
+                    executionTime: "48h",
+                    unitId: "default"
                 },
             ];
             setServices(seed);
@@ -136,7 +142,7 @@ export default function ServicesPage() {
         if (!formData.name || formData.price <= 0) return;
 
         if (editingId) {
-            const updated = services.map((s) => (s.id === editingId ? { ...formData, id: s.id } : s));
+            const updated = services.map((s) => (s.id === editingId ? { ...formData, id: s.id } as Service : s));
             saveToLocalStorage(updated);
         } else {
             const newService: Service = {
@@ -146,7 +152,7 @@ export default function ServicesPage() {
             saveToLocalStorage([...services, newService]);
         }
         setIsModalOpen(false);
-        setFormData(blankService());
+        setFormData(blankService(activeUnit));
         setEditingId(null);
         setActiveTab("geral");
     };
@@ -191,11 +197,12 @@ export default function ServicesPage() {
 
     const filteredServices = useMemo(() => {
         return services.filter((s) => {
+            const matchesUnit = !activeUnit || activeUnit === "all" || s.unitId === activeUnit;
             const matchesSearch = s.name.toLowerCase().includes(search.toLowerCase());
             const matchesCategory = activeCategory === "Todas" || s.category === activeCategory;
-            return matchesSearch && matchesCategory;
+            return matchesUnit && matchesSearch && matchesCategory;
         });
-    }, [services, search, activeCategory]);
+    }, [services, search, activeCategory, activeUnit]);
 
     const formatCurrency = (v: number) =>
         v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -231,7 +238,7 @@ export default function ServicesPage() {
                                         />
                                     </div>
                                     <button
-                                        onClick={() => { setFormData(blankService()); setEditingId(null); setIsModalOpen(true); }}
+                                        onClick={() => { setFormData(blankService(activeUnit)); setEditingId(null); setIsModalOpen(true); }}
                                         className="flex items-center gap-2 px-6 py-2.5 bg-brand-primary text-white rounded-xl font-bold shadow-lg shadow-brand-primary/20 hover:bg-brand-primaryHover transform active:scale-95 transition-all"
                                     >
                                         <Plus className="size-4" /> Novo Serviço
@@ -352,7 +359,7 @@ export default function ServicesPage() {
                                     <h3 className="text-xl font-bold text-brand-text mb-2">Inicie sua esteira profissional</h3>
                                     <p className="text-sm text-brand-muted max-w-sm">Diferencie seus serviços e vincule receitas para automatizar seu lucro e estoque.</p>
                                     <button
-                                        onClick={() => { setFormData(blankService()); setEditingId(null); setIsModalOpen(true); }}
+                                        onClick={() => { setFormData(blankService(activeUnit)); setEditingId(null); setIsModalOpen(true); }}
                                         className="mt-6 px-6 py-2.5 bg-brand-primary/10 text-brand-primary border border-brand-primary/20 rounded-xl font-bold hover:bg-brand-primary hover:text-white transition-all"
                                     >
                                         Cadastrar Meu Primeiro Serviço Pro

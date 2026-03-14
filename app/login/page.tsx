@@ -2,12 +2,14 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { syncData, pushDataToServer } from "@/lib/dataSync";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 
 export default function LoginPage() {
     const [isDark, setIsDark] = useState(false);
     const [mode, setMode] = useState<'login' | 'register'>('login');
+    const [registerType, setRegisterType] = useState<'collaborator' | 'owner'>('collaborator');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [name, setName] = useState('');
@@ -38,41 +40,91 @@ export default function LoginPage() {
 
         try {
             if (mode === 'register') {
-                // Verificar se este e-mail já foi pré-cadastrado por um gestor
-                const { data: invite } = await supabase
-                    .from('collaborators')
-                    .select('owner_id, role')
-                    .eq('email', email)
+                // ─── FLUXO DE CADASTRO ─────────────────────────────────────────
+                
+                // Verificar existência do e-mail no staff
+                const { data: staffInvite } = await supabase
+                    .from('staff')
+                    .select('id, role, unit, owner_id')
+                    .eq('email', email.toLowerCase().trim())
                     .maybeSingle();
 
-                const userRole = invite ? invite.role : 'owner';
-                const ownerId = invite ? invite.owner_id : null;
-
-                const { data: authData, error: authError } = await supabase.auth.signUp({
-                    email,
-                    password,
-                    options: {
-                        data: {
-                            full_name: name,
-                            role: userRole,
-                            owner_id: ownerId
-                        }
+                if (registerType === 'owner') {
+                    if (staffInvite) {
+                        throw new Error("Este e-mail está vinculado a uma conta de colaborador. Acesse como colaborador.");
                     }
-                });
 
-                if (authError) throw authError;
+                    // E-mail NÃO foi pré-cadastrado — é um novo dono criando conta
+                    const { data: authData, error: authError } = await supabase.auth.signUp({
+                        email,
+                        password,
+                        options: {
+                            data: {
+                                full_name: name,
+                                role: 'owner',
+                                is_owner: true,
+                            }
+                        }
+                    });
 
-                // Se era um colaborador, atualiza a tabela com o ID real dele
-                if (invite && authData.user) {
-                    await supabase
-                        .from('collaborators')
-                        .update({ user_id: authData.user.id })
-                        .eq('email', email);
+                    if (authError) throw authError;
+
+                    // Criar o registro do owner na tabela staff para consistência
+                    if (authData.user) {
+                        await supabase.from('staff').insert({
+                            name: name,
+                            email: email.toLowerCase().trim(),
+                            role: 'Administrador',
+                            unit: 'Todas as Unidades',
+                            active: true,
+                            has_system_access: true,
+                            user_id: authData.user.id,
+                            owner_id: authData.user.id, // Owner é dono de si mesmo
+                        });
+                    }
+
+                    showToast("Sua lavanderia foi criada com sucesso! Verifique seu e-mail para ativar.", "success");
+                } else {
+                    // registerType === 'collaborator'
+                    if (!staffInvite) {
+                        throw new Error("E-mail não encontrado na equipe. O administrador deve cadastrar seu e-mail antes do seu primeiro acesso.");
+                    }
+
+                    // E-mail FOI pré-cadastrado — é um COLABORADOR vinculando sua conta
+                    const { data: authData, error: authError } = await supabase.auth.signUp({
+                        email,
+                        password,
+                        options: {
+                            data: {
+                                full_name: name,
+                                role: staffInvite.role,      // Herda o cargo definido pelo admin
+                                owner_id: staffInvite.owner_id,  // Vincula ao dono da lavanderia
+                                unit: staffInvite.unit,
+                                is_owner: false,
+                            }
+                        }
+                    });
+
+                    if (authError) throw authError;
+
+                    // Atualiza o registro de staff com o user_id real do Supabase Auth
+                    if (authData.user) {
+                        await supabase
+                            .from('staff')
+                            .update({ user_id: authData.user.id })
+                            .eq('id', staffInvite.id);
+                    }
+
+                    showToast(
+                        `Vínculo concluído! Você é ${staffInvite.role} da lavanderia. Verifique seu e-mail para ativar.`,
+                        "success"
+                    );
                 }
 
-                showToast(invite ? "Vínculo com a lavanderia concluído! Verifique seu e-mail para ativar." : "Conta criada com sucesso! Verifique seu e-mail.", "success");
                 setMode('login');
+
             } else {
+                // ─── FLUXO DE LOGIN ────────────────────────────────────────────
                 const { data, error } = await supabase.auth.signInWithPassword({
                     email,
                     password,
@@ -85,7 +137,45 @@ export default function LoginPage() {
                     throw error;
                 }
 
-const nextParam = new URLSearchParams(window.location.search).get('next');
+                // Após login, verificar se o usuário tem registro na tabela staff
+                // e se o user_id está vinculado (pode ter sido criado antes do signup)
+                if (data.user) {
+                    const { data: myStaff } = await supabase
+                        .from('staff')
+                        .select('id, role, owner_id, user_id')
+                        .eq('email', email.toLowerCase().trim())
+                        .maybeSingle();
+
+                    // Se existe registro de staff sem user_id, vincular agora
+                    if (myStaff && !myStaff.user_id) {
+                        await supabase
+                            .from('staff')
+                            .update({ user_id: data.user.id })
+                            .eq('id', myStaff.id);
+                    }
+
+                    // Atualizar metadata do auth com role e owner_id corretos
+                    if (myStaff && myStaff.owner_id) {
+                        await supabase.auth.updateUser({
+                            data: {
+                                role: myStaff.role,
+                                owner_id: myStaff.owner_id,
+                                is_owner: myStaff.owner_id === data.user.id,
+                            }
+                        });
+                    }
+                }
+
+                // ─── SINCRONIZAR DADOS ──────────────────────────────────────
+                // Owner → push dados do localStorage para Supabase
+                // Colaborador → pull dados do Supabase para localStorage
+                try {
+                    await syncData();
+                } catch (syncErr) {
+                    console.error('[Login] Erro na sincronização:', syncErr);
+                }
+
+                const nextParam = new URLSearchParams(window.location.search).get('next');
                 showToast("Bem-vindo de volta!", "success");
                 router.refresh(); // Refresh to sync cookies for middleware
                 router.push(nextParam || '/dashboard');
@@ -151,7 +241,7 @@ const nextParam = new URLSearchParams(window.location.search).get('next');
                             <p className="text-slate-500 dark:text-slate-400 font-light">
                                 {mode === 'login'
                                     ? 'Gestão inteligente para lavanderias de alto padrão.'
-                                    : 'Junte-se ao sistema de gestão mais sofisticado do mercado.'}
+                                    : 'Se você recebeu um convite da sua lavanderia, use o mesmo e-mail cadastrado pelo administrador.'}
                             </p>
                         </div>
 
@@ -178,7 +268,42 @@ const nextParam = new URLSearchParams(window.location.search).get('next');
 
                         <form onSubmit={handleSubmit} className="space-y-6">
                             {mode === 'register' && (
-                                <div className="transition-soft">
+                                <div className="mb-6 animate-in fade-in slide-in-from-top-2 duration-300">
+                                    <label className="block text-xs font-light uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-2 ml-1">
+                                        Qual o seu perfil de acesso?
+                                    </label>
+                                    <div className="flex gap-2 p-1 bg-slate-100 dark:bg-navy-950 rounded-xl border border-slate-200 dark:border-slate-800">
+                                        <button
+                                            type="button"
+                                            onClick={() => setRegisterType('collaborator')}
+                                            className={`flex-1 py-2.5 text-xs sm:text-sm font-medium rounded-lg transition-all ${registerType === 'collaborator'
+                                                ? 'bg-white dark:bg-slate-800 text-brand-primary shadow-sm border border-slate-200 dark:border-slate-700'
+                                                : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-brand-text'
+                                                }`}
+                                        >
+                                            Sou Colaborador
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setRegisterType('owner')}
+                                            className={`flex-1 py-2.5 text-xs sm:text-sm font-medium rounded-lg transition-all ${registerType === 'owner'
+                                                ? 'bg-white dark:bg-slate-800 text-brand-primary shadow-sm border border-slate-200 dark:border-slate-700'
+                                                : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-brand-text'
+                                                }`}
+                                        >
+                                            Nova Lavanderia
+                                        </button>
+                                    </div>
+                                    <p className="mt-2 text-[11px] text-slate-400 dark:text-slate-500 font-light ml-1">
+                                        {registerType === 'owner'
+                                            ? 'Você criará uma nova conta de empresa do zero.'
+                                            : 'Você deve ter sido convidado pelo administrador.'}
+                                    </p>
+                                </div>
+                            )}
+
+                            {mode === 'register' && (
+                                <div className="transition-soft animate-in fade-in slide-in-from-top-2 duration-300">
                                     <label className="block text-xs font-light uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-2 ml-1" htmlFor="name">
                                         Nome Completo
                                     </label>
@@ -190,7 +315,7 @@ const nextParam = new URLSearchParams(window.location.search).get('next');
                                         type="text"
                                         value={name}
                                         onChange={(e) => setName(e.target.value)}
-                                        required
+                                        required={registerType === 'owner'}
                                     />
                                 </div>
                             )}
@@ -236,7 +361,7 @@ const nextParam = new URLSearchParams(window.location.search).get('next');
                                     type="submit"
                                     disabled={isLoading}
                                 >
-                                    {isLoading ? 'Wait...' : (mode === 'login' ? 'Acessar Painel' : 'Criar minha conta')}
+                                    {isLoading ? 'Aguarde...' : (mode === 'login' ? 'Acessar Painel' : 'Criar minha conta')}
                                     {!isLoading && <span className="material-symbols-outlined text-sm">arrow_forward</span>}
                                 </button>
                             </div>

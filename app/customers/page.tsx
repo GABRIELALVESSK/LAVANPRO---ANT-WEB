@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useMemo, useEffect } from "react";
+import { useUnit } from "@/hooks/useUnit";
 
 import { Customer, seedCustomers } from "../../lib/customers-data";
 
@@ -219,6 +220,7 @@ function EditPanel({ data, onChange, onTagToggle, onSave, onCancel, title }: Edi
 
 // ─── Main Component ────────────────────────────────────────────────────────────
 export default function CustomersPage() {
+    const { unitId: activeUnit } = useUnit();
     const [customers, setCustomers] = useState<Customer[]>(seedCustomers);
     const [isLoaded, setIsLoaded] = useState(false);
 
@@ -256,15 +258,19 @@ export default function CustomersPage() {
             const matchStatus = filterStatus === "Todos" || (filterStatus === "Ativo" ? c.active : !c.active);
             const matchTag = filterTag === "Todos" || c.tags.includes(filterTag);
             const matchOrigin = filterOrigin === "Todos" || c.origin === filterOrigin;
-            return matchSearch && matchStatus && matchTag && matchOrigin;
+            
+            // MASTER UNIT FILTER
+            const matchUnit = !activeUnit || activeUnit === "all" || c.unitId === activeUnit;
+            
+            return matchSearch && matchStatus && matchTag && matchOrigin && matchUnit;
         });
-    }, [customers, search, filterStatus, filterTag, filterOrigin]);
+    }, [customers, search, filterStatus, filterTag, filterOrigin, activeUnit]);
 
     const stats = [
-        { label: "Total Clientes", value: customers.length, icon: Users, color: "text-brand-primary", bg: "bg-brand-primary/10" },
-        { label: "Ativos", value: customers.filter(c => c.active).length, icon: CheckCircle2, color: "text-emerald-500", bg: "bg-emerald-500/10" },
-        { label: "Receita Total", value: formatCurrency(customers.reduce((s, c) => s + totalSpent(c.name, orders), 0)), icon: TrendingUp, color: "text-amber-500", bg: "bg-amber-500/10" },
-        { label: "VIPs", value: customers.filter(c => c.tags.includes("VIP")).length, icon: Star, color: "text-yellow-500", bg: "bg-yellow-500/10" },
+        { label: "Total Clientes", value: filtered.length, icon: Users, color: "text-brand-primary", bg: "bg-brand-primary/10" },
+        { label: "Ativos", value: filtered.filter(c => c.active).length, icon: CheckCircle2, color: "text-emerald-500", bg: "bg-emerald-500/10" },
+        { label: "Receita Total", value: formatCurrency(filtered.reduce((s, c) => s + totalSpent(c.name, orders), 0)), icon: TrendingUp, color: "text-amber-500", bg: "bg-amber-500/10" },
+        { label: "VIPs", value: filtered.filter(c => c.tags.includes("VIP")).length, icon: Star, color: "text-yellow-500", bg: "bg-yellow-500/10" },
     ];
 
     // Handlers — Create
@@ -276,9 +282,13 @@ export default function CustomersPage() {
         if (!form.name) return;
         const id = `C${String(customers.length + 1).padStart(3, "0")}`;
         const now = new Date().toISOString().slice(0, 10);
-        setCustomers(prev => [{ ...form, id, createdAt: now, orders: [] }, ...prev]);
+        setCustomers(prev => [{ ...form, id, createdAt: now, orders: [], unitId: activeUnit !== "all" ? activeUnit : "default" }, ...prev]);
         setIsCreating(false);
         setForm(blankCustomer());
+        setSearch("");
+        setFilterStatus("Todos");
+        setFilterTag("Todos");
+        setFilterOrigin("Todos");
     };
 
     // Handlers — Edit

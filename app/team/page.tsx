@@ -19,6 +19,7 @@ import {
 } from "@/lib/staffService";
 import { getUnits, type Unit } from "@/lib/units-data";
 import { useSubscription } from "@/hooks/useSubscription";
+import { useUnit } from "@/hooks/useUnit";
 
 // ─── Toast ────────────────────────────────────────────────────────────────────
 interface Toast { id: number; message: string; type: "success" | "error" }
@@ -226,6 +227,7 @@ function ProductivityBar({ value, max }: { value: number; max: number }) {
 // ─── Main Component ─────────────────────────────────────────────────────────
 export default function TeamPage() {
     // Data state
+    const { unitId: globalUnitId } = useUnit();
     const [staffList, setStaffList] = useState<Staff[]>([]);
     const [units, setUnits] = useState<Unit[]>([]);
     const [loading, setLoading] = useState(true);
@@ -256,6 +258,16 @@ export default function TeamPage() {
     const [filterUnit, setFilterUnit] = useState("Todas");
     const [filterStatus, setFilterStatus] = useState<"Todos" | "Ativo" | "Inativo">("Todos");
 
+    // Sync local filter with global sidebar
+    useEffect(() => {
+        if (!globalUnitId || globalUnitId === "all") {
+            setFilterUnit("Todas");
+        } else {
+            const unit = units.find(u => u.id === globalUnitId);
+            if (unit) setFilterUnit(unit.name);
+        }
+    }, [globalUnitId, units]);
+
     // Modal state
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [form, setForm] = useState<StaffFormData>(blankStaff());
@@ -265,7 +277,8 @@ export default function TeamPage() {
     // ─── Load data ──────────────────────────────────────────────────────────
     const loadStaff = useCallback(async () => {
         try {
-            const data = await fetchStaff();
+            setLoading(true);
+            const data = await fetchStaff(globalUnitId);
             setStaffList(data);
             setUnits(getUnits());
         } catch (err) {
@@ -274,7 +287,7 @@ export default function TeamPage() {
         } finally {
             setLoading(false);
         }
-    }, [addToast]);
+    }, [addToast, globalUnitId]);
 
     useEffect(() => { loadStaff(); }, [loadStaff]);
 

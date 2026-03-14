@@ -44,10 +44,41 @@ export function useSubscription(): SubscriptionData {
 
         const fetchSubscription = async () => {
             try {
+                // The RPC get_my_subscription now automatically handles
+                // collaborators by looking up the owner's subscription
                 const { data: subData, error } = await supabase.rpc('get_my_subscription');
 
                 if (error) {
                     console.error("Error fetching subscription:", error);
+                    
+                    // Fallback: try to find subscription via staff owner_id
+                    const { data: staffData } = await supabase
+                        .from('staff')
+                        .select('owner_id')
+                        .eq('user_id', user.id)
+                        .maybeSingle();
+
+                    if (staffData?.owner_id) {
+                        // Try fetching the owner's subscription directly
+                        const { data: ownerSub } = await supabase
+                            .from('subscriptions')
+                            .select('plan, status, trial_end')
+                            .eq('user_id', staffData.owner_id)
+                            .maybeSingle();
+                        
+                        if (ownerSub && isMounted) {
+                            const currentPlan = ownerSub.plan as PlanTier;
+                            setData({
+                                plan: currentPlan,
+                                status: ownerSub.status,
+                                trialEnd: ownerSub.trial_end ? new Date(ownerSub.trial_end) : null,
+                                isStarter: currentPlan === 'free',
+                                isPro: currentPlan === 'pro' || currentPlan === 'enterprise',
+                                isEnterprise: currentPlan === 'enterprise',
+                                isTrialing: ownerSub.status === 'trialing',
+                            });
+                        }
+                    }
                     return;
                 }
 

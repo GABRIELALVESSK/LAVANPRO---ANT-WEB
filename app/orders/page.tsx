@@ -14,6 +14,7 @@ import { Customer, seedCustomers } from "../../lib/customers-data";
 import { useState, useEffect, useMemo } from "react";
 import { UnitSelector } from "@/components/unit-selector";
 import { useRouter } from "next/navigation";
+import { useUnit } from "@/hooks/useUnit";
 
 const StatusColors: Record<string, string> = {
     "Recebido": "bg-slate-500",
@@ -56,7 +57,7 @@ export default function OrdersPage() {
     const [searchQuery, setSearchQuery] = useState("");
     const [filterStatus, setFilterStatus] = useState("Todos");
     const [filterPayment, setFilterPayment] = useState("Todos");
-    const [activeUnit, setActiveUnit] = useState("all");
+    const { unitId: activeUnit } = useUnit();
 
     // New order form
     const [allCustomers, setAllCustomers] = useState<any[]>([]);
@@ -96,10 +97,8 @@ export default function OrdersPage() {
         const params = new URLSearchParams(window.location.search);
         const status = params.get("status");
         const search = params.get("search");
-        const unit = params.get("unit");
         if (status) setFilterStatus(status);
         if (search) setSearchQuery(search);
-        if (unit) setActiveUnit(unit);
     }, []);
 
     const filteredOrders = useMemo(() => {
@@ -108,17 +107,20 @@ export default function OrdersPage() {
             const matchesSearch = o.id.toLowerCase().includes(q) || o.client.toLowerCase().includes(q);
             const matchesStatus = filterStatus === "Todos" || o.status === filterStatus;
             const matchesPayment = filterPayment === "Todos" || o.paymentStatus === filterPayment;
-            const matchesUnit = activeUnit === "all" || o.unitId === activeUnit;
+            
+            // MASTER UNIT FILTER
+            const matchesUnit = !activeUnit || activeUnit === "all" || o.unitId === activeUnit;
+            
             return matchesSearch && matchesStatus && matchesPayment && matchesUnit;
         });
     }, [orders, searchQuery, filterStatus, filterPayment, activeUnit]);
 
-    const stats = [
-        { label: "Em Andamento", value: orders.filter(o => !["Entregue", "Cancelado"].includes(o.status)).length, icon: Activity, color: "text-brand-primary", bg: "bg-brand-primary/10" },
-        { label: "Entregues", value: orders.filter(o => o.status === "Entregue").length, icon: CheckCircle2, color: "text-emerald-500", bg: "bg-emerald-500/10" },
-        { label: "A Receber", value: formatCurrency(orders.filter(o => o.paymentStatus === "A Pagar").reduce((s, o) => s + calcTotal(o.items), 0)), icon: CreditCard, color: "text-amber-500", bg: "bg-amber-500/10", wide: true },
-        { label: "Cancelados", value: orders.filter(o => o.status === "Cancelado").length, icon: AlertCircle, color: "text-rose-500", bg: "bg-rose-500/10" },
-    ];
+    const stats = useMemo(() => [
+        { label: "Em Andamento", value: filteredOrders.filter(o => !["Entregue", "Cancelado"].includes(o.status)).length, icon: Activity, color: "text-brand-primary", bg: "bg-brand-primary/10" },
+        { label: "Entregues", value: filteredOrders.filter(o => o.status === "Entregue").length, icon: CheckCircle2, color: "text-emerald-500", bg: "bg-emerald-500/10" },
+        { label: "A Receber", value: formatCurrency(filteredOrders.filter(o => o.paymentStatus === "A Pagar").reduce((s, o) => s + calcTotal(o.items), 0)), icon: CreditCard, color: "text-amber-500", bg: "bg-amber-500/10", wide: true },
+        { label: "Cancelados", value: filteredOrders.filter(o => o.status === "Cancelado").length, icon: AlertCircle, color: "text-rose-500", bg: "bg-rose-500/10" },
+    ], [filteredOrders]);
 
     const handleAddItem = () => setNewOrder(n => ({ ...n, items: [...n.items, { ...blankItem }] }));
     const handleRemoveItem = (idx: number) => setNewOrder(n => ({ ...n, items: n.items.filter((_, i) => i !== idx) }));
@@ -445,7 +447,7 @@ export default function OrdersPage() {
                                     </p>
                                 </motion.div>
                                 <div className="flex items-center gap-3">
-                                    <UnitSelector showAllOption={true} onUnitChange={setActiveUnit} />
+                                    <UnitSelector showAllOption={true} />
                                     <button onClick={() => setIsHistoryOpen(true)} className="px-4 py-2 bg-brand-card border border-brand-darkBorder rounded-lg text-xs font-bold text-brand-text hover:bg-brand-darkBorder transition-all flex items-center gap-2">
                                         <History className="size-4" /> Histórico
                                     </button>
