@@ -10,7 +10,7 @@ import {
     Download, RefreshCw, Calendar
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 // ─── Types ────────────────────────────────────────────────────────────────────
 type TransactionType = "RECEITA" | "DESPESA";
 type TransactionStatus = "PAGO" | "PENDENTE" | "ATRASADO";
@@ -26,6 +26,7 @@ interface Transaction {
     paymentMethod?: string;
     status: TransactionStatus;
     customerOrSupplier?: string;
+    unitId?: string;
 }
 
 type TransactionFormData = Omit<Transaction, "id">;
@@ -42,24 +43,22 @@ const STATUS_COLORS: Record<TransactionStatus, string> = {
 };
 
 // ─── Seed data ────────────────────────────────────────────────────────────────
-const seedTransactions: Transaction[] = [
-    { id: "FIN-1001", description: "Faturamento OS #ORD-2856", type: "RECEITA", category: "Serviços Realizados", value: 135, dueDate: "2026-03-08", paidDate: "2026-03-08", paymentMethod: "Cartão de Crédito", status: "PAGO", customerOrSupplier: "Carlos Machado" },
-    { id: "FIN-1002", description: "Compra de Sabão Omo Profissional", type: "DESPESA", category: "Fornecedores", value: 450, dueDate: "2026-03-10", status: "PENDENTE", customerOrSupplier: "Unilever" },
-    { id: "FIN-1003", description: "Faturamento OS #ORD-2854", type: "RECEITA", category: "Serviços Realizados", value: 120, dueDate: "2026-03-08", paidDate: "2026-03-08", paymentMethod: "PIX", status: "PAGO", customerOrSupplier: "Maria Oliveira" },
-    { id: "FIN-1004", description: "Conta de Energia Elétrica", type: "DESPESA", category: "Água/Luz/Internet", value: 1250, dueDate: "2026-03-05", status: "ATRASADO", customerOrSupplier: "Enel" },
-    { id: "FIN-1005", description: "Faturamento Mensal Hotel Bela Vista", type: "RECEITA", category: "Serviços Realizados", value: 3450, dueDate: "2026-03-15", status: "PENDENTE", paymentMethod: "Boleto", customerOrSupplier: "Hotel Bela Vista" },
-    { id: "FIN-1006", description: "Aluguel Loja Centro", type: "DESPESA", category: "Aluguel", value: 3000, dueDate: "2026-03-02", paidDate: "2026-03-02", paymentMethod: "Transferência", status: "PAGO", customerOrSupplier: "Imobiliária ABC" },
-    { id: "FIN-1007", description: "Manutenção Máquina Secadora", type: "DESPESA", category: "Manutenção", value: 350, dueDate: "2026-03-12", status: "PENDENTE", customerOrSupplier: "TecMec" },
-    { id: "FIN-1008", description: "Faturamento OS #ORD-2800", type: "RECEITA", category: "Serviços Realizados", value: 80, dueDate: "2026-02-14", paidDate: "2026-02-14", paymentMethod: "Dinheiro", status: "PAGO", customerOrSupplier: "Ana Paula" },
-];
+const seedTransactions: Transaction[] = [];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function formatCurrency(v: number) { return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }); }
 function formatDate(d: string) { return d.split("-").reverse().join("/"); }
 
-const blankTransaction = (type: TransactionType = "RECEITA"): TransactionFormData => ({
-    description: "", type, category: type === "RECEITA" ? INCOME_CATEGORIES[0] : EXPENSE_CATEGORIES[0],
-    value: 0, dueDate: new Date().toISOString().slice(0, 10), status: "PENDENTE", paymentMethod: "", customerOrSupplier: ""
+const blankTransaction = (type: TransactionType = "RECEITA", unitId: string = "all"): TransactionFormData => ({
+    description: "", 
+    type, 
+    category: type === "RECEITA" ? INCOME_CATEGORIES[0] : EXPENSE_CATEGORIES[0],
+    value: 0, 
+    dueDate: new Date().toISOString().slice(0, 10), 
+    status: "PENDENTE", 
+    paymentMethod: "", 
+    customerOrSupplier: "",
+    unitId
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -187,7 +186,36 @@ function TransactionModal({ data, onChange, onSave, onCancel }: TransactionModal
 
 // ─── Main Component ────────────────────────────────────────────────────────────
 export default function FinancePage() {
-    const [transactions, setTransactions] = useState<Transaction[]>(seedTransactions);
+    const [transactions, setTransactions] = useState<Transaction[]>([]);
+    const [isLoaded, setIsLoaded] = useState(false);
+    const [activeUnit, setActiveUnit] = useState("all");
+
+    // Load from localStorage
+    useEffect(() => {
+        const saved = localStorage.getItem("lavanpro_finance_transactions");
+        if (saved) {
+            try {
+                setTransactions(JSON.parse(saved));
+            } catch (e) {
+                console.error("Erro ao carregar transações:", e);
+            }
+        }
+        setIsLoaded(true);
+
+        const savedUnit = localStorage.getItem("lavanpro_selected_unit");
+        if (savedUnit) setActiveUnit(savedUnit);
+
+        const handleUnitChange = (e: any) => setActiveUnit(e.detail);
+        window.addEventListener("unit-changed", handleUnitChange);
+        return () => window.removeEventListener("unit-changed", handleUnitChange);
+    }, []);
+
+    // Save to localStorage
+    useEffect(() => {
+        if (isLoaded) {
+            localStorage.setItem("lavanpro_finance_transactions", JSON.stringify(transactions));
+        }
+    }, [transactions, isLoaded]);
 
     // Filters
     const [activeTab, setActiveTab] = useState<"TODOS" | "RECEITAS" | "DESPESAS">("TODOS");
@@ -196,7 +224,12 @@ export default function FinancePage() {
 
     // Modal state
     const [isCreating, setIsCreating] = useState(false);
-    const [form, setForm] = useState<TransactionFormData>(blankTransaction("RECEITA"));
+    const [form, setForm] = useState<TransactionFormData>(blankTransaction("RECEITA", activeUnit));
+
+    // Update form when activeUnit changes
+    useEffect(() => {
+        setForm(f => ({ ...f, unitId: activeUnit }));
+    }, [activeUnit]);
 
     // Handlers
     const handleFormChange = (field: keyof TransactionFormData, value: any) => setForm(f => ({ ...f, [field]: value }));
@@ -205,7 +238,7 @@ export default function FinancePage() {
         const id = `FIN-${String(transactions.length + 1001)}`;
         setTransactions(prev => [{ ...form, id, paidDate: form.status === "PAGO" ? new Date().toISOString().slice(0, 10) : undefined }, ...prev]);
         setIsCreating(false);
-        setForm(blankTransaction("RECEITA"));
+        setForm(blankTransaction("RECEITA", activeUnit));
     };
 
     const handleSettle = (id: string) => {
@@ -217,6 +250,7 @@ export default function FinancePage() {
     // Computations
     const filteredTransactions = useMemo(() => {
         return transactions.filter(t => {
+            const matchUnit = activeUnit === "all" || t.unitId === activeUnit;
             const matchTab = activeTab === "TODOS" || (activeTab === "RECEITAS" && t.type === "RECEITA") || (activeTab === "DESPESAS" && t.type === "DESPESA");
             const q = search.toLowerCase();
             const matchSearch = !q || t.description.toLowerCase().includes(q) || t.customerOrSupplier?.toLowerCase().includes(q) || t.category.toLowerCase().includes(q);
@@ -227,17 +261,18 @@ export default function FinancePage() {
                 matchPeriod = t.dueDate.startsWith(currentMonth);
             }
 
-            return matchTab && matchSearch && matchPeriod;
+            return matchUnit && matchTab && matchSearch && matchPeriod;
         }).sort((a, b) => new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime()); // sort desc
-    }, [transactions, activeTab, search, filterPeriod]);
+    }, [transactions, activeTab, search, filterPeriod, activeUnit]);
 
-    // Financial calculations based ONLY on current filtered period (ignoring tab and search for top stats if desired, but let's filter by period)
+    // Financial calculations based ONLY on current filtered period and unit
     const periodTransactions = transactions.filter(t => {
+        const matchUnit = activeUnit === "all" || t.unitId === activeUnit;
         if (filterPeriod === "MesAtual") {
             const currentMonth = new Date().toISOString().slice(0, 7);
-            return t.dueDate.startsWith(currentMonth);
+            return matchUnit && t.dueDate.startsWith(currentMonth);
         }
-        return true;
+        return matchUnit;
     });
 
     const totalIncome = periodTransactions.filter(t => t.type === "RECEITA" && t.status === "PAGO").reduce((s, t) => s + t.value, 0);

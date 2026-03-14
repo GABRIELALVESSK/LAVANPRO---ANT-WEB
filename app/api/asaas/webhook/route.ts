@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 
+export const dynamic = 'force-dynamic';
+
 const ASAAS_WEBHOOK_SECRET = process.env.ASAAS_WEBHOOK_SECRET || "";
 
 export async function POST(req: Request) {

@@ -48,57 +48,10 @@ interface LabelHistory {
     releasedAt: string | null;
 }
 
-// ─── Seed Data ────────────────────────────────────────────────────────────────
-const SEED_ORDERS_DB: MockOrder[] = [
-    {
-        id: "ORD-2856", clientName: "Carlos Machado", clientPhone: "(11) 98765-4321",
-        status: "Em Finalização", createdAt: "2026-03-08T09:00:00Z",
-        items: [
-            { name: "Terno Completo - Paletó", qty: 1, category: "Roupas Formais" },
-            { name: "Terno Completo - Calça", qty: 1, category: "Roupas Formais" },
-            { name: "Camisa Social Branca", qty: 2, category: "Uso Diário" },
-        ]
-    },
-    {
-        id: "ORD-2855", clientName: "Maria Oliveira", clientPhone: "(11) 91234-5678",
-        status: "Recebido", createdAt: "2026-03-08T14:00:00Z",
-        items: [{ name: "Edredom Casal Master", qty: 1, category: "Cama, Mesa e Banho" }]
-    },
-    {
-        id: "ORD-2854", clientName: "João Santos", clientPhone: "(11) 99887-6655",
-        status: "Em Lavagem", createdAt: "2026-03-07T11:00:00Z",
-        items: [
-            { name: "Jaqueta de Couro", qty: 1, category: "Peças Especiais" },
-            { name: "Calça Jeans", qty: 3, category: "Uso Diário" },
-        ]
-    },
-    {
-        id: "ORD-2853", clientName: "Ana Lima", clientPhone: "(11) 97766-5544",
-        status: "Pronto", createdAt: "2026-03-07T08:00:00Z",
-        items: [{ name: "Vestido de Festa", qty: 1, category: "Roupas Formais" }]
-    },
-];
-
-const INITIAL_LABELS: ReusableLabel[] = Array.from({ length: 10 }, (_, i) => {
-    const n = i + 1;
-    const code = `TAG-${String(n).padStart(3, "0")}`;
-    // Pre-assign first 3 to orders
-    const assignments: Record<number, string> = { 1: "ORD-2856", 2: "ORD-2855", 5: "ORD-2854" };
-    return {
-        id: `label-${n}`,
-        code,
-        displayNumber: n,
-        status: assignments[n] ? "assigned" : "available",
-        currentOrderId: assignments[n] ?? null,
-    };
-});
-
-const INITIAL_HISTORY: LabelHistory[] = [
-    { labelId: "label-1", orderId: "ORD-2856", assignedAt: "2026-03-08T09:05:00Z", releasedAt: null },
-    { labelId: "label-2", orderId: "ORD-2855", assignedAt: "2026-03-08T14:05:00Z", releasedAt: null },
-    { labelId: "label-5", orderId: "ORD-2854", assignedAt: "2026-03-07T11:05:00Z", releasedAt: null },
-    { labelId: "label-3", orderId: "ORD-2853", assignedAt: "2026-03-06T08:05:00Z", releasedAt: "2026-03-07T16:00:00Z" },
-];
+// ─── Seed Data (CLEANED - ONLY REAL DATA) ──────────────────────────────────
+const SEED_ORDERS_DB: MockOrder[] = [];
+const INITIAL_LABELS: ReusableLabel[] = [];
+const INITIAL_HISTORY: LabelHistory[] = [];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function getStatusColor(status: OrderStatus) {
@@ -1146,7 +1099,7 @@ function LabelsContent() {
                                                                         list="orders-datalist"
                                                                         value={linkOrderId}
                                                                         onChange={e => setLinkOrderId(e.target.value.trim().toUpperCase())}
-                                                                        placeholder="Ex: ORD-2856, ORD-5792..."
+                                                                        placeholder="Ex: ORD-0001, #ORD-0001..."
                                                                         className="w-full px-3 py-2.5 bg-brand-bg border border-brand-darkBorder rounded-xl text-sm text-brand-text placeholder:text-brand-muted focus:outline-none focus:ring-2 focus:ring-brand-primary"
                                                                     />
                                                                     <datalist id="orders-datalist">

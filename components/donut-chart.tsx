@@ -1,5 +1,6 @@
 "use client";
 import { ArrowUpRight } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 interface DonutChartProps {
   activeRange?: string;
@@ -9,6 +10,7 @@ interface DonutChartProps {
 const COLORS = ["#8b5cf6", "#6366f1", "#a78bfa", "#ddd6fe", "#7c3aed", "#4f46e5"];
 
 export function DonutChart({ data: propData }: DonutChartProps) {
+  const router = useRouter();
   const data = (propData && propData.length > 0) ? propData.slice(0, 5).map((item, i) => {
     const total = propData.reduce((s, curr) => s + curr.value, 0);
     return {
@@ -40,7 +42,7 @@ export function DonutChart({ data: propData }: DonutChartProps) {
   return (
     <div className="bg-brand-card rounded-2xl border border-brand-darkBorder shadow-xl overflow-hidden group">
       <div 
-        onClick={() => window.location.href = '/reports'}
+        onClick={() => router.push('/reports')}
         className="p-6 border-b border-brand-darkBorder cursor-pointer hover:bg-white/5 transition-all group/header"
       >
         <h4 className="text-lg font-bold text-brand-text group-hover/header:text-brand-primary transition-colors flex items-center justify-between">

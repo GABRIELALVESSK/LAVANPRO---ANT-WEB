@@ -1,4 +1,6 @@
 "use client";
+import { useRouter } from "next/navigation";
+import { ArrowUpRight } from "lucide-react";
 
 interface BarChartProps {
   activeRange?: string;
@@ -16,9 +18,8 @@ const COLORS: Record<string, { color: string; icon: string }> = {
   "Outros": { color: "#94a3b8", icon: "✨" },
 };
 
-import { ArrowUpRight } from "lucide-react";
-
 export function BarChart({ data: propData }: BarChartProps) {
+  const router = useRouter();
   const data = (propData && propData.length > 0) ? propData.slice(0, 4).map((item) => {
     const totalValue = propData.reduce((s, curr) => s + curr.value, 0);
     const config = COLORS[item.method] || COLORS["Outros"];
@@ -36,7 +37,7 @@ export function BarChart({ data: propData }: BarChartProps) {
   return (
     <div className="bg-brand-card rounded-2xl border border-brand-darkBorder shadow-xl overflow-hidden group">
       <div 
-        onClick={() => window.location.href = '/finance'}
+        onClick={() => router.push('/finance')}
         className="p-6 border-b border-brand-darkBorder cursor-pointer hover:bg-white/5 transition-all group/header"
       >
         <h4 className="text-lg font-bold text-brand-text group-hover/header:text-brand-primary transition-colors flex items-center justify-between">
@@ -77,19 +78,6 @@ export function BarChart({ data: propData }: BarChartProps) {
           </div>
         ))}
 
-        {/* Totals footer */}
-        <div className="mt-2 pt-4 border-t border-brand-darkBorder grid grid-cols-2 gap-3">
-          <div className="bg-brand-bg rounded-xl p-3 border border-brand-darkBorder text-center">
-            <p className="text-[10px] font-bold text-brand-muted uppercase tracking-wider">Digital</p>
-            <p className="text-base font-black text-brand-text mt-0.5">
-              {((data[0]?.percent || 0) + (data[1]?.percent || 0) + (data[2]?.percent || 0))}%
-            </p>
-          </div>
-          <div className="bg-brand-bg rounded-xl p-3 border border-brand-darkBorder text-center">
-            <p className="text-[10px] font-bold text-brand-muted uppercase tracking-wider">Físico</p>
-            <p className="text-base font-black text-brand-text mt-0.5">{(data[3]?.percent || 0)}%</p>
-          </div>
-        </div>
       </div>
     </div>
   );

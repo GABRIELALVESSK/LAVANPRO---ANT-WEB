@@ -4,7 +4,6 @@ import { useState, useEffect, useMemo } from "react";
 import { Sidebar } from "@/components/sidebar";
 import { Filters } from "@/components/filters";
 import { StatsCards } from "@/components/stats-cards";
-import { MainChart } from "@/components/main-chart";
 import { DonutChart } from "@/components/donut-chart";
 import { BarChart } from "@/components/bar-chart";
 import { TransactionTable } from "@/components/transaction-table";
@@ -21,35 +20,98 @@ import {
   Zap,
   PackageCheck
 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
 import { useSubscription } from "@/hooks/useSubscription";
 import { PlanGuard } from "@/components/plan-guard";
 import { Order } from "@/lib/orders-data";
 import { calculateDashboardMetrics } from "@/lib/dashboard-utils";
+import { UnitSelector } from "@/components/unit-selector";
+
+// Dynamic imports to avoid SSR issues with heavy/DOM-based components
+const MainChart = dynamic(() => import("@/components/main-chart").then(mod => mod.MainChart), { 
+  ssr: false,
+  loading: () => <div className="h-[400px] w-full bg-brand-card animate-pulse rounded-2xl border border-brand-darkBorder" />
+});
 
 export default function Page() {
+  const router = useRouter();
   const { plan, isEnterprise } = useSubscription();
   const [activeRange, setActiveRange] = useState("30d");
-  const [customDates, setCustomDates] = useState({
-    start: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
-    end: new Date().toISOString().split("T")[0],
+  const [customDates, setCustomDates] = useState<{ start: string; end: string }>({
+    start: "",
+    end: "",
   });
-  const [selectedUnit, setSelectedUnit] = useState("Todas as Unidades");
+  const [activeUnit, setActiveUnit] = useState("all");
   const [orders, setOrders] = useState<Order[]>([]);
 
   useEffect(() => {
-    const saved = localStorage.getItem("lavanpro_orders_v3");
-    if (saved) {
-      try {
-        setOrders(JSON.parse(saved));
-      } catch (e) {
-        console.error("Error loading orders", e);
+    // Set initial dates on client side only to avoid hydration mismatch
+    const start = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+    const end = new Date().toISOString().split("T")[0];
+    setCustomDates({ start, end });
+
+    // Load initial unit preference
+    const savedUnit = localStorage.getItem("lavanpro_selected_unit");
+    if (savedUnit) setActiveUnit(savedUnit);
+
+    const loadAndPurge = () => {
+      const saved = localStorage.getItem("lavanpro_orders_v3");
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          
+          // Purge mock data to ensure "zeroed-out" state as requested
+          const mockIDs = ["#ORD-2856", "#ORD-2855", "#ORD-2854", "#ORD-2853", "#ORD-2852", "#ORD-2851", "#ORD-3792", "ORD-2856", "ORD-3792"];
+          const mockNames = ["Carlos Machado", "Hotel Bela Vista", "Maria Oliveira", "João Silva", "Augusto Silveira", "Mariana Souza", "Rodrigo Santos", "Gabriel Rodrigues Alves (Mock)"];
+          
+          const filtered = parsed.filter((o: any) => 
+            !mockIDs.includes(o.id) && 
+            !mockNames.includes(o.client) &&
+            !o.id.includes("3792") && // Specifically target this one from user screenshot
+            !o.id.includes("2856")
+          );
+
+          if (filtered.length !== parsed.length) {
+            localStorage.setItem("lavanpro_orders_v3", JSON.stringify(filtered));
+          }
+          setOrders(filtered);
+        } catch (e) {
+          console.error("Error loading orders", e);
+        }
       }
+    };
+
+    loadAndPurge();
+
+    // Cleanup other mock legacy data
+    const savedCust = localStorage.getItem("lavanpro_customers");
+    if (savedCust) {
+        try {
+            const parsed = JSON.parse(savedCust);
+            const filtered = parsed.filter((c: any) => !["Carlos Machado", "Hotel Bela Vista", "Maria Oliveira", "João Silva", "Mariana Souza", "Rodrigo Santos", "Gabriel Rodrigues Alves (Mock)"].includes(c.name));
+            if (filtered.length !== parsed.length) localStorage.setItem("lavanpro_customers", JSON.stringify(filtered));
+        } catch(e) {}
     }
+
+    // Listener for sidebar unit changes
+    const handleUnitChange = (e: any) => {
+      setActiveUnit(e.detail);
+    };
+    window.addEventListener("unit-changed", handleUnitChange);
+    return () => window.removeEventListener("unit-changed", handleUnitChange);
   }, []);
 
   const metrics = useMemo(() => {
-    return calculateDashboardMetrics(orders, activeRange, customDates);
-  }, [orders, activeRange, customDates]);
+    // If dates are not yet initialized, use placeholder values to avoid errors
+    if (!customDates.start) {
+      return calculateDashboardMetrics(orders, activeRange, {
+        start: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
+        end: new Date().toISOString().split("T")[0],
+      }, activeUnit);
+    }
+    return calculateDashboardMetrics(orders, activeRange, customDates, activeUnit);
+  }, [orders, activeRange, customDates, activeUnit]);
 
   const handleNavigate = (route: string, filters?: Record<string, string>) => {
     const params = new URLSearchParams();
@@ -57,11 +119,11 @@ export default function Page() {
       Object.entries(filters).forEach(([key, value]) => params.append(key, value));
     }
     // Context persistence
-    params.append("range", activeRange);
-    params.append("unit", selectedUnit);
+    params.set("range", activeRange);
+    params.set("unit", activeUnit);
     
     const queryString = params.toString();
-    window.location.href = `${route}${queryString ? `?${queryString}` : ""}`;
+    router.push(`${route}${queryString ? `?${queryString}` : ""}`);
   };
 
   const operationalData = [
@@ -122,14 +184,24 @@ export default function Page() {
       <Sidebar />
       <div className="flex-1 flex flex-col h-screen overflow-hidden">
         <main className="flex-1 overflow-y-auto bg-brand-bg custom-scrollbar">
-          <Filters
-            activeRange={activeRange}
-            onChange={setActiveRange}
-            customDates={customDates}
-            onCustomDatesChange={setCustomDates}
-            selectedUnit={selectedUnit}
-            onUnitChange={setSelectedUnit}
-          />
+          {/* Stats & Filters */}
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 px-8 pt-8">
+            <Filters
+              activeRange={activeRange}
+              onChange={setActiveRange}
+              customDates={customDates}
+              onCustomDatesChange={setCustomDates}
+            />
+            
+            <div className="flex items-center gap-4">
+              {!isEnterprise && (
+                <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-amber-500/10 border border-amber-500/20 rounded-lg">
+                  <Crown className="size-3 text-amber-500" />
+                  <span className="text-[10px] font-black text-amber-500 uppercase tracking-widest">Plano Pro</span>
+                </div>
+              )}
+            </div>
+          </div>
 
           <div className="px-8 py-8 space-y-8 pb-16 max-w-[1800px] mx-auto">
 
@@ -138,7 +210,7 @@ export default function Page() {
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-sm font-bold text-brand-muted uppercase tracking-widest">Visão Operacional em Tempo Real</h2>
                 <button 
-                  onClick={() => window.location.href = '/orders'}
+                  onClick={() => router.push('/orders')}
                   className="flex items-center gap-1 text-xs font-bold text-brand-primary hover:underline transition-all"
                 >
                   Ver todos os pedidos <ArrowRight className="size-3" />
@@ -211,7 +283,7 @@ export default function Page() {
                       <h3 className="text-sm font-bold text-brand-text mb-1 text-center">Gráficos Avançados Bloqueados</h3>
                       <p className="text-[11px] text-brand-muted mb-4 text-center">A análise detalhada de mix de produtos e performance por período é exclusiva para assinantes Enterprise.</p>
                       <button
-                        onClick={() => window.location.href = '/settings?tab=status'}
+                        onClick={() => router.push('/settings?tab=status')}
                         className="px-4 py-2 bg-brand-primary text-white text-[10px] font-black rounded-lg hover:bg-brand-primaryHover transition-all flex items-center gap-2 mx-auto"
                       >
                         Fazer Upgrade Agora <ArrowRight className="size-3" />
@@ -238,8 +310,7 @@ export default function Page() {
         .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 10px; }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.15); }
       `}</style>
-    </div>
-
+      </div>
     </div>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 import { MoreVertical, ArrowUpRight } from "lucide-react";
 import { Order } from "@/lib/orders-data";
+import { useRouter } from "next/navigation";
 
 interface TransactionTableProps {
   activeRange?: string;
@@ -22,6 +23,8 @@ function getStatusColor(status: string) {
 }
 
 export function TransactionTable({ orders }: TransactionTableProps) {
+  const router = useRouter();
+  
   // Sort by date desc and take top 5
   const transactions = [...orders]
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
@@ -35,7 +38,7 @@ export function TransactionTable({ orders }: TransactionTableProps) {
           <p className="text-sm text-brand-muted mt-0.5">{orders.length} registros no total</p>
         </div>
         <button 
-          onClick={() => window.location.href = '/orders'}
+          onClick={() => router.push('/orders')}
           className="flex items-center gap-1.5 text-brand-primary text-sm font-bold hover:underline"
         >
           Ver todas <ArrowUpRight className="size-4" />
@@ -64,7 +67,7 @@ export function TransactionTable({ orders }: TransactionTableProps) {
               return (
                 <tr
                   key={tx.id}
-                  onClick={() => window.location.href = `/orders?search=${tx.id.replace('#', '')}`}
+                  onClick={() => router.push(`/orders?search=${tx.id.replace('#', '')}`)}
                   className={`hover:bg-brand-primary/10 transition-all border-b border-brand-darkBorder last:border-0 cursor-pointer group/row ${i % 2 === 0 ? "" : "bg-brand-bg/20"}`}
                 >
                   <td className="px-6 py-4 font-mono text-xs font-bold text-brand-muted group-hover/row:text-brand-primary transition-colors">{tx.id}</td>

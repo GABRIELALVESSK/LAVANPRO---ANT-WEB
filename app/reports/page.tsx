@@ -4,7 +4,8 @@ import { Sidebar } from "@/components/sidebar";
 import { AccessGuard } from "@/components/access-guard";
 import { PlanGuard } from "@/components/plan-guard";
 import { Filters } from "@/components/filters";
-import { useEffect, useState } from "react";
+import { UnitSelector } from "@/components/unit-selector";
+import { useEffect, useState, useMemo } from "react";
 import { Download, Wallet, Activity, Users } from "lucide-react";
 import {
   AreaChart,
@@ -21,53 +22,15 @@ import {
   Pie,
 } from "recharts";
 
-// --- MOCK DATA ---
+// ─── Data Helpers ─────────────────────────────────────────────────────────────
+function formatCurrency(v: number) { 
+  return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }); 
+}
 
-const faturamentoData = [
-  { date: "01/05", faturamento: 4500, ticket: 85 },
-  { date: "05/05", faturamento: 5200, ticket: 82 },
-  { date: "10/05", faturamento: 4800, ticket: 90 },
-  { date: "15/05", faturamento: 6100, ticket: 88 },
-  { date: "20/05", faturamento: 5900, ticket: 95 },
-  { date: "25/05", faturamento: 7500, ticket: 84 },
-  { date: "30/05", faturamento: 8200, ticket: 89 },
-];
-
-const servicosData = [
-  { name: "Lavagem Completa", value: 12500, color: "#8b5cf6" },
-  { name: "Dry Clean", value: 8400, color: "#6366f1" },
-  { name: "Apenas Passar", value: 4200, color: "#a78bfa" },
-  { name: "Enxoval", value: 2100, color: "#ddd6fe" },
-];
-
-const contasData = [
-  { name: "Semana 1", aReceber: 3200, aPagar: 1500 },
-  { name: "Semana 2", aReceber: 4100, aPagar: 2100 },
-  { name: "Semana 3", aReceber: 3800, aPagar: 1800 },
-  { name: "Semana 4", aReceber: 5200, aPagar: 2900 },
-];
-
-const statusData = [
-  { name: "Concluído", value: 65, color: "#10b981" },
-  { name: "Em Lavagem", value: 20, color: "#3b82f6" },
-  { name: "Aguardando", value: 10, color: "#f59e0b" },
-  { name: "Cancelado", value: 5, color: "#ef4444" },
-];
-
-const produtividadeData = [
-  { name: "Carlos", pecas: 450 },
-  { name: "Mariana", pecas: 380 },
-  { name: "João", pecas: 420 },
-  { name: "Ana", pecas: 510 },
-];
-
-const topClientes = [
-  { id: 1, nome: "Hotel Bela Vista", pedidos: 24, valor: "R$ 4.250,00", ultima: "Ontem" },
-  { id: 2, nome: "Pousada Rio Verde", pedidos: 18, valor: "R$ 3.100,00", ultima: "Hoje" },
-  { id: 3, nome: "Ana Paula Silva", pedidos: 12, valor: "R$ 1.840,00", ultima: "Há 2 dias" },
-  { id: 4, nome: "Restaurante Sabor", pedidos: 10, valor: "R$ 1.500,00", ultima: "Há 4 dias" },
-  { id: 5, nome: "Clínica Saúde", pedidos: 8, valor: "R$ 1.250,00", ultima: "Há 1 semana" },
-];
+function calcOrderTotal(items: any[]) {
+  if (!Array.isArray(items)) return 0;
+  return items.reduce((sum, i) => sum + (Number(i.qty || 0) * Number(i.unitPrice || 0)), 0);
+}
 
 // --- COMPONENTS ---
 
@@ -92,7 +55,7 @@ function CustomTooltip({ active, payload, label, prefix = "R$ " }: any) {
 
 export default function ReportsPage() {
   const [activeRange, setActiveRange] = useState("30d");
-  const [selectedUnit, setSelectedUnit] = useState("Todas as Unidades");
+  const [selectedUnit, setSelectedUnit] = useState("all");
   const [customDates, setCustomDates] = useState({
     start: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
     end: new Date().toISOString().split("T")[0],
@@ -100,8 +63,37 @@ export default function ReportsPage() {
 
   const [activeTab, setActiveTab] = useState("financeiro");
   const [stockAlerts, setStockAlerts] = useState<any[]>([]);
+  const [orders, setOrders] = useState<any[]>([]);
+  const [customers, setCustomers] = useState<any[]>([]);
+  const [financeTransactions, setFinanceTransactions] = useState<any[]>([]);
 
   useEffect(() => {
+    // Load Orders
+    const savedOrders = localStorage.getItem("lavanpro_orders_v3");
+    if (savedOrders) {
+      try { setOrders(JSON.parse(savedOrders)); } catch (e) {}
+    }
+
+    // Load Customers
+    const savedCustomers = localStorage.getItem("lavanpro_customers");
+    if (savedCustomers) {
+      try { setCustomers(JSON.parse(savedCustomers)); } catch (e) {}
+    }
+
+    // Load Finance
+    const savedFinance = localStorage.getItem("lavanpro_finance_transactions");
+    if (savedFinance) {
+        try { setFinanceTransactions(JSON.parse(savedFinance)); } catch(e) {}
+    }
+
+    // Load initial unit preference and listen for changes
+    const savedUnit = localStorage.getItem("lavanpro_selected_unit");
+    if (savedUnit) setSelectedUnit(savedUnit);
+
+    const handleUnitChange = (e: any) => setSelectedUnit(e.detail);
+    window.addEventListener("unit-changed", handleUnitChange);
+
+    // Stock Alerts (Existing)
     const savedProducts = localStorage.getItem("lavanpro_stock_products_v2");
     if (savedProducts) {
       try {
@@ -122,7 +114,168 @@ export default function ReportsPage() {
         console.error("Erro ao ler estoque para relatórios:", e);
       }
     }
+
+    return () => window.removeEventListener("unit-changed", handleUnitChange);
   }, []);
+
+  // ─── Filtered Data ────────────────────────────────────────────────────────
+  const filteredOrders = useMemo(() => {
+    let result = orders;
+    
+    // Unit filter
+    if (selectedUnit !== "all") {
+        result = result.filter(o => o.unitId === selectedUnit);
+    }
+
+    // Date filter
+    const start = new Date(customDates.start + "T00:00:00");
+    const end = new Date(customDates.end + "T23:59:59");
+    
+    return result.filter(o => {
+        const d = new Date(o.createdAt);
+        return d >= start && d <= end;
+    });
+  }, [orders, selectedUnit, customDates]);
+
+  // ─── Metrics Calculation ──────────────────────────────────────────────────
+  
+  // 1. Faturamento vs Ticket Médio (Daily)
+  const faturamentoData = useMemo(() => {
+    const map: Record<string, { faturamento: number; count: number }> = {};
+    
+    // Initialize last 7 days or range
+    filteredOrders.forEach(o => {
+        const dateKey = new Date(o.createdAt).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+        if (!map[dateKey]) map[dateKey] = { faturamento: 0, count: 0 };
+        const total = calcOrderTotal(o.items);
+        map[dateKey].faturamento += total;
+        map[dateKey].count += 1;
+    });
+
+    return Object.entries(map).map(([date, data]) => ({
+        date,
+        faturamento: data.faturamento,
+        ticket: data.count > 0 ? data.faturamento / data.count : 0
+    })).sort((a,b) => {
+        const [da, ma] = a.date.split("/").map(Number);
+        const [db, mb] = b.date.split("/").map(Number);
+        return (ma * 100 + da) - (mb * 100 + db);
+    });
+  }, [filteredOrders]);
+
+  // 2. Serviços mais vendidos
+  const servicosData = useMemo(() => {
+    const map: Record<string, number> = {};
+    filteredOrders.forEach(o => {
+        o.items.forEach((i: any) => {
+            map[i.service] = (map[i.service] || 0) + (Number(i.qty) * Number(i.unitPrice));
+        });
+    });
+
+    const colors = ["#8b5cf6", "#6366f1", "#a78bfa", "#ddd6fe", "#7c3aed", "#4f46e5"];
+    return Object.entries(map)
+        .map(([name, value], idx) => ({ name, value, color: colors[idx % colors.length] }))
+        .sort((a, b) => b.value - a.value)
+        .slice(0, 5);
+  }, [filteredOrders]);
+
+  // 3. A Receber vs A Pagar
+  const contasData = useMemo(() => {
+    // Weekly grouping for the last 4 weeks or range
+    const result = [
+        { name: "Semana 1", aReceber: 0, aPagar: 0 },
+        { name: "Semana 2", aReceber: 0, aPagar: 0 },
+        { name: "Semana 3", aReceber: 0, aPagar: 0 },
+        { name: "Semana 4", aReceber: 0, aPagar: 0 },
+    ];
+
+    // Simple placeholder logic: group by quarter of the filtered orders
+    if (filteredOrders.length === 0) return result;
+
+    filteredOrders.forEach((o, idx) => {
+        const weekIdx = Math.min(3, Math.floor((idx / filteredOrders.length) * 4));
+        const total = calcOrderTotal(o.items);
+        if (o.paymentStatus === "A Pagar" || o.paymentStatus === "Faturado") {
+            result[weekIdx].aReceber += total;
+        }
+    });
+
+    // Add real expenses if available
+    financeTransactions.forEach(t => {
+        if (t.type === "DESPESA" && t.status !== "PAGO") {
+            // Very simple mapping for now
+            result[2].aPagar += t.value; 
+        }
+    });
+
+    return result;
+  }, [filteredOrders, financeTransactions]);
+
+  // 4. Status de Pedidos
+  const statusData = useMemo(() => {
+    if (filteredOrders.length === 0) return [];
+    
+    const map: Record<string, number> = {};
+    filteredOrders.forEach(o => {
+        map[o.status] = (map[o.status] || 0) + 1;
+    });
+
+    const colors: Record<string, string> = {
+        "Entregue": "#10b981",
+        "Lavagem": "#3b82f6",
+        "Triagem": "#f59e0b",
+        "Cancelado": "#ef4444",
+        "Recebido": "#64748b",
+        "Em Rota": "#8b5cf6"
+    };
+
+    return Object.entries(map).map(([name, count]) => ({
+        name,
+        value: Math.round((count / filteredOrders.length) * 100),
+        color: colors[name] || "#a855f7"
+    })).sort((a,b) => b.value - a.value);
+  }, [filteredOrders]);
+
+  // 5. Top Clientes
+  const topClientesData = useMemo(() => {
+    const map: Record<string, { nome: string; pedidos: number; valor: number; ultima: string }> = {};
+    
+    filteredOrders.forEach(o => {
+        if (!map[o.client]) {
+            map[o.client] = { nome: o.client, pedidos: 0, valor: 0, ultima: o.createdAt };
+        }
+        map[o.client].pedidos += 1;
+        map[o.client].valor += calcOrderTotal(o.items);
+        if (new Date(o.createdAt) > new Date(map[o.client].ultima)) {
+            map[o.client].ultima = o.createdAt;
+        }
+    });
+
+    return Object.entries(map)
+        .map(([id, data]) => ({ 
+            id, 
+            nome: data.nome, 
+            pedidos: data.pedidos, 
+            valor: formatCurrency(data.valor), 
+            ultima: new Date(data.ultima).toLocaleDateString("pt-BR")
+        }))
+        .sort((a, b) => {
+            const valA = parseFloat(a.valor.replace(/[R$\.\s]/g, '').replace(',', '.'));
+            const valB = parseFloat(b.valor.replace(/[R$\.\s]/g, '').replace(',', '.'));
+            return valB - valA;
+        })
+        .slice(0, 5);
+  }, [filteredOrders]);
+
+  // 6. Produtividade (Just a placeholder based on unit distribution)
+  const produtividadeData = useMemo(() => {
+    const map: Record<string, number> = {};
+    filteredOrders.forEach(o => {
+        const unit = o.unitId || "Default";
+        map[unit] = (map[unit] || 0) + o.items.reduce((s: number, i: any) => s + (Number(i.qty) || 0), 0);
+    });
+    return Object.entries(map).map(([name, pecas]) => ({ name, pecas }));
+  }, [filteredOrders]);
 
   const tabs = [
     { id: "financeiro", label: "Financeiro e Vendas", icon: Wallet },
@@ -137,16 +290,17 @@ export default function ReportsPage() {
         <PlanGuard moduleName="Relatórios" requiredPlan="enterprise">
           <div className="flex-1 flex flex-col h-screen overflow-hidden">
             <main className="flex-1 overflow-y-auto bg-brand-bg">
-              <Filters
-                title="Relatórios e Análises"
-                subtitle="Explore dados detalhados para tomada de decisão"
-                activeRange={activeRange}
-                onChange={setActiveRange}
-                customDates={customDates}
-                onCustomDatesChange={setCustomDates}
-                selectedUnit={selectedUnit}
-                onUnitChange={setSelectedUnit}
-              />
+                <div className="px-8 pt-8 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+                  <Filters
+                    title="Relatórios e Análises"
+                    subtitle="Explore dados detalhados para tomada de decisão"
+                    activeRange={activeRange}
+                    onChange={setActiveRange}
+                    customDates={customDates}
+                    onCustomDatesChange={setCustomDates}
+                  />
+                  <div className="self-end md:self-auto" />
+                </div>
 
               <div className="px-8 py-8 space-y-8 pb-16 max-w-[1800px] mx-auto">
                 {/* Header / Export / Tabs */}
@@ -227,33 +381,35 @@ export default function ReportsPage() {
                       </div>
                     </div>
 
-                    {/* Row 2: Serviços mais vendidos */}
-                    <div className="bg-brand-card rounded-2xl border border-brand-darkBorder p-6 shadow-xl">
-                      <div className="mb-6 flex justify-between items-center">
-                        <div>
-                          <h3 className="text-base font-bold text-brand-text">Serviços Mais Vendidos</h3>
-                          <p className="text-xs text-brand-muted">Ranking por volume financeiro</p>
+                      {/* Serviços mais vendidos */}
+                      <div className="bg-brand-card rounded-2xl border border-brand-darkBorder p-6 shadow-xl">
+                        <div className="mb-6 flex justify-between items-center">
+                          <div>
+                            <h3 className="text-base font-bold text-brand-text">Serviços Mais Vendidos</h3>
+                            <p className="text-xs text-brand-muted">Ranking por volume financeiro</p>
+                          </div>
                         </div>
-                      </div>
-                      <div className="grid grid-cols-1 gap-4">
-                        {servicosData.map((s, i) => (
-                          <div key={s.name} className="flex items-center gap-4">
-                            <span className="text-sm font-bold text-brand-muted w-4">{i + 1}</span>
-                            <div className="flex-1">
-                              <div className="flex justify-between text-sm mb-1">
-                                <span className="font-semibold text-brand-text">{s.name}</span>
-                                <span className="font-bold text-brand-muted">
-                                  R$ {s.value.toLocaleString("pt-BR")}
-                                </span>
-                              </div>
-                              <div className="h-2 w-full bg-brand-bg rounded-full overflow-hidden">
-                                <div className="h-full rounded-full" style={{ width: `${(s.value / servicosData[0].value) * 100}%`, backgroundColor: s.color }} />
+                        <div className="grid grid-cols-1 gap-4">
+                          {servicosData.length > 0 ? servicosData.map((s, i) => (
+                            <div key={s.name} className="flex items-center gap-4">
+                              <span className="text-sm font-bold text-brand-muted w-4">{i + 1}</span>
+                              <div className="flex-1">
+                                <div className="flex justify-between text-sm mb-1">
+                                  <span className="font-semibold text-brand-text">{s.name}</span>
+                                  <span className="font-bold text-brand-muted">
+                                    R$ {s.value.toLocaleString("pt-BR")}
+                                  </span>
+                                </div>
+                                <div className="h-2 w-full bg-brand-bg rounded-full overflow-hidden">
+                                  <div className="h-full rounded-full" style={{ width: `${(s.value / servicosData[0].value) * 100}%`, backgroundColor: s.color }} />
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        ))}
+                          )) : (
+                            <div className="text-center py-8 text-brand-muted text-sm">Sem dados de serviço no período.</div>
+                          )}
+                        </div>
                       </div>
-                    </div>
                   </div>
                 )}
 
@@ -384,7 +540,7 @@ export default function ReportsPage() {
                             </tr>
                           </thead>
                           <tbody>
-                            {topClientes.map((cliente, i) => (
+                            {topClientesData.length > 0 ? topClientesData.map((cliente, i) => (
                               <tr key={cliente.id} className="border-b border-brand-darkBorder last:border-0 hover:bg-brand-primary/5 transition-colors">
                                 <td className="px-6 py-4">
                                   <span className={`inline-flex items-center justify-center size-6 rounded-full text-xs font-bold ${i === 0 ? "bg-amber-500/20 text-amber-500" :
@@ -404,7 +560,11 @@ export default function ReportsPage() {
                                 <td className="px-6 py-4 font-bold text-emerald-500">{cliente.valor}</td>
                                 <td className="px-6 py-4 text-sm text-brand-muted">{cliente.ultima}</td>
                               </tr>
-                            ))}
+                            )) : (
+                                <tr>
+                                    <td colSpan={5} className="text-center py-8 text-brand-muted text-sm">Sem dados de clientes no período.</td>
+                                </tr>
+                            )}
                           </tbody>
                         </table>
                       </div>

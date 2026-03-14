@@ -28,12 +28,27 @@ const TAG_COLORS: Record<string, string> = {
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-function totalSpent(c: Customer) { return c.orders.reduce((s, o) => s + o.value, 0); }
+function getCustomerOrders(customerName: string, allOrders: any[]) {
+    return allOrders.filter(o => o.client === customerName);
+}
+
+function totalSpent(customerName: string, allOrders: any[]) { 
+    return getCustomerOrders(customerName, allOrders).reduce((s, o) => {
+        const orderTotal = o.items?.reduce((sum: number, i: any) => sum + (Number(i.qty || 0) * Number(i.unitPrice || 0)), 0) || 0;
+        return s + orderTotal;
+    }, 0); 
+}
+
 function formatCurrency(v: number) { return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }); }
-function avgTicket(c: Customer) { return c.orders.length ? totalSpent(c) / c.orders.length : 0; }
+
+function avgTicket(customerName: string, allOrders: any[]) { 
+    const orders = getCustomerOrders(customerName, allOrders);
+    return orders.length ? totalSpent(customerName, allOrders) / orders.length : 0; 
+}
 const blankCustomer = (): CustomerFormData => ({
     name: "", phone: "", email: "", address: "",
     origin: ORIGINS[0], notes: "", active: true, tags: [],
+    unitId: "default"
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -207,9 +222,15 @@ export default function CustomersPage() {
     const [customers, setCustomers] = useState<Customer[]>(seedCustomers);
     const [isLoaded, setIsLoaded] = useState(false);
 
+    const [orders, setOrders] = useState<any[]>([]);
+
     useEffect(() => {
         const saved = localStorage.getItem("lavanpro_customers");
         if (saved) { try { setCustomers(JSON.parse(saved)); } catch { } }
+        
+        const savedOrders = localStorage.getItem("lavanpro_orders_v3");
+        if (savedOrders) { try { setOrders(JSON.parse(savedOrders)); } catch { } }
+
         setIsLoaded(true);
     }, []);
 
@@ -242,7 +263,7 @@ export default function CustomersPage() {
     const stats = [
         { label: "Total Clientes", value: customers.length, icon: Users, color: "text-brand-primary", bg: "bg-brand-primary/10" },
         { label: "Ativos", value: customers.filter(c => c.active).length, icon: CheckCircle2, color: "text-emerald-500", bg: "bg-emerald-500/10" },
-        { label: "Receita Total", value: formatCurrency(customers.reduce((s, c) => s + totalSpent(c), 0)), icon: TrendingUp, color: "text-amber-500", bg: "bg-amber-500/10" },
+        { label: "Receita Total", value: formatCurrency(customers.reduce((s, c) => s + totalSpent(c.name, orders), 0)), icon: TrendingUp, color: "text-amber-500", bg: "bg-amber-500/10" },
         { label: "VIPs", value: customers.filter(c => c.tags.includes("VIP")).length, icon: Star, color: "text-yellow-500", bg: "bg-yellow-500/10" },
     ];
 
@@ -262,7 +283,7 @@ export default function CustomersPage() {
 
     // Handlers — Edit
     const openEdit = (c: Customer) => {
-        setEditForm({ name: c.name, phone: c.phone, email: c.email, address: c.address, origin: c.origin, notes: c.notes, active: c.active, tags: [...c.tags] });
+        setEditForm({ name: c.name, phone: c.phone, email: c.email, address: c.address, origin: c.origin, notes: c.notes, active: c.active, tags: [...c.tags], unitId: c.unitId });
         setEditMode(true);
     };
     const handleEditChange = (field: keyof CustomerFormData, value: any) =>
@@ -395,15 +416,15 @@ export default function CustomersPage() {
                                             )}
                                             <div className="grid grid-cols-3 gap-2 text-center">
                                                 <div className="bg-brand-bg rounded-xl p-2 border border-brand-darkBorder">
-                                                    <p className="text-sm font-black text-brand-text">{c.orders.length}</p>
+                                                    <p className="text-sm font-black text-brand-text">{getCustomerOrders(c.name, orders).length}</p>
                                                     <p className="text-[10px] text-brand-muted font-semibold">Pedidos</p>
                                                 </div>
                                                 <div className="bg-brand-bg rounded-xl p-2 border border-brand-darkBorder">
-                                                    <p className="text-sm font-black text-emerald-500">{formatCurrency(totalSpent(c))}</p>
+                                                    <p className="text-sm font-black text-emerald-500">{formatCurrency(totalSpent(c.name, orders))}</p>
                                                     <p className="text-[10px] text-brand-muted font-semibold">Total gasto</p>
                                                 </div>
                                                 <div className="bg-brand-bg rounded-xl p-2 border border-brand-darkBorder">
-                                                    <p className="text-sm font-black text-brand-primary">{formatCurrency(avgTicket(c))}</p>
+                                                    <p className="text-sm font-black text-brand-primary">{formatCurrency(avgTicket(c.name, orders))}</p>
                                                     <p className="text-[10px] text-brand-muted font-semibold">Ticket médio</p>
                                                 </div>
                                             </div>
@@ -484,15 +505,15 @@ export default function CustomersPage() {
                                     </div>
                                     <div className="grid grid-cols-3 gap-3">
                                         <div className="p-4 bg-brand-bg border border-brand-darkBorder rounded-xl text-center">
-                                            <p className="text-2xl font-black text-brand-text">{selected.orders.length}</p>
+                                            <p className="text-2xl font-black text-brand-text">{getCustomerOrders(selected.name, orders).length}</p>
                                             <p className="text-xs text-brand-muted font-semibold">Pedidos</p>
                                         </div>
                                         <div className="p-4 bg-brand-bg border border-brand-darkBorder rounded-xl text-center">
-                                            <p className="text-2xl font-black text-emerald-500">{formatCurrency(totalSpent(selected))}</p>
+                                            <p className="text-2xl font-black text-emerald-500">{formatCurrency(totalSpent(selected.name, orders))}</p>
                                             <p className="text-xs text-brand-muted font-semibold">Total gasto</p>
                                         </div>
                                         <div className="p-4 bg-brand-bg border border-brand-darkBorder rounded-xl text-center">
-                                            <p className="text-2xl font-black text-brand-primary">{formatCurrency(avgTicket(selected))}</p>
+                                            <p className="text-2xl font-black text-brand-primary">{formatCurrency(avgTicket(selected.name, orders))}</p>
                                             <p className="text-xs text-brand-muted font-semibold">Ticket médio</p>
                                         </div>
                                     </div>
@@ -504,18 +525,18 @@ export default function CustomersPage() {
                                     )}
                                     <div>
                                         <h4 className="text-[11px] font-bold uppercase tracking-wider text-brand-muted mb-3 flex items-center gap-2"><ShoppingBag className="size-3.5" />Histórico de Pedidos</h4>
-                                        {selected.orders.length === 0 ? (
+                                        {getCustomerOrders(selected.name, orders).length === 0 ? (
                                             <p className="text-sm text-brand-muted text-center py-6 bg-brand-bg rounded-xl border border-brand-darkBorder">Nenhum pedido registrado ainda.</p>
                                         ) : (
                                             <div className="bg-brand-bg border border-brand-darkBorder rounded-xl overflow-hidden divide-y divide-brand-darkBorder">
-                                                {selected.orders.map(o => (
+                                                {getCustomerOrders(selected.name, orders).map((o: any) => (
                                                     <div key={o.id} className="flex items-center justify-between px-4 py-3 hover:bg-white/5 transition-colors">
                                                         <div>
                                                             <p className="text-sm font-bold text-brand-text">{o.id}</p>
-                                                            <p className="text-xs text-brand-muted">{o.date} · {o.service}</p>
+                                                            <p className="text-xs text-brand-muted">{o.createdAt} · {o.items[0]?.service || "N/A"}</p>
                                                         </div>
                                                         <div className="flex items-center gap-3">
-                                                            <span className="text-sm font-bold text-emerald-500">{formatCurrency(o.value)}</span>
+                                                            <span className="text-sm font-bold text-emerald-500">{formatCurrency(o.items.reduce((sum: number, i: any) => sum + (i.qty * i.unitPrice), 0))}</span>
                                                             <span className={`text-[10px] font-bold px-2 py-0.5 rounded-lg border ${o.status === "Entregue" ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20" : o.status === "Cancelado" ? "bg-rose-500/10 text-rose-500 border-rose-500/20" : "bg-brand-primary/10 text-brand-primary border-brand-primary/20"}`}>{o.status}</span>
                                                         </div>
                                                     </div>

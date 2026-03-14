@@ -42,22 +42,8 @@ const CATEGORIES = ["Produtos Químicos", "Embalagens", "Materiais de Escritóri
 const UNITS = ["Litro (L)", "Galão (GL)", "Quilograma (kg)", "Unidade (un)", "Caixa (cx)", "Pacote (pct)", "Rolo (rl)"];
 
 // ─── Seed data ────────────────────────────────────────────────────────────────
-const seedProducts: Product[] = [
-    { id: "PROD-101", name: "Sabão Líquido Omo Pro", category: "Produtos Químicos", unit: "Galão (GL)", minStock: 5, currentStock: 12, unitCost: 145.50 },
-    { id: "PROD-102", name: "Amaciante Comfort Pro", category: "Produtos Químicos", unit: "Galão (GL)", minStock: 4, currentStock: 3, unitCost: 120.00 },
-    { id: "PROD-103", name: "Tira Manchas Vanish", category: "Produtos Químicos", unit: "Unidade (un)", minStock: 10, currentStock: 15, unitCost: 45.90 },
-    { id: "PROD-104", name: "Cabides de Plástico Preto", category: "Embalagens", unit: "Caixa (cx)", minStock: 2, currentStock: 5, unitCost: 85.00 },
-    { id: "PROD-105", name: "Capa Plástica para Terno", category: "Embalagens", unit: "Rolo (rl)", minStock: 3, currentStock: 2, unitCost: 110.00 },
-    { id: "PROD-106", name: "Etiquetas Térmicas QR", category: "Materiais de Escritório", unit: "Rolo (rl)", minStock: 5, currentStock: 8, unitCost: 35.00 },
-];
-
-const seedMovements: Movement[] = [
-    { id: "MOV-1001", date: "2026-03-08", type: "SAIDA", productId: "PROD-101", quantity: 1, unitCost: 145.50, reason: "Consumo Operação Dia", user: "Gabriel" },
-    { id: "MOV-1002", date: "2026-03-08", type: "SAIDA", productId: "PROD-102", quantity: 1, unitCost: 120.00, reason: "Consumo Operação Dia", user: "Gabriel" },
-    { id: "MOV-1003", date: "2026-03-07", type: "ENTRADA", productId: "PROD-101", quantity: 10, unitCost: 145.50, reason: "Compra Mensal Fornecedor A", user: "Gabriel" },
-    { id: "MOV-1004", date: "2026-03-05", type: "SAIDA", productId: "PROD-105", quantity: 1, unitCost: 110.00, reason: "Reposição Expedição", user: "Ana Paula" },
-    { id: "MOV-1005", date: "2026-03-01", type: "ENTRADA", productId: "PROD-104", quantity: 5, unitCost: 85.00, reason: "Compra de Embalagens", user: "Gabriel" },
-];
+const seedProducts: Product[] = [];
+const seedMovements: Movement[] = [];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function formatCurrency(v: number) { return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }); }

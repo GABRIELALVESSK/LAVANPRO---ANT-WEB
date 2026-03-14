@@ -1,81 +1,28 @@
 "use client";
 
 import { AccessGuard } from "@/components/access-guard";
-
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, Suspense, useMemo } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/lib/supabase";
 import { Sidebar } from "@/components/sidebar";
 import { SettingsSidebar, SettingsMobileNav } from "@/components/settings/settings-sidebar";
-import { CompanyDataTab } from "@/components/settings/company-data-tab";
-import { UnitDataTab } from "@/components/settings/unit-data-tab";
-import { UsersTab } from "@/components/settings/users-tab";
-import { AccessProfilesTab } from "@/components/settings/access-profiles-tab";
-import { OperationalPrefsTab } from "@/components/settings/operational-prefs-tab";
-import { SystemParamsTab } from "@/components/settings/system-params-tab";
-import { FeatureStatusTab } from "@/components/settings/feature-status-tab";
 import { motion, AnimatePresence } from "framer-motion";
-import { CheckCircle2 } from "lucide-react";
+import dynamic from "next/dynamic";
 import type { SettingsTab } from "@/components/settings/settings-sidebar";
-import type { CompanyFormData } from "@/components/settings/company-data-tab";
-import type { UnitFormData } from "@/components/settings/unit-data-tab";
-import type { OperationalPrefsData } from "@/components/settings/operational-prefs-tab";
-import type { SystemParamsData } from "@/components/settings/system-params-tab";
+import { PaymentSuccessModal } from "@/components/settings/payment-success-modal";
+
+// Dynamically import all tabs with no SSR to avoid 500 errors
+const CompanyDataTab = dynamic(() => import("@/components/settings/company-data-tab").then(m => m.CompanyDataTab), { ssr: false });
+const UnitDataTab = dynamic(() => import("@/components/settings/unit-data-tab").then(m => m.UnitDataTab), { ssr: false });
+const UsersTab = dynamic(() => import("@/components/settings/users-tab").then(m => m.UsersTab), { ssr: false });
+const AccessProfilesTab = dynamic(() => import("@/components/settings/access-profiles-tab").then(m => m.AccessProfilesTab), { ssr: false });
+const OperationalPrefsTab = dynamic(() => import("@/components/settings/operational-prefs-tab").then(m => m.OperationalPrefsTab), { ssr: false });
+const SystemParamsTab = dynamic(() => import("@/components/settings/system-params-tab").then(m => m.SystemParamsTab), { ssr: false });
+const FeatureStatusTab = dynamic(() => import("@/components/settings/feature-status-tab").then(m => m.FeatureStatusTab), { ssr: false });
 
 // Plan tier configuration
 type PlanTier = "free" | "pro" | "enterprise";
-
-const DEFAULT_OPENING_HOURS: Record<string, { open: string; close: string; active: boolean }> = {
-  mon: { open: "08:00", close: "18:00", active: true },
-  tue: { open: "08:00", close: "18:00", active: true },
-  wed: { open: "08:00", close: "18:00", active: true },
-  thu: { open: "08:00", close: "18:00", active: true },
-  fri: { open: "08:00", close: "18:00", active: true },
-  sat: { open: "08:00", close: "13:00", active: true },
-  sun: { open: "08:00", close: "12:00", active: false },
-};
-
-function PaymentSuccessModal({ onClose, plan }: { onClose: () => void; plan: string }) {
-  return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
-      <motion.div
-        initial={{ opacity: 0, scale: 0.9, y: 20 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.9, y: 20 }}
-        className="bg-brand-card w-full max-w-md rounded-3xl border border-brand-primary/30 shadow-2xl p-8 text-center relative overflow-hidden"
-      >
-        {/* Animated Background Glow */}
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-1/2 bg-brand-primary/20 blur-[80px] -z-10" />
-
-        <div className="mx-auto size-20 bg-emerald-500/10 rounded-full flex items-center justify-center mb-6 border border-emerald-500/20">
-          <motion.div
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            transition={{ type: "spring", damping: 12, delay: 0.2 }}
-          >
-            <CheckCircle2 className="size-10 text-emerald-500" />
-          </motion.div>
-        </div>
-
-        <h2 className="text-2xl font-black text-brand-text mb-2">Pagamento Confirmado!</h2>
-        <p className="text-brand-muted text-sm mb-8">
-          Parabéns! Sua lavanderia agora está no plano <strong className="text-brand-primary uppercase">{plan}</strong>.
-          Todas as funcionalidades extras já estão liberadas para você.
-        </p>
-
-        <div className="space-y-3">
-          <button
-            onClick={onClose}
-            className="w-full py-3.5 bg-brand-primary text-white rounded-xl font-bold shadow-lg shadow-brand-primary/20 hover:bg-brand-primaryHover transition-all"
-          >
-            Começar a Usar
-          </button>
-        </div>
-      </motion.div>
-    </div>
-  );
-}
 
 function SettingsContent() {
   const [activeTab, setActiveTab] = useState<SettingsTab>("company");
@@ -96,14 +43,24 @@ function SettingsContent() {
       // Limpa a URL para não mostrar o modal de novo no refresh
       router.replace("/settings");
     }
+    
+    // Check for tab parameter
+    const tabParam = searchParams.get("tab") as SettingsTab;
+    if (tabParam && ["company", "unit", "users", "profiles", "operational", "system", "features"].includes(tabParam)) {
+      setActiveTab(tabParam);
+    }
   }, [searchParams, router]);
 
-  const isAdmin =
-    user?.user_metadata?.role === "owner" ||
-    user?.user_metadata?.role === "Gerente" ||
-    user?.user_metadata?.role === "Gerente Geral" ||
-    user?.user_metadata?.role === "Administrador" ||
-    user?.email === "gabriel23900@gmail.com";
+  const isAdmin = useMemo(() => {
+    if (!user) return false;
+    return (
+      user?.user_metadata?.role === "owner" ||
+      user?.user_metadata?.role === "Gerente" ||
+      user?.user_metadata?.role === "Gerente Geral" ||
+      user?.user_metadata?.role === "Administrador" ||
+      user?.email === "gabriel23900@gmail.com"
+    );
+  }, [user]);
 
   // Fetch plan from Supabase
   useEffect(() => {
@@ -132,13 +89,12 @@ function SettingsContent() {
           window.dispatchEvent(new CustomEvent('refresh-subscription'));
         }
       };
-      // For now we don't block the page load while fetching
       fetchPlan();
     }
   }, [user]);
 
   // Form states
-  const [companyForm, setCompanyForm] = useState<CompanyFormData>({
+  const [companyForm, setCompanyForm] = useState({
     razaoSocial: "",
     nomeFantasia: "Lavanderia Pro",
     cnpj: "",
@@ -148,21 +104,7 @@ function SettingsContent() {
     website: "",
   });
 
-  const [unitForm, setUnitForm] = useState<UnitFormData>({
-    name: "Lavanderia Pro - Centro",
-    street: "Av. Paulista",
-    number: "1000",
-    complement: "",
-    neighborhood: "Bela Vista",
-    city: "São Paulo",
-    state: "SP",
-    zipCode: "01310-100",
-    phone: "(11) 3000-4000",
-    email: "centro@lavanderiapro.com",
-    openingHours: DEFAULT_OPENING_HOURS,
-  });
-
-  const [operationalForm, setOperationalForm] = useState<OperationalPrefsData>({
+  const [operationalForm, setOperationalForm] = useState({
     defaultDeliveryDays: 3,
     autoLabeling: true,
     whatsappNotify: false,
@@ -176,7 +118,7 @@ function SettingsContent() {
     deliveryScheduled: true,
   });
 
-  const [systemForm, setSystemForm] = useState<SystemParamsData>({
+  const [systemForm, setSystemForm] = useState({
     language: "pt-BR",
     currency: "BRL",
     timezone: "America/Sao_Paulo",
@@ -186,13 +128,11 @@ function SettingsContent() {
 
   // Load data from localStorage on mount
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
     const savedCompany = localStorage.getItem("lavanpro_company");
     if (savedCompany) {
       try { setCompanyForm(JSON.parse(savedCompany)); } catch { /* ignore */ }
-    }
-    const savedUnit = localStorage.getItem("lavanpro_unit");
-    if (savedUnit) {
-      try { setUnitForm(JSON.parse(savedUnit)); } catch { /* ignore */ }
     }
     const savedOperational = localStorage.getItem("lavanpro_operational");
     if (savedOperational) {
@@ -206,10 +146,10 @@ function SettingsContent() {
 
   // Set default tab for non-admins
   useEffect(() => {
-    if (!loading && !isAdmin) {
+    if (!loading && !isAdmin && activeTab === 'company') {
       setActiveTab("operational");
     }
-  }, [loading, isAdmin]);
+  }, [loading, isAdmin, activeTab]);
 
   const showToast = (message: string, type: "success" | "error" | "info" = "success") => {
     const id = Math.random().toString(36).substring(2, 9);
@@ -224,7 +164,6 @@ function SettingsContent() {
     await new Promise((resolve) => setTimeout(resolve, 600));
     try {
       localStorage.setItem("lavanpro_company", JSON.stringify(companyForm));
-      localStorage.setItem("lavanpro_unit", JSON.stringify(unitForm));
       localStorage.setItem("lavanpro_operational", JSON.stringify(operationalForm));
       localStorage.setItem("lavanpro_system", JSON.stringify(systemForm));
       showToast("Todas as alterações foram salvas com sucesso!", "success");
@@ -258,7 +197,7 @@ function SettingsContent() {
               </p>
             </div>
             <div className="flex items-center gap-3">
-              {activeTab !== "users" && activeTab !== "profiles" && activeTab !== "features" && (
+              {activeTab !== "users" && activeTab !== "profiles" && activeTab !== "features" && activeTab !== "unit" && (
                 <button
                   onClick={handleSaveAll}
                   disabled={isSavingAll}
@@ -278,7 +217,7 @@ function SettingsContent() {
           </header>
 
           <div className="flex-1 flex overflow-hidden relative">
-            {loading && (
+            {(loading || !user) && (
               <div className="absolute inset-0 bg-brand-bg/50 backdrop-blur-sm z-50 flex items-center justify-center">
                 <div className="size-12 border-4 border-brand-primary/30 border-t-brand-primary rounded-full animate-spin"></div>
               </div>
@@ -294,7 +233,7 @@ function SettingsContent() {
 
             {/* Content area */}
             <main className="flex-1 overflow-y-auto">
-              <div className="px-8 py-8 max-w-4xl">
+              <div className="px-8 py-8 max-w-4xl pb-24">
                 {/* Mobile nav */}
                 <SettingsMobileNav
                   activeTab={activeTab}
@@ -307,7 +246,7 @@ function SettingsContent() {
                     <CompanyDataTab form={companyForm} onChange={setCompanyForm} />
                   )}
                   {activeTab === "unit" && (
-                    <UnitDataTab form={unitForm} onChange={setUnitForm} />
+                    <UnitDataTab currentPlan={currentPlan} />
                   )}
                   {activeTab === "users" && (
                     <UsersTab user={user} showToast={showToast} />
@@ -359,6 +298,10 @@ function SettingsContent() {
             ))}
           </AnimatePresence>
         </div>
+
+        {showSuccessModal && (
+            <PaymentSuccessModal onClose={() => setShowSuccessModal(false)} plan={currentPlan} />
+        )}
       </div>
     </AccessGuard>
   );

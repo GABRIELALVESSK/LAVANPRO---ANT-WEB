@@ -22,10 +22,9 @@ export interface Staff {
 export type StaffFormData = Pick<Staff, 'name' | 'email' | 'phone' | 'role' | 'unit' | 'active' | 'has_system_access'>
 
 export const ROLES: Role[] = ['Administrador', 'Gerente', 'Atendente', 'Operador de Máquinas', 'Motorista']
-export const UNITS = ['Matriz Centro', 'Filial Jardins', 'Filial Pinheiros', 'Todas as Unidades']
 
 export const blankStaff = (): StaffFormData => ({
-    name: '', email: '', phone: '', role: 'Atendente', unit: UNITS[0], active: true, has_system_access: false
+    name: '', email: '', phone: '', role: 'Atendente', unit: '', active: true, has_system_access: false
 })
 
 // ─── CRUD ─────────────────────────────────────────────────────────────────────

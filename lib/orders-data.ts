@@ -5,7 +5,7 @@ export interface Order {
     paymentMethod: string; paymentStatus: string; delivery: string;
     items: OrderItem[]; status: string; progress: number; bgColor: string;
     textColor: string; observations: string; estimatedDelivery: string;
-    history: HistoryEntry[]; createdAt: string;
+    history: HistoryEntry[]; createdAt: string; unitId: string;
 }
 
 export const SERVICES = [

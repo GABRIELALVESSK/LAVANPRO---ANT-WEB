@@ -12,6 +12,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Order, OrderItem, HistoryEntry, SERVICES as initialServices } from "../../lib/orders-data";
 import { Customer, seedCustomers } from "../../lib/customers-data";
 import { useState, useEffect, useMemo } from "react";
+import { UnitSelector } from "@/components/unit-selector";
 import { useRouter } from "next/navigation";
 
 const StatusColors: Record<string, string> = {
@@ -38,20 +39,13 @@ const STATUS_CONFIG: Record<string, { color: string; bg: string; progress: numbe
 
 const PAYMENT_STATUSES = ["A Pagar", "Pago - PIX", "Pago - Cartão", "Pago - Dinheiro", "Faturado"];
 
-const seedOrders: Order[] = [
-    { id: "#ORD-2856", client: "Carlos Machado", phone: "(11) 98765-4321", email: "carlos.machado@email.com", address: "Rua Augusta, 1500 - Consolação", paymentMethod: "Cartão de Crédito", paymentStatus: "Pago - Cartão", delivery: "Entrega em Domicílio", items: [{ service: "Lavagem Completa", qty: 3, unitPrice: 45 }], status: "Em Lavagem", progress: 32, bgColor: "bg-brand-primary", textColor: "text-brand-primary", observations: "Cliente pediu amaciante extra.", estimatedDelivery: "2026-03-09", history: [{ time: "08:00", status: "Recebido", note: "Pedido registrado." }, { time: "08:30", status: "Em Triagem", note: "Triagem concluída." }, { time: "09:15", status: "Em Lavagem", note: "Iniciado processo de lavagem." }], createdAt: "2026-03-08" },
-    { id: "#ORD-2854", client: "Maria Oliveira", phone: "(11) 91234-5678", email: "maria.oli@email.com", address: "Av. Paulista, 1000 - Bela Vista", paymentMethod: "PIX", paymentStatus: "Pago - PIX", delivery: "Retirada no Balcão", items: [{ service: "Edredom / Cobertor", qty: 2, unitPrice: 60 }], status: "Em Secagem", progress: 50, bgColor: "bg-amber-500", textColor: "text-amber-500", observations: "", estimatedDelivery: "2026-03-08", history: [{ time: "07:00", status: "Recebido", note: "" }, { time: "08:00", status: "Em Lavagem", note: "" }, { time: "11:00", status: "Em Secagem", note: "Passou para secagem." }], createdAt: "2026-03-08" },
-    { id: "#ORD-2851", client: "João Silva", phone: "(11) 99999-1111", email: "jao.silva@email.com", address: "Rua Xuxa, 20 - Centro", paymentMethod: "Dinheiro", paymentStatus: "A Pagar", delivery: "Entrega em Domicílio", items: [{ service: "Apenas Passar", qty: 5, unitPrice: 25 }], status: "Em Finalização", progress: 72, bgColor: "bg-blue-400", textColor: "text-blue-400", observations: "Não usar alta temperatura.", estimatedDelivery: "2026-03-08", history: [{ time: "06:00", status: "Recebido", note: "" }, { time: "07:30", status: "Em Lavagem", note: "" }, { time: "10:00", status: "Em Secagem", note: "" }, { time: "12:00", status: "Em Finalização", note: "" }], createdAt: "2026-03-07" },
-    { id: "#ORD-2850", client: "Ana Paula", phone: "(11) 98888-2222", email: "ana.p@email.com", address: "Av. Brigadeiro, 500 - Jardins", paymentMethod: "Cartão de Débito", paymentStatus: "Pago - Cartão", delivery: "Entrega em Domicílio", items: [{ service: "Lavagem a Seco", qty: 1, unitPrice: 80 }, { service: "Terno / Blazer", qty: 2, unitPrice: 90 }], status: "Entregue", progress: 100, bgColor: "bg-emerald-500", textColor: "text-emerald-500", observations: "", estimatedDelivery: "2026-03-08", history: [{ time: "09:00", status: "Recebido", note: "" }, { time: "10:00", status: "Em Lavagem", note: "" }, { time: "13:00", status: "Pronto", note: "Pedido separado." }, { time: "15:00", status: "Entregue", note: "Confirmado pelo cliente." }], createdAt: "2026-03-07" },
-    { id: "#ORD-2849", client: "Hotel Bela Vista", phone: "(11) 97777-3333", email: "contato@hotelbelavista.com", address: "Rua Oscar Freire, 1200", paymentMethod: "Boleto", paymentStatus: "Faturado", delivery: "Entrega em Domicílio", items: [{ service: "Enxoval (kg)", qty: 50, unitPrice: 12 }], status: "Cancelado", progress: 0, bgColor: "bg-rose-500", textColor: "text-rose-500", observations: "URGENTE: Pedido cancelado pelo cliente.", estimatedDelivery: "2026-03-10", history: [{ time: "14:00", status: "Recebido", note: "" }, { time: "15:30", status: "Cancelado", note: "Cliente solicitou cancelamento." }], createdAt: "2026-03-08" },
-];
-
+const seedOrders: Order[] = [];
 function calcTotal(items: OrderItem[]) { return items.reduce((s: number, i: OrderItem) => s + i.qty * i.unitPrice, 0); }
 function formatCurrency(v: number) { return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }); }
 
 export default function OrdersPage() {
     const router = useRouter();
-    const [orders, setOrders] = useState<Order[]>(seedOrders);
+    const [orders, setOrders] = useState<Order[]>([]);
     const [isLoaded, setIsLoaded] = useState(false);
     const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
     const [isNewOrderOpen, setIsNewOrderOpen] = useState(false);
@@ -62,6 +56,7 @@ export default function OrdersPage() {
     const [searchQuery, setSearchQuery] = useState("");
     const [filterStatus, setFilterStatus] = useState("Todos");
     const [filterPayment, setFilterPayment] = useState("Todos");
+    const [activeUnit, setActiveUnit] = useState("all");
 
     // New order form
     const [allCustomers, setAllCustomers] = useState<any[]>([]);
@@ -81,8 +76,14 @@ export default function OrdersPage() {
     });
 
     useEffect(() => {
-        const saved = localStorage.getItem("lavanpro_orders_v3");
-        if (saved) { try { setOrders(JSON.parse(saved)); } catch { } }
+        try {
+            const saved = localStorage.getItem("lavanpro_orders_v3");
+            if (saved) {
+                setOrders(JSON.parse(saved));
+            }
+        } catch (e) {
+            console.error("Error loading orders from localStorage:", e);
+        }
         setIsLoaded(true);
     }, []);
 
@@ -95,19 +96,22 @@ export default function OrdersPage() {
         const params = new URLSearchParams(window.location.search);
         const status = params.get("status");
         const search = params.get("search");
+        const unit = params.get("unit");
         if (status) setFilterStatus(status);
         if (search) setSearchQuery(search);
+        if (unit) setActiveUnit(unit);
     }, []);
 
     const filteredOrders = useMemo(() => {
         const q = searchQuery.toLowerCase();
         return orders.filter(o => {
-            const matchSearch = !q || o.client.toLowerCase().includes(q) || o.phone.includes(q) || o.id.toLowerCase().includes(q);
-            const matchStatus = filterStatus === "Todos" || o.status === filterStatus;
-            const matchPayment = filterPayment === "Todos" || o.paymentStatus === filterPayment;
-            return matchSearch && matchStatus && matchPayment;
+            const matchesSearch = o.id.toLowerCase().includes(q) || o.client.toLowerCase().includes(q);
+            const matchesStatus = filterStatus === "Todos" || o.status === filterStatus;
+            const matchesPayment = filterPayment === "Todos" || o.paymentStatus === filterPayment;
+            const matchesUnit = activeUnit === "all" || o.unitId === activeUnit;
+            return matchesSearch && matchesStatus && matchesPayment && matchesUnit;
         });
-    }, [orders, searchQuery, filterStatus, filterPayment]);
+    }, [orders, searchQuery, filterStatus, filterPayment, activeUnit]);
 
     const stats = [
         { label: "Em Andamento", value: orders.filter(o => !["Entregue", "Cancelado"].includes(o.status)).length, icon: Activity, color: "text-brand-primary", bg: "bg-brand-primary/10" },
@@ -123,10 +127,10 @@ export default function OrdersPage() {
             const items = [...n.items];
             if (field === "service") {
                 const svc = currentServices.find(s => s.name === value);
-                items[idx] = { 
-                    ...items[idx], 
-                    service: value as string, 
-                    unitPrice: svc ? svc.price : items[idx].unitPrice 
+                items[idx] = {
+                    ...items[idx],
+                    service: value as string,
+                    unitPrice: svc ? svc.price : items[idx].unitPrice
                 };
             } else if (field === "unitPrice") {
                 items[idx] = { ...items[idx], unitPrice: Number(value) };
@@ -152,10 +156,10 @@ export default function OrdersPage() {
         const items = [...selectedOrder.items];
         if (field === "service") {
             const svc = currentServices.find(s => s.name === value);
-            items[idx] = { 
-                ...items[idx], 
-                service: value as string, 
-                unitPrice: svc ? svc.price : items[idx].unitPrice 
+            items[idx] = {
+                ...items[idx],
+                service: value as string,
+                unitPrice: svc ? svc.price : items[idx].unitPrice
             };
         } else if (field === "unitPrice") {
             items[idx] = { ...items[idx], unitPrice: Number(value) };
@@ -209,7 +213,8 @@ export default function OrdersPage() {
                 active: true,
                 createdAt: dateStr,
                 tags: ["Recorrente"],
-                orders: [newOrderEntry]
+                orders: [newOrderEntry],
+                unitId: activeUnit === "all" ? "default" : activeUnit
             };
             updatedCusts = [newCust, ...updatedCusts];
         }
@@ -228,6 +233,7 @@ export default function OrdersPage() {
             estimatedDelivery: newOrder.estimatedDelivery,
             history: [{ time: timeStr, status: "Triagem", note: "Pedido criado." }],
             createdAt: dateStr,
+            unitId: activeUnit === "all" ? "default" : activeUnit
         };
         
         setOrders(prev => [freshOrder, ...prev]);
@@ -439,6 +445,7 @@ export default function OrdersPage() {
                                     </p>
                                 </motion.div>
                                 <div className="flex items-center gap-3">
+                                    <UnitSelector showAllOption={true} onUnitChange={setActiveUnit} />
                                     <button onClick={() => setIsHistoryOpen(true)} className="px-4 py-2 bg-brand-card border border-brand-darkBorder rounded-lg text-xs font-bold text-brand-text hover:bg-brand-darkBorder transition-all flex items-center gap-2">
                                         <History className="size-4" /> Histórico
                                     </button>

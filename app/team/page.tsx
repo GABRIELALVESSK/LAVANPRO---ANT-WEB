@@ -14,9 +14,10 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useState, useMemo, useEffect, useCallback } from "react";
 import {
     type Staff, type StaffFormData, type Role,
-    ROLES, UNITS, blankStaff,
+    ROLES, blankStaff,
     fetchStaff, createStaff, updateStaff, deleteStaff
 } from "@/lib/staffService";
+import { getUnits, type Unit } from "@/lib/units-data";
 import { useSubscription } from "@/hooks/useSubscription";
 
 // ─── Toast ────────────────────────────────────────────────────────────────────
@@ -75,6 +76,7 @@ function CardSkeleton() {
 // ─── Staff Modal ──────────────────────────────────────────────────────────────
 interface StaffModalProps {
     data: StaffFormData;
+    units: Unit[];
     onChange: (field: keyof StaffFormData, value: string | boolean) => void;
     onSave: () => void;
     onCancel: () => void;
@@ -82,7 +84,7 @@ interface StaffModalProps {
     saving: boolean;
 }
 
-function StaffModal({ data, onChange, onSave, onCancel, title, saving }: StaffModalProps) {
+function StaffModal({ data, units, onChange, onSave, onCancel, title, saving }: StaffModalProps) {
     const isAdmin = data.role === "Administrador" || data.role === "Gerente";
 
     return (
@@ -146,7 +148,9 @@ function StaffModal({ data, onChange, onSave, onCancel, title, saving }: StaffMo
                                 <label className="text-[11px] font-bold uppercase tracking-wider text-brand-muted">Unidade de Vínculo</label>
                                 <select value={data.unit} onChange={e => onChange("unit", e.target.value)}
                                     className="w-full px-3 py-2.5 bg-brand-bg border border-brand-darkBorder rounded-xl text-sm text-brand-text appearance-none focus:outline-none focus:ring-2 focus:ring-brand-primary">
-                                    {UNITS.map(u => <option key={u} value={u} className="bg-brand-card">{u}</option>)}
+                                    <option value="" className="bg-brand-card">Selecionar Unidade...</option>
+                                    <option value="Todas as Unidades" className="bg-brand-card">Todas as Unidades</option>
+                                    {units.map(u => <option key={u.id} value={u.name} className="bg-brand-card">{u.name}</option>)}
                                 </select>
                             </div>
                         </div>
@@ -223,6 +227,7 @@ function ProductivityBar({ value, max }: { value: number; max: number }) {
 export default function TeamPage() {
     // Data state
     const [staffList, setStaffList] = useState<Staff[]>([]);
+    const [units, setUnits] = useState<Unit[]>([]);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const { plan, isEnterprise } = useSubscription();
@@ -262,6 +267,7 @@ export default function TeamPage() {
         try {
             const data = await fetchStaff();
             setStaffList(data);
+            setUnits(getUnits());
         } catch (err) {
             console.error("Erro ao carregar equipe:", err);
             addToast("Erro ao carregar equipe. Tente novamente.", "error");
@@ -497,7 +503,7 @@ export default function TeamPage() {
                                         <select value={filterUnit} onChange={e => setFilterUnit(e.target.value)}
                                             className="pl-9 pr-8 py-2.5 bg-brand-card border border-brand-darkBorder rounded-xl text-xs font-bold text-brand-text appearance-none hover:border-brand-primary/50 transition-colors">
                                             <option>Todas</option>
-                                            {UNITS.map(u => <option key={u}>{u}</option>)}
+                                            {units.map(u => <option key={u.id}>{u.name}</option>)}
                                         </select>
                                     </div>
 
@@ -562,7 +568,7 @@ export default function TeamPage() {
                                                     <div className="space-y-2 text-xs text-brand-muted">
                                                         <div className="flex items-center gap-2"><Mail className="size-3.5 shrink-0" /> <span className="line-clamp-1">{staff.email || "—"}</span></div>
                                                         <div className="flex items-center gap-2"><Phone className="size-3.5 shrink-0" /> <span>{staff.phone || "—"}</span></div>
-                                                        <div className="flex items-center gap-2"><MapPin className="size-3.5 shrink-0" /> <span className="font-semibold text-brand-text">{staff.unit}</span></div>
+                                                        <div className="flex items-center gap-2"><MapPin className="size-3.5 shrink-0" /> <span className="font-semibold text-brand-text">{staff.unit || "Não vinculada"}</span></div>
                                                     </div>
 
                                                     <div className="h-px bg-brand-darkBorder my-1" />
@@ -603,6 +609,7 @@ export default function TeamPage() {
                         <StaffModal
                             key="staff-modal"
                             data={form}
+                            units={units}
                             onChange={handleFormChange}
                             onSave={handleSave}
                             onCancel={() => { setIsModalOpen(false); setEditingId(null); }}

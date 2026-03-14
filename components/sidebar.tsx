@@ -15,7 +15,6 @@ import {
   Package,
   UserCog,
   QrCode,
-  Bell,
   Crown,
   ChevronDown,
   Building2,
@@ -24,7 +23,6 @@ import {
   ShoppingBag,
   MessageSquare
 } from "lucide-react";
-import { UNITS } from "@/lib/staffService";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -34,6 +32,7 @@ import { usePermissions } from "@/hooks/usePermissions";
 import { useSubscription, PlanTier } from "@/hooks/useSubscription";
 import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
+import { UnitSelector } from "@/components/unit-selector";
 
 // All possible navigation items with their required permission key
 const ALL_NAV_ITEMS = [
@@ -64,8 +63,6 @@ export function Sidebar() {
   const [mounted, setMounted] = useState(false);
   const [isPlansModalOpen, setIsPlansModalOpen] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
-  const [selectedUnit, setSelectedUnit] = useState(UNITS[0]);
-  const [isUnitSelectorOpen, setIsUnitSelectorOpen] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -125,48 +122,13 @@ export function Sidebar() {
             </div>
           </div>
 
-          {/* Enterprise Unit Selector */}
-          {plan === 'enterprise' && (
-            <div className="mb-6 relative">
-              <label className="text-[9px] font-black uppercase tracking-widest text-brand-muted mb-2 block px-1">
-                Unidade Ativa
-              </label>
-              <button
-                onClick={() => setIsUnitSelectorOpen(!isUnitSelectorOpen)}
-                className="w-full flex items-center justify-between gap-3 px-3 py-2 bg-brand-card hover:bg-brand-card/80 border border-brand-darkBorder rounded-xl transition-all group"
-              >
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="size-6 rounded-lg bg-brand-primary/10 flex items-center justify-center shrink-0">
-                    <Building2 className="size-3.5 text-brand-primary" />
-                  </div>
-                  <span className="text-xs font-bold text-brand-text truncate uppercase tracking-tight">
-                    {selectedUnit}
-                  </span>
-                </div>
-                <ChevronDown className={`size-3 text-brand-muted transition-transform duration-300 ${isUnitSelectorOpen ? 'rotate-180' : ''}`} />
-              </button>
-
-              {isUnitSelectorOpen && (
-                <div className="absolute top-full left-0 right-0 mt-2 p-1.5 bg-brand-card border border-brand-darkBorder rounded-xl shadow-2xl z-50 animate-in fade-in slide-in-from-top-2">
-                  {UNITS.map((unit) => (
-                    <button
-                      key={unit}
-                      onClick={() => {
-                        setSelectedUnit(unit);
-                        setIsUnitSelectorOpen(false);
-                      }}
-                      className={`w-full text-left px-3 py-2 rounded-lg text-xs font-bold transition-colors ${selectedUnit === unit
-                        ? 'bg-brand-primary/10 text-brand-primary'
-                        : 'text-brand-muted hover:bg-white/5 hover:text-brand-text'
-                        }`}
-                    >
-                      {unit}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
+          {/* Unit Selector (Centralized control) */}
+          <div className="mb-6 relative">
+            <UnitSelector onUnitChange={(id) => {
+              localStorage.setItem("lavanpro_selected_unit", id);
+              window.dispatchEvent(new CustomEvent("unit-changed", { detail: id }));
+            }} />
+          </div>
 
           {/* Nav Groups */}
           <nav className="space-y-5">

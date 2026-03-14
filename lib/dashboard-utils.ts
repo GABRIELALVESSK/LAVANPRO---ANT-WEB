@@ -13,30 +13,48 @@ export interface DashboardMetrics {
   chartData: { date: string; atual: number; anterior: number }[];
 }
 
-export function calculateDashboardMetrics(orders: Order[] = [], range: string, customDates?: { start: string; end: string }): DashboardMetrics {
+export function calculateDashboardMetrics(orders: Order[] = [], range: string, customDates?: { start: string; end: string }, unitId?: string): DashboardMetrics {
   const now = new Date();
   let startDate = new Date();
 
+  // Robust array check
+  const safeOrders = Array.isArray(orders) ? orders : [];
+  
+  // 1. Filter by unit first if specified and not "all"
+  let unitFilteredOrders = safeOrders;
+  if (unitId && unitId !== "all") {
+    unitFilteredOrders = safeOrders.filter(o => o.unitId === unitId);
+  }
+
+  // 2. Resolve the start date for the selected range
   try {
     if (range === "hoje") {
       startDate.setHours(0, 0, 0, 0);
     } else if (range === "7d") {
-      startDate.setDate(now.getDate() - 7);
+      startDate.setTime(now.getTime() - 7 * 24 * 60 * 60 * 1000);
     } else if (range === "30d") {
-      startDate.setDate(now.getDate() - 30);
+      startDate.setTime(now.getTime() - 30 * 24 * 60 * 60 * 1000);
     } else if (range === "custom" && customDates?.start) {
-      startDate = new Date(customDates.start);
+      startDate = new Date(customDates.start + "T00:00:00");
+    } else {
+      startDate.setTime(now.getTime() - 30 * 24 * 60 * 60 * 1000);
     }
   } catch (e) {
-    startDate = new Date(now.getDate() - 30);
+    console.error("Error parsing dates in calculateDashboardMetrics:", e);
+    startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
   }
 
-  const safeOrders = Array.isArray(orders) ? orders : [];
-  
-  const filteredOrders = safeOrders.filter(o => {
+  // Ensure startDate is a valid date
+  if (isNaN(startDate.getTime())) {
+    startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+  }
+
+  // 3. Filter by date range
+  const filteredOrders = unitFilteredOrders.filter(o => {
     if (!o.createdAt) return false;
     try {
-        return new Date(o.createdAt) >= startDate;
+        const orderDate = new Date(o.createdAt);
+        return orderDate >= startDate;
     } catch {
         return false;
     }
@@ -117,9 +135,13 @@ export function calculateDashboardMetrics(orders: Order[] = [], range: string, c
     
     const dayOrders = filteredOrders.filter(o => {
       if (!o.createdAt) return false;
-      const orderDate = new Date(o.createdAt);
-      if (range === "hoje") return orderDate.getHours() === d.getHours() && orderDate.toDateString() === now.toDateString();
-      return orderDate.toDateString() === d.toDateString();
+      try {
+        const orderDate = new Date(o.createdAt);
+        if (range === "hoje") return orderDate.getHours() === d.getHours() && orderDate.toDateString() === now.toDateString();
+        return orderDate.toDateString() === d.toDateString();
+      } catch {
+        return false;
+      }
     });
 
     const dayValue = dayOrders.reduce((acc, o) => {
@@ -130,7 +152,7 @@ export function calculateDashboardMetrics(orders: Order[] = [], range: string, c
     chartData.push({
       date: label,
       atual: dayValue,
-      anterior: dayValue * (0.7 + Math.random() * 0.2) // Randomized dummy anterior for better look
+      anterior: 0 // Default to zero comparison instead of random to avoid hydration mismatch
     });
   }
 

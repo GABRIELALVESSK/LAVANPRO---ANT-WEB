@@ -10,6 +10,7 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import { DashboardMetrics } from "@/lib/dashboard-utils";
+import { useRouter } from "next/navigation";
 
 interface StatsCardsProps {
   activeRange?: string;
@@ -112,9 +113,7 @@ function StatCard({
 }
 
 export function StatsCards({ metrics }: StatsCardsProps) {
-  const handleNavigate = (route: string) => {
-    window.location.href = route;
-  };
+  const router = useRouter();
 
   const cards: StatCardProps[] = [
     {
@@ -122,44 +121,44 @@ export function StatsCards({ metrics }: StatsCardsProps) {
       iconBg: "bg-emerald-500/10",
       label: "Faturamento do Período",
       value: formatCurrency(metrics.faturamento),
-      trend: "+5.4%", 
+      trend: "0%", 
       isPositive: true,
       sparkColor: "#10b981",
-      onClick: () => handleNavigate("/finance"),
+      onClick: () => router.push("/finance"),
     },
     {
       icon: <Receipt className="size-5 text-brand-primary" />,
       iconBg: "bg-brand-primary/10",
       label: "Ticket Médio",
       value: formatCurrency(metrics.ticketMedio),
-      trend: "+1.2%",
+      trend: "0%",
       isPositive: true,
       sparkColor: "#8b5cf6",
-      onClick: () => handleNavigate("/reports"),
+      onClick: () => router.push("/reports"),
     },
     {
       icon: <ShoppingBag className="size-5 text-blue-500" />,
       iconBg: "bg-blue-500/10",
       label: "Pedidos no Período",
       value: String(metrics.pedidosTotal),
-      trend: "+8.3%",
+      trend: "0%",
       isPositive: true,
       sparkColor: "#3b82f6",
       extra: String(metrics.pedidosAbertos),
       extraLabel: "em aberto",
-      onClick: () => handleNavigate("/orders"),
+      onClick: () => router.push("/orders"),
     },
     {
       icon: <Truck className="size-5 text-amber-500" />,
       iconBg: "bg-amber-500/10",
       label: "Taxa de Entrega",
       value: `${metrics.taxaEntrega.toFixed(0)}%`,
-      trend: "+0.5%",
+      trend: "0%",
       isPositive: true,
       sparkColor: "#f59e0b",
       extra: `${metrics.taxaBalcao.toFixed(0)}%`,
       extraLabel: "retirada no balcão",
-      onClick: () => handleNavigate("/reports"),
+      onClick: () => router.push("/reports"),
     },
   ];
 

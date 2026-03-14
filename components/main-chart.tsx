@@ -10,6 +10,7 @@ import {
   CartesianGrid,
 } from "recharts";
 import { ArrowUpRight } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 interface MainChartProps {
   activeRange?: string;
@@ -44,10 +45,11 @@ function CustomTooltip({ active, payload }: any) {
 }
 
 export function MainChart({ chartData, totalFaturado, pedidosTotal }: MainChartProps) {
+  const router = useRouter();
   return (
     <div className="bg-brand-card rounded-2xl border border-brand-darkBorder shadow-xl overflow-hidden group">
       <div 
-        onClick={() => window.location.href = '/reports'}
+        onClick={() => router.push('/reports')}
         className="p-6 border-b border-brand-darkBorder flex flex-wrap items-center justify-between gap-4 cursor-pointer hover:bg-white/5 transition-all group/header"
       >
         <div>
@@ -117,22 +119,11 @@ export function MainChart({ chartData, totalFaturado, pedidosTotal }: MainChartP
                 {totalFaturado.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
               </p>
             </div>
-            <div className="h-px bg-brand-darkBorder" />
-            <div>
-              <p className="text-xs text-brand-muted mb-0.5">Status do Crescimento</p>
-              <p className="text-sm font-bold text-emerald-500 flex items-center gap-1">
-                Acompanhando Mercado
-              </p>
-            </div>
-            <div className="h-px bg-brand-darkBorder" />
-            <div>
-              <p className="text-xs text-brand-muted mb-0.5">Previsão</p>
-              <p className="text-sm font-bold text-brand-text">Em análise...</p>
-            </div>
-            <div className="h-px bg-brand-darkBorder" />
             <div className="p-3 bg-brand-primary/5 rounded-xl border border-brand-primary/10">
-              <p className="text-[10px] font-bold text-brand-primary uppercase tracking-tighter">Dica do Sistema</p>
-              <p className="text-[10px] text-brand-muted mt-1 leading-relaxed">Seu ticket médio subiu nos últimos 7 dias!</p>
+              <p className="text-[10px] font-bold text-brand-primary uppercase tracking-tighter">Status da Operação</p>
+              <p className="text-[10px] text-brand-muted mt-1 leading-relaxed">
+                {totalFaturado > 0 ? "As métricas refletem os dados registrados na unidade selecionada." : "Nenhum dado registrado para o período."}
+              </p>
             </div>
           </div>
         </div>
