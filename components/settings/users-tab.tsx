@@ -34,6 +34,9 @@ export function UsersTab({ user, showToast }: UsersTabProps) {
 
     useEffect(() => {
         fetchCollaborators();
+        
+        window.addEventListener("data-synced", fetchCollaborators);
+        return () => window.removeEventListener("data-synced", fetchCollaborators);
     }, [user]);
 
     const fetchCollaborators = async () => {
@@ -74,9 +77,9 @@ export function UsersTab({ user, showToast }: UsersTabProps) {
             showToast("Erro ao salvar colaborador: " + error.message, "error");
         } else {
             showToast("Colaborador adicionado com sucesso!", "success");
-            setIsNewUserModalOpen(false);
             setNewUserForm({ name: "", email: "", role: "Atendente", password: "" });
             fetchCollaborators();
+            window.dispatchEvent(new CustomEvent("data-synced"));
         }
         setIsSavingUser(false);
     };
@@ -100,6 +103,7 @@ export function UsersTab({ user, showToast }: UsersTabProps) {
             setIsEditModalOpen(false);
             setSelectedUser(null);
             fetchCollaborators();
+            window.dispatchEvent(new CustomEvent("data-synced"));
         }
         setIsSavingUser(false);
     };
@@ -114,6 +118,7 @@ export function UsersTab({ user, showToast }: UsersTabProps) {
             showToast("Colaborador removido com sucesso!", "success");
             fetchCollaborators();
             setIsDeleteModalOpen(false);
+            window.dispatchEvent(new CustomEvent("data-synced"));
         }
         setIsDeletingUserId(null);
         setUserToDelete(null);

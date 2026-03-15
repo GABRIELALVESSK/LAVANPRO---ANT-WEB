@@ -1,6 +1,6 @@
 "use client";
 
-import { Sidebar } from "@/components/sidebar";
+import { Sidebar, MobileHeader } from "@/components/sidebar";
 import { AccessGuard } from "@/components/access-guard";
 import {
     Plus, Search, Tag, Coins, Percent, TrendingUp, Edit3, Trash2, X,
@@ -10,6 +10,7 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect, useMemo } from "react";
 import { useUnit } from "@/hooks/useUnit";
+import { pushDataToServer, syncData } from "@/lib/dataSync";
 
 // --- Types ---
 type ChargeType = "UNIDADE" | "QUILO" | "PECA" | "FIXO";
@@ -80,46 +81,56 @@ export default function ServicesPage() {
 
     // Load from LocalStorage
     useEffect(() => {
-        const saved = localStorage.getItem("lavanpro_services_pro");
-        if (saved) {
-            try {
-                setServices(JSON.parse(saved));
-            } catch (e) {
-                console.error("Error loading services", e);
+        const loadLocalServices = () => {
+            const saved = localStorage.getItem("lavanpro_services_pro");
+            if (saved) {
+                try {
+                    setServices(JSON.parse(saved));
+                } catch (e) {
+                    console.error("Error loading services", e);
+                }
+            } else {
+                const seed: Service[] = [
+                    {
+                        id: "1",
+                        name: "Lavagem de Edredom Casal",
+                        category: "Edredons & Cobertores",
+                        chargeType: "UNIDADE",
+                        price: 55.0,
+                        recipe: [
+                            { id: "r1", productId: "PROD-101", name: "Sabão Líquido Omo Pro", quantity: 0.1, unit: "L", unitCost: 14.50 },
+                            { id: "r2", productId: "PROD-102", name: "Amaciante Comfort Pro", quantity: 0.05, unit: "L", unitCost: 12.00 },
+                            { id: "r3", productId: "PROD-105", name: "Saco Plástico G", quantity: 1, unit: "un", unitCost: 0.80 },
+                        ],
+                        executionTime: "72h",
+                        description: "Tratamento profundo com secagem industrial.",
+                        unitId: "default"
+                    },
+                    {
+                        id: "2",
+                        name: "Lavagem de Roupa de Cor (Cid)",
+                        category: "Lavanderia",
+                        chargeType: "QUILO",
+                        price: 18.5,
+                        recipe: [
+                            { id: "r4", productId: "PROD-101", name: "Sabão Líquido Omo Pro", quantity: 0.05, unit: "L", unitCost: 14.50 },
+                        ],
+                        executionTime: "48h",
+                        unitId: "default"
+                    },
+                ];
+                setServices(seed);
+                localStorage.setItem("lavanpro_services_pro", JSON.stringify(seed));
             }
-        } else {
-            const seed: Service[] = [
-                {
-                    id: "1",
-                    name: "Lavagem de Edredom Casal",
-                    category: "Edredons & Cobertores",
-                    chargeType: "UNIDADE",
-                    price: 55.0,
-                    recipe: [
-                        { id: "r1", productId: "PROD-101", name: "Sabão Líquido Omo Pro", quantity: 0.1, unit: "L", unitCost: 14.50 },
-                        { id: "r2", productId: "PROD-102", name: "Amaciante Comfort Pro", quantity: 0.05, unit: "L", unitCost: 12.00 },
-                        { id: "r3", productId: "PROD-105", name: "Saco Plástico G", quantity: 1, unit: "un", unitCost: 0.80 },
-                    ],
-                    executionTime: "72h",
-                    description: "Tratamento profundo com secagem industrial.",
-                    unitId: "default"
-                },
-                {
-                    id: "2",
-                    name: "Lavagem de Roupa de Cor (Cid)",
-                    category: "Lavanderia",
-                    chargeType: "QUILO",
-                    price: 18.5,
-                    recipe: [
-                        { id: "r4", productId: "PROD-101", name: "Sabão Líquido Omo Pro", quantity: 0.05, unit: "L", unitCost: 14.50 },
-                    ],
-                    executionTime: "48h",
-                    unitId: "default"
-                },
-            ];
-            setServices(seed);
-            localStorage.setItem("lavanpro_services_pro", JSON.stringify(seed));
-        }
+        };
+
+        loadLocalServices();
+        
+        // Puxa do servidor
+        syncData();
+
+        window.addEventListener("data-synced", loadLocalServices);
+        return () => window.removeEventListener("data-synced", loadLocalServices);
     }, []);
 
     const saveToLocalStorage = (newServices: Service[]) => {
@@ -138,7 +149,7 @@ export default function ServicesPage() {
         return { profit, marginPercent };
     };
 
-    const handleSave = () => {
+    const handleSave = async () => {
         if (!formData.name || formData.price <= 0) return;
 
         if (editingId) {
@@ -155,13 +166,19 @@ export default function ServicesPage() {
         setFormData(blankService(activeUnit));
         setEditingId(null);
         setActiveTab("geral");
+
+        // Sincroniza com servidor
+        await pushDataToServer();
     };
 
-    const handleDelete = (id: string, e: React.MouseEvent) => {
+    const handleDelete = async (id: string, e: React.MouseEvent) => {
         e.stopPropagation();
         if (confirm("Deseja realmente excluir este serviço?")) {
             const filtered = services.filter((s) => s.id !== id);
             saveToLocalStorage(filtered);
+            
+            // Sincroniza com servidor
+            await pushDataToServer();
         }
     };
 
@@ -209,11 +226,12 @@ export default function ServicesPage() {
 
     return (
         <AccessGuard permission="services">
-            <div className="flex h-screen bg-brand-bg text-brand-text font-sans">
+            <div className="flex min-h-screen bg-brand-bg text-brand-text font-sans">
                 <Sidebar />
-                <div className="flex-1 flex flex-col overflow-hidden">
-                    <main className="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar">
-                        <div className="max-w-[1400px] mx-auto space-y-8">
+                <div className="flex-1 flex flex-col h-screen overflow-hidden">
+                    <MobileHeader title="Serviços" />
+                    <main className="flex-1 overflow-y-auto responsive-px py-6 lg:py-8 custom-scrollbar">
+                        <div className="max-w-[1400px] mx-auto space-y-8 safe-bottom">
 
                             {/* Header Professional */}
                             <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -247,7 +265,7 @@ export default function ServicesPage() {
                             </header>
 
                             {/* Category Tabs */}
-                            <div className="flex flex-wrap gap-2 p-1.5 bg-brand-card/50 rounded-2xl border border-brand-darkBorder w-fit">
+                            <div className="flex flex-nowrap overflow-x-auto pb-2 -mb-2 no-scrollbar gap-2 p-1.5 bg-brand-card/50 rounded-2xl border border-brand-darkBorder w-full lg:w-fit">
                                 {["Todas", ...SERVICE_CATEGORIES].map(cat => (
                                     <button
                                         key={cat}

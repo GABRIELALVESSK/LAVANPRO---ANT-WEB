@@ -1,8 +1,9 @@
 "use client";
 
-import { Sidebar } from "@/components/sidebar";
+import { Sidebar, MobileHeader } from "@/components/sidebar";
 import { AccessGuard } from "@/components/access-guard";
 import { PlanGuard } from "@/components/plan-guard";
+import { UnitSelector } from "@/components/unit-selector";
 import {
     Users, Search, Plus, X, Phone, Mail, MapPin,
     CheckCircle2, Edit3, Trash2, Calendar, Shield,
@@ -411,12 +412,13 @@ export default function TeamPage() {
 
     return (
         <AccessGuard permission="team">
-            <div className="flex h-screen bg-brand-bg text-brand-text font-sans">
+            <div className="flex min-h-screen bg-brand-bg text-brand-text font-sans">
                 <Sidebar />
                 <PlanGuard moduleName="Equipe" requiredPlan="pro">
-                    <div className="flex-1 flex flex-col overflow-hidden">
-                        <main className="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar">
-                            <div className="max-w-[1600px] mx-auto space-y-6">
+                    <div className="flex-1 flex flex-col h-screen overflow-hidden">
+                        <MobileHeader title="Equipe" />
+                        <main className="flex-1 overflow-y-auto responsive-px py-6 lg:py-8 custom-scrollbar">
+                            <div className="max-w-[1600px] mx-auto space-y-6 safe-bottom">
 
                                 {/* Header */}
                                 <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -424,26 +426,29 @@ export default function TeamPage() {
                                         <h1 className="text-3xl font-black text-brand-text tracking-tight">Gestão de Equipe</h1>
                                         <p className="text-brand-muted text-sm font-medium mt-1">Colaboradores, permissões de acesso e controle operacional</p>
                                     </motion.div>
-
-                                    <div className="flex flex-col items-end gap-2">
-                                        <button
-                                            onClick={openNew}
-                                            disabled={isLimitReached}
-                                            className={`px-5 py-2.5 rounded-xl text-sm font-bold transition-all shadow-lg flex items-center gap-2 self-start md:self-auto ${isLimitReached
-                                                ? "bg-brand-darkBorder text-brand-muted cursor-not-allowed grayscale"
-                                                : "bg-brand-primary text-white hover:bg-brand-primaryHover shadow-brand-primary/20"
-                                                }`}
-                                        >
-                                            {isLimitReached ? <Lock className="size-4" /> : <Plus className="size-4" />}
-                                            Novo Colaborador
-                                        </button>
-
-                                        {isLimitReached && (
-                                            <p className="text-[10px] font-bold text-amber-500 bg-amber-500/10 px-2 py-1 rounded-lg border border-amber-500/20 flex items-center gap-1.5 animate-pulse">
-                                                <Sparkles className="size-3" />
-                                                Limite de {currentLimit} usuários no plano {plan.toUpperCase()} atingido
-                                            </p>
-                                        )}
+                                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                                        <div className="w-full sm:w-64">
+                                            <UnitSelector />
+                                        </div>
+                                        <div className="flex flex-col items-end gap-2">
+                                            <button
+                                                onClick={openNew}
+                                                disabled={isLimitReached}
+                                                className={`px-5 py-2.5 rounded-xl text-sm font-bold transition-all shadow-lg flex items-center gap-2 self-start md:self-auto ${isLimitReached
+                                                    ? "bg-brand-darkBorder text-brand-muted cursor-not-allowed grayscale"
+                                                    : "bg-brand-primary text-white hover:bg-brand-primaryHover shadow-brand-primary/20"
+                                                    }`}
+                                            >
+                                                {isLimitReached ? <Lock className="size-4" /> : <Plus className="size-4" />}
+                                                Novo Colaborador
+                                            </button>
+                                            {isLimitReached && (
+                                                <p className="text-[10px] font-bold text-amber-500 bg-amber-500/10 px-2 py-1 rounded-lg border border-amber-500/20 flex items-center gap-1.5 animate-pulse">
+                                                    <Sparkles className="size-3" />
+                                                    Limite de {currentLimit} usuários no plano {plan.toUpperCase()} atingido
+                                                </p>
+                                            )}
+                                        </div>
                                     </div>
                                 </header>
 

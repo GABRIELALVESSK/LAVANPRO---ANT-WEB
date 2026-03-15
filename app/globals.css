@@ -40,10 +40,15 @@
 }
 
 @layer base {
+  html {
+    overflow-x: hidden;
+  }
   body {
     background-color: var(--color-brand-bg);
     color: var(--color-brand-text);
     font-family: var(--font-sans);
+    overflow-x: hidden;
+    -webkit-text-size-adjust: 100%;
   }
 }
 
@@ -76,5 +81,86 @@
 
   .accordion-content.active {
     opacity: 1;
+  }
+
+  /* ─── Mobile Drawer ─────────────────────────────────────── */
+  .mobile-drawer-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(4px);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+  }
+  .mobile-drawer-overlay.open {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .mobile-drawer {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    z-index: 50;
+    width: 280px;
+    max-width: 85vw;
+    transform: translateX(-100%);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: env(safe-area-inset-bottom, 0);
+  }
+  .mobile-drawer.open {
+    transform: translateX(0);
+  }
+
+  /* ─── Mobile Header ─────────────────────────────────────── */
+  .mobile-top-bar {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    padding: 12px 16px;
+    padding-top: calc(12px + env(safe-area-inset-top, 0));
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    border-bottom: 1px solid var(--theme-border);
+    background: var(--theme-bg);
+  }
+
+  /* ─── Responsive Padding Helper ─────────────────────────── */
+  .responsive-px {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+  @media (min-width: 768px) {
+    .responsive-px {
+      padding-left: 24px;
+      padding-right: 24px;
+    }
+  }
+  @media (min-width: 1024px) {
+    .responsive-px {
+      padding-left: 32px;
+      padding-right: 32px;
+    }
+  }
+
+  /* ─── Scrollable filter tabs ────────────────────────────── */
+  .filter-scroll {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .filter-scroll::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* ─── iOS safe area ─────────────────────────────────────── */
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 16px);
   }
 }

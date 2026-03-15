@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { Sidebar } from "@/components/sidebar";
+import { Sidebar, MobileHeader } from "@/components/sidebar";
 import { Filters } from "@/components/filters";
 import { StatsCards } from "@/components/stats-cards";
 import { DonutChart } from "@/components/donut-chart";
@@ -26,9 +26,11 @@ import { useSubscription } from "@/hooks/useSubscription";
 import { PlanGuard } from "@/components/plan-guard";
 import { AccessGuard } from "@/components/access-guard";
 import { Order } from "@/lib/orders-data";
+import { Transaction } from "@/app/finance/page";
 import { calculateDashboardMetrics } from "@/lib/dashboard-utils";
 import { UnitSelector } from "@/components/unit-selector";
 import { useUnit } from "@/hooks/useUnit";
+import { syncData } from "@/lib/dataSync";
 
 // Dynamic imports to avoid SSR issues with heavy/DOM-based components
 const MainChart = dynamic(() => import("@/components/main-chart").then(mod => mod.MainChart), { 
@@ -46,6 +48,7 @@ export default function Page() {
   });
   const { unitId: activeUnit } = useUnit();
   const [orders, setOrders] = useState<Order[]>([]);
+  const [financeTransactions, setFinanceTransactions] = useState<Transaction[]>([]);
 
   useEffect(() => {
     // Set initial dates on client side only to avoid hydration mismatch
@@ -82,8 +85,26 @@ export default function Page() {
 
     loadAndPurge();
 
+    const loadFinance = () => {
+        const savedFin = localStorage.getItem("lavanpro_finance_transactions");
+        if (savedFin) {
+            try {
+                setFinanceTransactions(JSON.parse(savedFin));
+            } catch (e) {
+                console.error("Error loading finance transactions", e);
+            }
+        }
+    };
+    loadFinance();
+    
+    // Puxa dados do servidor logo ao entrar no Dashboard
+    syncData();
+
     // Listen for sync events
-    const handleSync = () => loadAndPurge();
+    const handleSync = () => {
+        loadAndPurge();
+        loadFinance();
+    };
     window.addEventListener("data-synced", handleSync);
     
     // Cleanup other mock legacy data
@@ -107,10 +128,10 @@ export default function Page() {
       return calculateDashboardMetrics(orders, activeRange, {
         start: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
         end: new Date().toISOString().split("T")[0],
-      }, activeUnit);
+      }, activeUnit, financeTransactions);
     }
-    return calculateDashboardMetrics(orders, activeRange, customDates, activeUnit);
-  }, [orders, activeRange, customDates, activeUnit]);
+    return calculateDashboardMetrics(orders, activeRange, customDates, activeUnit, financeTransactions);
+  }, [orders, activeRange, customDates, activeUnit, financeTransactions]);
 
   // Explicitly filter orders for the TransactionTable based on activeUnit
   const filteredOrders = useMemo(() => {
@@ -188,20 +209,26 @@ export default function Page() {
     <AccessGuard permission="dashboard">
       <div className="flex min-h-screen bg-brand-bg text-brand-text font-sans">
         <Sidebar />
-      <div className="flex-1 flex flex-col h-screen overflow-hidden">
-        <main className="flex-1 overflow-y-auto bg-brand-bg custom-scrollbar">
-          {/* Stats & Filters */}
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 px-8 pt-8">
-            <Filters
-              activeRange={activeRange}
-              onChange={setActiveRange}
-              customDates={customDates}
-              onCustomDatesChange={setCustomDates}
-            />
+        <div className="flex-1 flex flex-col h-screen overflow-hidden">
+          <MobileHeader title="Visão Geral" />
+          <main className="flex-1 overflow-y-auto bg-brand-bg custom-scrollbar">
+            {/* Stats & Filters */}
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 responsive-px pt-6 lg:pt-8">
+              <div className="flex-1">
+                <Filters
+                  activeRange={activeRange}
+                  onChange={setActiveRange}
+                  customDates={customDates}
+                  onCustomDatesChange={setCustomDates}
+                />
+              </div>
             
-            <div className="flex items-center gap-4">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+              <div className="w-full sm:w-64">
+                <UnitSelector />
+              </div>
               {!isEnterprise && (
-                <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-amber-500/10 border border-amber-500/20 rounded-lg">
+                <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-amber-500/10 border border-amber-500/20 rounded-lg shrink-0">
                   <Crown className="size-3 text-amber-500" />
                   <span className="text-[10px] font-black text-amber-500 uppercase tracking-widest">Plano Pro</span>
                 </div>
@@ -209,11 +236,11 @@ export default function Page() {
             </div>
           </div>
 
-          <div className="px-8 py-8 space-y-8 pb-16 max-w-[1800px] mx-auto">
+          <div className="responsive-px py-6 lg:py-8 space-y-8 safe-bottom max-w-[1800px] mx-auto">
 
             {/* Operational Quick View */}
             <section>
-              <div className="flex items-center justify-between mb-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-2">
                 <h2 className="text-sm font-bold text-brand-muted uppercase tracking-widest">Visão Operacional em Tempo Real</h2>
                 <button 
                   onClick={() => router.push('/orders')}
@@ -222,7 +249,7 @@ export default function Page() {
                   Ver todos os pedidos <ArrowRight className="size-3" />
                 </button>
               </div>
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+              <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 md:gap-4">
                 {operationalData.map((item) => {
                   const Icon = item.icon;
                   return (

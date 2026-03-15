@@ -1,7 +1,8 @@
 "use client";
 
-import { Sidebar } from "@/components/sidebar";
+import { Sidebar, MobileHeader } from "@/components/sidebar";
 import { AccessGuard } from "@/components/access-guard";
+import { UnitSelector } from "@/components/unit-selector";
 import {
     Users, Search, Plus, X, ChevronRight,
     Phone, Mail, MapPin, StickyNote, ShoppingBag, Star,
@@ -11,6 +12,7 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useMemo, useEffect } from "react";
 import { useUnit } from "@/hooks/useUnit";
+import { pushDataToServer, syncData } from "@/lib/dataSync";
 
 import { Customer, seedCustomers } from "../../lib/customers-data";
 
@@ -227,13 +229,22 @@ export default function CustomersPage() {
     const [orders, setOrders] = useState<any[]>([]);
 
     useEffect(() => {
-        const saved = localStorage.getItem("lavanpro_customers");
-        if (saved) { try { setCustomers(JSON.parse(saved)); } catch { } }
-        
-        const savedOrders = localStorage.getItem("lavanpro_orders_v3");
-        if (savedOrders) { try { setOrders(JSON.parse(savedOrders)); } catch { } }
+        const loadLocal = () => {
+            const saved = localStorage.getItem("lavanpro_customers");
+            if (saved) { try { setCustomers(JSON.parse(saved)); } catch { } }
+            const savedOrders = localStorage.getItem("lavanpro_orders_v3");
+            if (savedOrders) { try { setOrders(JSON.parse(savedOrders)); } catch { } }
+        };
 
+        loadLocal();
         setIsLoaded(true);
+
+        // Puxa do servidor ao entrar
+        syncData();
+
+        // Escuta atualizações de fundo
+        window.addEventListener("data-synced", loadLocal);
+        return () => window.removeEventListener("data-synced", loadLocal);
     }, []);
 
     useEffect(() => {
@@ -285,10 +296,11 @@ export default function CustomersPage() {
         setCustomers(prev => [{ ...form, id, createdAt: now, orders: [], unitId: activeUnit !== "all" ? activeUnit : "default" }, ...prev]);
         setIsCreating(false);
         setForm(blankCustomer());
-        setSearch("");
-        setFilterStatus("Todos");
         setFilterTag("Todos");
         setFilterOrigin("Todos");
+        
+        // Sincroniza com o servidor imediatamente
+        pushDataToServer();
     };
 
     // Handlers — Edit
@@ -306,6 +318,9 @@ export default function CustomersPage() {
         setCustomers(prev => prev.map(c => c.id === selected.id ? updated : c));
         setSelected(updated);
         setEditMode(false);
+        
+        // Sincroniza com o servidor imediatamente
+        pushDataToServer();
     };
 
     // Handlers — Delete
@@ -313,15 +328,19 @@ export default function CustomersPage() {
         setCustomers(prev => prev.filter(c => c.id !== id));
         setDeleteConfirm(null);
         setSelected(null);
+        
+        // Sincroniza com o servidor imediatamente
+        pushDataToServer();
     };
 
     return (
         <AccessGuard permission="customers">
-            <div className="flex h-screen bg-brand-bg text-brand-text font-sans">
+            <div className="flex min-h-screen bg-brand-bg text-brand-text font-sans">
                 <Sidebar />
-                <div className="flex-1 flex flex-col overflow-hidden">
-                    <main className="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar">
-                        <div className="max-w-[1600px] mx-auto space-y-6">
+                <div className="flex-1 flex flex-col h-screen overflow-hidden">
+                    <MobileHeader title="Clientes" />
+                    <main className="flex-1 overflow-y-auto responsive-px py-6 lg:py-8 custom-scrollbar">
+                        <div className="max-w-[1600px] mx-auto space-y-6 safe-bottom">
 
                             {/* Header */}
                             <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -329,13 +348,15 @@ export default function CustomersPage() {
                                     <h1 className="text-3xl font-black text-brand-text tracking-tight">Gestão de Clientes</h1>
                                     <p className="text-brand-muted text-sm font-medium mt-1">Cadastro, histórico e relacionamento com clientes</p>
                                 </motion.div>
-                                <button
-                                    onClick={() => { setForm(blankCustomer()); setIsCreating(true); }}
-                                    className="px-5 py-2.5 bg-brand-primary text-white rounded-xl text-sm font-bold hover:bg-brand-primaryHover transition-all shadow-lg shadow-brand-primary/20 flex items-center gap-2 self-start md:self-auto"
-                                >
-                                    <Plus className="size-4" /> Novo Cliente
-                                </button>
-                            </header>
+                                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                                        <div className="w-full sm:w-64">
+                                            <UnitSelector />
+                                        </div>
+                                        <button onClick={() => { setForm(blankCustomer()); setIsCreating(true); }} className="px-5 py-2.5 bg-brand-primary text-white rounded-xl text-sm font-bold hover:bg-brand-primaryHover transition-all shadow-lg shadow-brand-primary/20 flex items-center gap-2 cursor-pointer whitespace-nowrap">
+                                            <Plus className="size-4" /> Novo Cliente
+                                        </button>
+                                    </div>
+                                </header>
 
                             {/* Stats */}
                             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

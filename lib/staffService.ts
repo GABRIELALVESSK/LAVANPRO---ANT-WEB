@@ -34,9 +34,14 @@ async function getEffectiveOwnerId(): Promise<string> {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.user) throw new Error('Usuário não autenticado');
 
+    // First, check if owner_id is already in JWT metadata (most efficient)
+    const metaOwnerId = session.user.user_metadata?.owner_id;
+    if (metaOwnerId) return metaOwnerId;
+
     const userId = session.user.id;
 
-    // Check if this user is a collaborator (has an owner_id in staff table)
+    // Fallback: Check if this user is a collaborator (has an owner_id in staff table)
+    // Using a direct query - Note: if RLS is recursive, this will fail.
     const { data: staffRecord } = await supabase
         .from('staff')
         .select('owner_id')

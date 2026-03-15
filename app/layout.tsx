@@ -1,8 +1,9 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css'; // Global styles
 import { ThemeProvider } from '@/components/theme-provider';
 import { DataSynchronizer } from '@/components/data-synchronizer';
+import { SidebarProvider } from '@/components/sidebar';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -12,6 +13,14 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: 'Lavanderia Pro',
   description: 'Painel de Faturamento Detalhado',
+};
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  viewportFit: 'cover',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -35,7 +44,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           disableTransitionOnChange
         >
           <DataSynchronizer />
-          {children}
+          <SidebarProvider>
+            {children}
+          </SidebarProvider>
         </ThemeProvider>
       </body>
     </html>

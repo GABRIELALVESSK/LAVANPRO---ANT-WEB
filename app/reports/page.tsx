@@ -1,6 +1,6 @@
 "use client";
 
-import { Sidebar } from "@/components/sidebar";
+import { Sidebar, MobileHeader } from "@/components/sidebar";
 import { AccessGuard } from "@/components/access-guard";
 import { PlanGuard } from "@/components/plan-guard";
 import { Filters } from "@/components/filters";
@@ -277,20 +277,30 @@ export default function ReportsPage() {
         .slice(0, 5);
   }, [filteredOrders]);
 
-  // 6. Produtividade (Just a placeholder based on unit distribution)
+  // 6. Produtividade por Colaborador
   const produtividadeData = useMemo(() => {
     const map: Record<string, number> = {};
     filteredOrders.forEach(o => {
-        const unit = o.unitId || "Default";
-        map[unit] = (map[unit] || 0) + o.items.reduce((s: number, i: any) => s + (Number(i.qty) || 0), 0);
+        // Tenta encontrar o colaborador (novo campo)
+        let collaborator = o.createdBy || o.lastUpdatedBy;
+        
+        // Se não tiver, busca no histórico
+        if (!collaborator && o.history) {
+            const entryWithStaff = [...o.history].reverse().find((h: any) => h.staffName);
+            if (entryWithStaff) collaborator = entryWithStaff.staffName;
+        }
+
+        // Se AINDA não tiver (pedidos legados), usa o responsável da unidade para não sumir do gráfico
+        if (!collaborator) {
+            const unit = units.find(u => u.id === o.unitId);
+            collaborator = unit ? (unit.responsible || unit.name) : (o.unitId && o.unitId !== "default" ? o.unitId : "Administrador");
+        }
+
+        const pecas = o.items.reduce((s: number, i: any) => s + (Number(i.qty) || 0), 0);
+        map[collaborator] = (map[collaborator] || 0) + pecas;
     });
     
-    return Object.entries(map).map(([id, pecas]) => {
-        const unit = units.find(u => u.id === id);
-        // Map to unit.responsible or unit.name or "Default/Admin"
-        const displayName = unit ? (unit.responsible || unit.name) : (id === "default" || id === "Default" ? "Gabriel Alves" : id);
-        return { name: displayName, pecas };
-    });
+    return Object.entries(map).map(([name, pecas]) => ({ name, pecas }));
   }, [filteredOrders, units]);
 
   const tabs = [
@@ -305,8 +315,9 @@ export default function ReportsPage() {
         <Sidebar />
         <PlanGuard moduleName="Relatórios" requiredPlan="enterprise">
           <div className="flex-1 flex flex-col h-screen overflow-hidden">
-            <main className="flex-1 overflow-y-auto bg-brand-bg">
-                <div className="px-8 pt-8 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+            <MobileHeader title="Relatórios" />
+            <main className="flex-1 overflow-y-auto bg-brand-bg responsive-px py-6 lg:py-8">
+                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
                   <Filters
                     title="Relatórios e Análises"
                     subtitle="Explore dados detalhados para tomada de decisão"
@@ -315,10 +326,12 @@ export default function ReportsPage() {
                     customDates={customDates}
                     onCustomDatesChange={setCustomDates}
                   />
-                  <div className="self-end md:self-auto" />
+                  <div className="w-full lg:w-72">
+                    <UnitSelector />
+                  </div>
                 </div>
 
-              <div className="px-8 py-8 space-y-8 pb-16 max-w-[1800px] mx-auto">
+              <div className="py-8 space-y-8 pb-16 max-w-[1800px] mx-auto safe-bottom">
                 {/* Header / Export / Tabs */}
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                   <div className="flex items-center gap-2 p-1 bg-brand-card border border-brand-darkBorder rounded-xl w-fit">

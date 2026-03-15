@@ -59,9 +59,14 @@ export function getUnits(): Unit[] {
     if (typeof window === 'undefined') return [];
     try {
         const saved = localStorage.getItem("lavanpro_units");
-        return saved ? JSON.parse(saved) : [];
+        const units = saved ? JSON.parse(saved) : [];
+        // Se estiver vazio, retorna a unidade padrão para não quebrar a interface
+        if (Array.isArray(units) && units.length === 0) {
+            return [DEFAULT_UNIT];
+        }
+        return units;
     } catch {
-        return [];
+        return [DEFAULT_UNIT];
     }
 }
 

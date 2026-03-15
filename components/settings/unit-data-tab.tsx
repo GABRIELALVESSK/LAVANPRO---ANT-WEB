@@ -7,6 +7,7 @@ import {
     ArrowRight, Lock, Crown
 } from "lucide-react";
 import { Unit, DEFAULT_OPENING_HOURS, getUnits, saveUnits } from "@/lib/units-data";
+import { pushDataToServer } from "@/lib/dataSync";
 import { motion, AnimatePresence } from "framer-motion";
 
 interface UnitDataTabProps {
@@ -70,6 +71,7 @@ export function UnitDataTab({ currentPlan }: UnitDataTabProps) {
             const newList = units.filter(u => u.id !== id);
             setUnits(newList);
             saveUnits(newList);
+            pushDataToServer('lavanpro_units');
         }
     };
 
@@ -92,6 +94,7 @@ export function UnitDataTab({ currentPlan }: UnitDataTabProps) {
 
         setUnits(newList);
         saveUnits(newList);
+        pushDataToServer('lavanpro_units');
         setIsSaving(false);
         setIsEditing(false);
         setEditingUnit(null);

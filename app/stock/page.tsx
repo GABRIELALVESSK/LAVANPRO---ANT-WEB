@@ -1,7 +1,8 @@
 "use client";
 
-import { Sidebar } from "@/components/sidebar";
+import { Sidebar, MobileHeader } from "@/components/sidebar";
 import { AccessGuard } from "@/components/access-guard";
+import { UnitSelector } from "@/components/unit-selector";
 import { PlanGuard } from "@/components/plan-guard";
 import {
     Package, AlertTriangle, TrendingUp, TrendingDown, Plus, Search,
@@ -11,6 +12,7 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect, useMemo } from "react";
 import { useUnit } from "@/hooks/useUnit";
+import { pushDataToServer, syncData } from "@/lib/dataSync";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Product {
@@ -268,15 +270,32 @@ export default function StockPage() {
     }, [activeUnit]);
 
     useEffect(() => {
-        const savedProducts = localStorage.getItem("lavanpro_stock_products_v2");
-        const savedMovements = localStorage.getItem("lavanpro_stock_movements_v2");
-        if (savedProducts) { try { setProducts(JSON.parse(savedProducts)); } catch { } }
-        if (savedMovements) { try { setMovements(JSON.parse(savedMovements)); } catch { } }
+        const loadLocal = () => {
+            const savedProducts = localStorage.getItem("lavanpro_stock_products_v2");
+            const savedMovements = localStorage.getItem("lavanpro_stock_movements_v2");
+            if (savedProducts) { try { setProducts(JSON.parse(savedProducts)); } catch { } }
+            if (savedMovements) { try { setMovements(JSON.parse(savedMovements)); } catch { } }
+        };
+
+        loadLocal();
+        
+        // Puxa dados do servidor logo ao entrar no Estoque
+        syncData();
+
+        // Escuta atualizações de fundo
+        window.addEventListener("data-synced", loadLocal);
+        return () => window.removeEventListener("data-synced", loadLocal);
     }, []);
 
     useEffect(() => {
         localStorage.setItem("lavanpro_stock_products_v2", JSON.stringify(products));
         localStorage.setItem("lavanpro_stock_movements_v2", JSON.stringify(movements));
+        
+        // Sync to server (with a small delay to avoid too many requests)
+        const timeout = setTimeout(() => {
+            pushDataToServer();
+        }, 1000);
+        return () => clearTimeout(timeout);
     }, [products, movements]);
 
     const handleProductChange = (f: keyof ProductFormData, v: any) => setProductForm(prev => ({ ...prev, [f]: v }));
@@ -350,12 +369,13 @@ export default function StockPage() {
 
     return (
         <AccessGuard permission="stock">
-            <div className="flex h-screen bg-brand-bg text-brand-text font-sans">
+            <div className="flex min-h-screen bg-brand-bg text-brand-text font-sans">
                 <Sidebar />
                 <PlanGuard moduleName="Estoque" requiredPlan="pro">
-                    <div className="flex-1 flex flex-col overflow-hidden">
-                        <main className="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar">
-                            <div className="max-w-[1600px] mx-auto space-y-6">
+                    <div className="flex-1 flex flex-col h-screen overflow-hidden">
+                        <MobileHeader title="Estoque" />
+                        <main className="flex-1 overflow-y-auto responsive-px py-6 lg:py-8 custom-scrollbar">
+                            <div className="max-w-[1600px] mx-auto space-y-6 safe-bottom">
 
                                 {/* Header */}
                                 <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -363,19 +383,24 @@ export default function StockPage() {
                                         <h1 className="text-3xl font-black text-brand-text tracking-tight">Estoque & Insumos</h1>
                                         <p className="text-brand-muted text-sm font-medium mt-1">Controle de entradas, saídas e custos operacionais</p>
                                     </motion.div>
-                                    <div className="flex items-center gap-3 self-start md:self-auto">
-                                        <button
-                                            onClick={() => openNewMovement()}
-                                            className="px-4 py-2.5 bg-brand-card border border-brand-darkBorder text-brand-text rounded-xl text-sm font-bold hover:bg-white/5 transition-all flex items-center gap-2"
-                                        >
-                                            <Archive className="size-4" /> Registrar Movimentação
-                                        </button>
-                                        <button
-                                            onClick={() => { setProductForm(blankProduct(activeUnit)); setEditingProductId(null); setIsProductModalOpen(true); }}
-                                            className="px-5 py-2.5 bg-brand-primary text-white rounded-xl text-sm font-bold hover:bg-brand-primaryHover transition-all shadow-lg shadow-brand-primary/20 flex items-center gap-2"
-                                        >
-                                            <Plus className="size-4" /> Novo Produto
-                                        </button>
+                                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                                        <div className="w-full sm:w-64">
+                                            <UnitSelector />
+                                        </div>
+                                        <div className="flex items-center gap-3">
+                                            <button
+                                                onClick={() => openNewMovement()}
+                                                className="px-4 py-2.5 bg-brand-card border border-brand-darkBorder text-brand-text rounded-xl text-sm font-bold hover:bg-white/5 transition-all flex items-center gap-2 whitespace-nowrap"
+                                            >
+                                                <Archive className="size-4" /> Registrar Movimentação
+                                            </button>
+                                            <button
+                                                onClick={() => { setProductForm(blankProduct(activeUnit)); setEditingProductId(null); setIsProductModalOpen(true); }}
+                                                className="px-5 py-2.5 bg-brand-primary text-white rounded-xl text-sm font-bold hover:bg-brand-primaryHover transition-all shadow-lg shadow-brand-primary/20 flex items-center gap-2 whitespace-nowrap"
+                                            >
+                                                <Plus className="size-4" /> Novo Produto
+                                            </button>
+                                        </div>
                                     </div>
                                 </header>
 

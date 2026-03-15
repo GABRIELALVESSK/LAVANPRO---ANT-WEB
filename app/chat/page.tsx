@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Sidebar } from "@/components/sidebar";
+import { Sidebar, MobileHeader } from "@/components/sidebar";
 import { AccessGuard } from "@/components/access-guard";
 import { PlanGuard } from "@/components/plan-guard";
 import {
@@ -98,6 +98,7 @@ export default function WhatsAppWebPage() {
     const [connectionStatus, setConnectionStatus] = useState<'disconnected' | 'connecting' | 'connected'>('connected'); // Inicia conectado para demo, mas pode ser alterado
     const [showQrModal, setShowQrModal] = useState(false);
     const [qrCode, setQrCode] = useState<string | null>(null);
+    const [view, setView] = useState<'list' | 'chat'>('list'); // Responsive view toggle
 
     const activeChat = chats.find(c => c.id === activeChatId) || chats[0];
     const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -140,6 +141,11 @@ export default function WhatsAppWebPage() {
                     : c
             ));
         }, 1000);
+    };
+
+    const selectChat = (id: string) => {
+        setActiveChatId(id);
+        setView('chat');
     };
 
     const generateAiResponse = async () => {
@@ -226,10 +232,12 @@ export default function WhatsAppWebPage() {
     return (
         <AccessGuard permission="chat">
             <title>Mensagens IA Enterprise | LavanPro</title>
-            <div className="flex h-screen bg-[#0c0c0e] text-[#e9edef] font-sans selection:bg-brand-primary/30">
+            <div className="flex min-h-screen bg-[#0c0c0e] text-[#e9edef] font-sans selection:bg-brand-primary/30">
                 <Sidebar />
                 <PlanGuard moduleName="WhatsApp IA Enterprise" requiredPlan="enterprise">
-                    <div className="flex-1 flex overflow-hidden lg:m-2 lg:rounded-2xl border border-white/5 shadow-2xl bg-[#111b21] relative">
+                    <div className="flex-1 flex flex-col h-screen overflow-hidden">
+                        <MobileHeader />
+                        <div className="flex-1 flex overflow-hidden lg:m-2 lg:rounded-2xl border border-white/5 shadow-2xl bg-[#111b21] relative">
 
                         {/* --- QR CONNECTION MODAL --- */}
                         <AnimatePresence>
@@ -291,7 +299,7 @@ export default function WhatsAppWebPage() {
                         </AnimatePresence>
 
                         {/* --- LEFT SIDEBAR (Chats) --- */}
-                        <div className="w-[350px] md:w-[400px] flex flex-col border-r border-white/10 bg-[#111b21]">
+                        <div className={`w-full lg:w-[400px] flex flex-col border-r border-white/10 bg-[#111b21] ${view === 'chat' ? 'hidden lg:flex' : 'flex'}`}>
                             {/* Header Sidebar */}
                             <div className="h-[60px] px-4 flex items-center justify-between bg-[#202c33]/70 backdrop-blur-md">
                                 <div className="flex items-center gap-3">
@@ -335,7 +343,7 @@ export default function WhatsAppWebPage() {
                                 {chats.map((chat) => (
                                     <div
                                         key={chat.id}
-                                        onClick={() => setActiveChatId(chat.id)}
+                                        onClick={() => selectChat(chat.id)}
                                         className={`flex items-center gap-3 p-3 hover:bg-[#202c33] cursor-pointer transition-all border-b border-white/5 ${activeChatId === chat.id ? "bg-[#2a3942]" : ""}`}
                                     >
                                         <div className="relative shrink-0">
@@ -364,14 +372,17 @@ export default function WhatsAppWebPage() {
                         </div>
 
                         {/* --- MAIN CHAT WINDOW --- */}
-                        <div className="flex-1 flex flex-col bg-[#0b141a] relative">
+                        <div className={`flex-1 flex flex-col bg-[#0b141a] relative ${view === 'list' ? 'hidden lg:flex' : 'flex'}`}>
                             {/* Chat Background Image Overlay (Standard WA Pattern) */}
                             <div className="absolute inset-0 opacity-[0.03] pointer-events-none bg-[url('https://whatsapp-web.org/wp-content/uploads/2021/01/whatsapp-web-background-id-1-1024x576.jpg')] bg-repeat" />
 
                             {/* Chat Header */}
-                            <div className="h-[60px] px-4 flex items-center justify-between bg-[#202c33] border-b border-white/5 z-10">
+                            <div className="h-[60px] px-4 flex items-center justify-between bg-[#202c33] border-b border-white/5 z-10 shrink-0">
                                 <div className="flex items-center gap-3">
-                                    <div className="size-10 bg-[#6a7175] rounded-full flex items-center justify-center text-lg font-bold">
+                                    <button onClick={() => setView('list')} className="lg:hidden p-1 -ml-1 hover:bg-white/10 rounded-full transition-colors">
+                                        <ChevronRight className="size-6 rotate-180" />
+                                    </button>
+                                    <div className="size-10 bg-[#6a7175] rounded-full flex items-center justify-center text-lg font-bold shrink-0">
                                         {activeChat.name.charAt(0)}
                                     </div>
                                     <div>
@@ -559,8 +570,8 @@ export default function WhatsAppWebPage() {
                                 </motion.div>
                             )}
                         </AnimatePresence>
-
                     </div>
+                </div>
                 </PlanGuard>
 
                 <style jsx global>{`

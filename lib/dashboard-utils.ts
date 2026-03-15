@@ -13,7 +13,13 @@ export interface DashboardMetrics {
   chartData: { date: string; atual: number; anterior: number }[];
 }
 
-export function calculateDashboardMetrics(orders: Order[] = [], range: string, customDates?: { start: string; end: string }, unitId?: string): DashboardMetrics {
+export function calculateDashboardMetrics(
+  orders: Order[] = [], 
+  range: string, 
+  customDates?: { start: string; end: string }, 
+  unitId?: string,
+  financeTransactions: any[] = []
+): DashboardMetrics {
   const now = new Date();
   let startDate = new Date();
 
@@ -60,11 +66,33 @@ export function calculateDashboardMetrics(orders: Order[] = [], range: string, c
     }
   });
   
-  const faturamento = filteredOrders.reduce((acc, o) => {
-    const items = Array.isArray(o.items) ? o.items : [];
-    const total = items.reduce((sum, i) => sum + ((Number(i.qty) || 0) * (Number(i.unitPrice) || 0)), 0);
-    return acc + total;
-  }, 0);
+  // --- Atualização: Faturamento agora também considera Finanças Reais (RECEITAS PAGAS) ---
+  // Para evitar contar duas vezes (Pedios pagos + Finanças), iremos assumir que 
+  // finanças PAGO do tipo RECEITA é o fluxo financeiro real do período 
+  // se o array estiver vazio, usa legado.
+  const unitFilteredFinance = financeTransactions.filter(f => !unitId || unitId === "all" || f.unitId === unitId);
+  const periodFilteredFinance = unitFilteredFinance.filter(f => {
+    if (!f.dueDate && !f.paidDate) return false;
+    try {
+        const d = new Date(f.paidDate || f.dueDate);
+        return d >= startDate;
+    } catch { return false; }
+  });
+
+  let faturamento = 0;
+  if (periodFilteredFinance.length > 0) {
+      // Usa os lançamentos financeiros validados
+      faturamento = periodFilteredFinance
+          .filter(f => f.type === "RECEITA" && f.status === "PAGO")
+          .reduce((acc, f) => acc + (f.value || 0), 0);
+  } else {
+      // Fallback para soma dos itens do pedido (Legado)
+      faturamento = filteredOrders.reduce((acc, o) => {
+        const items = Array.isArray(o.items) ? o.items : [];
+        const total = items.reduce((sum, i) => sum + ((Number(i.qty) || 0) * (Number(i.unitPrice) || 0)), 0);
+        return acc + total; // Only count paid if you want, but historically this counted all in period
+      }, 0);
+  }
 
   const pedidosTotal = filteredOrders.length;
   const pedidosAbertos = filteredOrders.filter(o => o.status !== "Entregue" && o.status !== "Cancelado").length;
@@ -115,6 +143,20 @@ export function calculateDashboardMetrics(orders: Order[] = [], range: string, c
     .map(([label, value]) => ({ label, value }))
     .sort((a, b) => b.value - a.value);
 
+  periodFilteredFinance.filter(f => f.type === "RECEITA").forEach(f => {
+      const pMethod = f.paymentMethod || "Outros";
+      payMap[pMethod] = (payMap[pMethod] || 0) + (f.value || 0);
+  });
+
+  if(Object.keys(payMap).length === 0) {
+      filteredOrders.forEach(o => {
+        const pMethod = o.paymentMethod || "Outros";
+        const items = Array.isArray(o.items) ? o.items : [];
+        const oTotal = items.reduce((sum, i) => sum + ((Number(i.qty) || 0) * (Number(i.unitPrice) || 0)), 0);
+        payMap[pMethod] = (payMap[pMethod] || 0) + oTotal;
+      });
+  }
+
   const paymentMethodRevenue = Object.entries(payMap)
     .map(([method, value]) => ({ method, value }))
     .sort((a, b) => b.value - a.value);
@@ -144,10 +186,25 @@ export function calculateDashboardMetrics(orders: Order[] = [], range: string, c
       }
     });
 
-    const dayValue = dayOrders.reduce((acc, o) => {
-      const items = Array.isArray(o.items) ? o.items : [];
-      return acc + items.reduce((sum, i) => sum + ((Number(i.qty) || 0) * (Number(i.unitPrice) || 0)), 0);
-    }, 0);
+    const dayFinance = periodFilteredFinance.filter(f => {
+        if (!f.paidDate && !f.dueDate) return false;
+        try {
+            const fd = new Date(f.paidDate || f.dueDate);
+            if (range === "hoje") return fd.getHours() === d.getHours() && fd.toDateString() === now.toDateString();
+            return fd.toDateString() === d.toDateString();
+        } catch { return false; }
+    });
+
+    let dayValue = 0;
+    if (periodFilteredFinance.length > 0) {
+        dayValue = dayFinance.filter(f => f.type === "RECEITA" && f.status === "PAGO")
+                             .reduce((acc, f) => acc + (f.value || 0), 0);
+    } else {
+        dayValue = dayOrders.reduce((acc, o) => {
+          const items = Array.isArray(o.items) ? o.items : [];
+          return acc + items.reduce((sum, i) => sum + ((Number(i.qty) || 0) * (Number(i.unitPrice) || 0)), 0);
+        }, 0);
+    }
     
     chartData.push({
       date: label,

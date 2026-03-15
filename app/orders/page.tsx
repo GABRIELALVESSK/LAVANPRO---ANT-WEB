@@ -1,6 +1,6 @@
 "use client";
 
-import { Sidebar } from "@/components/sidebar";
+import { Sidebar, MobileHeader } from "@/components/sidebar";
 import { AccessGuard } from "@/components/access-guard";
 import {
     Truck, CheckCircle2, AlertCircle, Clock, Activity, History, Timer,
@@ -15,6 +15,8 @@ import { useState, useEffect, useMemo } from "react";
 import { UnitSelector } from "@/components/unit-selector";
 import { useRouter } from "next/navigation";
 import { useUnit } from "@/hooks/useUnit";
+import { useAuth } from "@/hooks/useAuth";
+import { syncData, pushDataToServer } from "@/lib/dataSync";
 
 const StatusColors: Record<string, string> = {
     "Recebido": "bg-slate-500",
@@ -46,6 +48,7 @@ function formatCurrency(v: number) { return v.toLocaleString("pt-BR", { style: "
 
 export default function OrdersPage() {
     const router = useRouter();
+    const { staffName } = useAuth();
     const [orders, setOrders] = useState<Order[]>([]);
     const [isLoaded, setIsLoaded] = useState(false);
     const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
@@ -89,12 +92,19 @@ export default function OrdersPage() {
         };
 
         loadOrders();
-        
+
+        // Puxa dados do servidor logo ao abrir a página
+        syncData();
+
         const handleSync = () => loadOrders();
         window.addEventListener("data-synced", handleSync);
+        window.addEventListener("storage", handleSync);
         setIsLoaded(true);
 
-        return () => window.removeEventListener("data-synced", handleSync);
+        return () => {
+            window.removeEventListener("data-synced", handleSync);
+            window.removeEventListener("storage", handleSync);
+        };
     }, []);
 
     useEffect(() => {
@@ -116,10 +126,10 @@ export default function OrdersPage() {
             const matchesSearch = o.id.toLowerCase().includes(q) || o.client.toLowerCase().includes(q);
             const matchesStatus = filterStatus === "Todos" || o.status === filterStatus;
             const matchesPayment = filterPayment === "Todos" || o.paymentStatus === filterPayment;
-            
+
             // MASTER UNIT FILTER
             const matchesUnit = !activeUnit || activeUnit === "all" || o.unitId === activeUnit;
-            
+
             return matchesSearch && matchesStatus && matchesPayment && matchesUnit;
         });
     }, [orders, searchQuery, filterStatus, filterPayment, activeUnit]);
@@ -242,16 +252,25 @@ export default function OrdersPage() {
             bgColor: "bg-brand-primary", textColor: "text-brand-primary",
             observations: newOrder.observations,
             estimatedDelivery: newOrder.estimatedDelivery,
-            history: [{ time: timeStr, status: "Triagem", note: "Pedido criado." }],
+            history: [{ time: timeStr, status: "Triagem", note: "Pedido criado.", staffName }],
             createdAt: dateStr,
-            unitId: activeUnit === "all" ? "default" : activeUnit
+            unitId: activeUnit === "all" ? "default" : activeUnit,
+            createdBy: staffName,
+            lastUpdatedBy: staffName
         };
-        
-        setOrders(prev => [freshOrder, ...prev]);
+
+        const currentOrders = JSON.parse(localStorage.getItem("lavanpro_orders_v3") || "[]");
+        const updatedOrders = [freshOrder, ...currentOrders];
+        localStorage.setItem("lavanpro_orders_v3", JSON.stringify(updatedOrders));
+
+        setOrders(updatedOrders);
         setIsNewOrderOpen(false);
         setCustomerSearch("");
         setShowCustSuggestions(false);
         setNewOrder({ client: "", phone: "", email: "", address: "", delivery: "Entrega em Domicílio", paymentMethod: "PIX", paymentStatus: "A Pagar", estimatedDelivery: "", observations: "", items: [{ ...blankItem }] });
+
+        // Sincroniza com o servidor imediatamente
+        pushDataToServer('lavanpro_orders_v3');
     };
 
     useEffect(() => {
@@ -275,37 +294,51 @@ export default function OrdersPage() {
             }
         };
 
-        const savedServices = localStorage.getItem("lavanpro_services_pro");
-        if (savedServices) {
-            try { setRealServices(JSON.parse(savedServices)); } catch { }
-        }
-        
+        const loadServices = () => {
+            const savedServices = localStorage.getItem("lavanpro_services_pro");
+            if (savedServices) {
+                try { setRealServices(JSON.parse(savedServices)); } catch { }
+            }
+        };
+
         loadCusts();
+        loadServices();
 
         const handleStorage = (e: StorageEvent) => {
             if (e.key === "lavanpro_customers") loadCusts();
+            if (e.key === "lavanpro_services_pro") loadServices();
         };
+
+        const handleSync = () => {
+            loadCusts();
+            loadServices();
+        };
+
         window.addEventListener("storage", handleStorage);
-        return () => window.removeEventListener("storage", handleStorage);
+        window.addEventListener("data-synced", handleSync);
+        return () => {
+            window.removeEventListener("storage", handleStorage);
+            window.removeEventListener("data-synced", handleSync);
+        };
     }, []);
 
     const currentServices = realServices.length > 0 ? realServices : initialServices;
 
     const filteredCustomers = useMemo(() => {
         if (!customerSearch) return [];
-        return allCustomers.filter(c => 
-            c.name.toLowerCase().includes(customerSearch.toLowerCase()) || 
+        return allCustomers.filter(c =>
+            c.name.toLowerCase().includes(customerSearch.toLowerCase()) ||
             (c.phone && c.phone.includes(customerSearch))
         ).slice(0, 5);
     }, [allCustomers, customerSearch]);
 
     const selectCustomer = (c: any) => {
-        setNewOrder(n => ({ 
-            ...n, 
-            client: c.name, 
-            phone: c.phone || "", 
-            email: c.email || "", 
-            address: c.address || "" 
+        setNewOrder(n => ({
+            ...n,
+            client: c.name,
+            phone: c.phone || "",
+            email: c.email || "",
+            address: c.address || ""
         }));
         setCustomerSearch(c.name);
         setShowCustSuggestions(false);
@@ -378,16 +411,51 @@ export default function OrdersPage() {
             progress: cfg?.progress ?? selectedOrder.progress,
             bgColor: cfg?.bg ?? selectedOrder.bgColor,
             textColor: cfg?.textColor ?? selectedOrder.textColor,
-            history: [...selectedOrder.history, { time: now, status: statusOption, note: statusOption === "Em Lavagem" ? "Iniciado processo e estoque baixado." : "" }],
+            history: [
+                ...selectedOrder.history,
+                {
+                    time: now,
+                    status: statusOption,
+                    note: statusOption === "Em Lavagem" ? "Iniciado processo e estoque baixado." : "",
+                    staffName
+                }
+            ],
+            lastUpdatedBy: staffName
         };
         setSelectedOrder(updated);
         setIsStatusDropdown(false);
+
+        // Se marcou como "Entregue", desvincular automaticamente a etiqueta QR
+        if (statusOption === "Entregue") {
+            try {
+                const savedLabels = localStorage.getItem("lavanpro_labels");
+                if (savedLabels) {
+                    const allLabels = JSON.parse(savedLabels);
+                    const cleanId = String(selectedOrder.id).replace("#", "").trim();
+                    const linkedLabel = allLabels.find((l: any) => String(l.currentOrderId || "").trim() === cleanId);
+
+                    if (linkedLabel) {
+                        const updatedLabels = allLabels.map((l: any) =>
+                            l.id === linkedLabel.id ? { ...l, status: "available", currentOrderId: null } : l
+                        );
+                        localStorage.setItem("lavanpro_labels", JSON.stringify(updatedLabels));
+                        pushDataToServer('lavanpro_labels');
+                        window.dispatchEvent(new Event("storage"));
+                    }
+                }
+            } catch (e) {
+                console.error("Erro ao desvincular etiqueta:", e);
+            }
+        }
     };
 
     const handleDeleteOrder = (id: string) => {
         if (confirm("Tem certeza que deseja excluir este pedido? Esta ação é irreversível e removerá o pedido de todos os registros.")) {
-            setOrders(prev => prev.filter(o => o.id !== id));
+            const updated = orders.filter(o => o.id !== id);
+            localStorage.setItem("lavanpro_orders_v3", JSON.stringify(updated));
+            setOrders(updated);
             setSelectedOrder(null);
+            pushDataToServer('lavanpro_orders_v3');
         }
     };
 
@@ -411,40 +479,63 @@ export default function OrdersPage() {
         setAllCustomers(updatedCusts);
         localStorage.setItem("lavanpro_customers", JSON.stringify(updatedCusts));
 
-        // ... existing QR Logic ...
+        // Desvincula QR automaticamente quando pedido está como Entregue
         if (selectedOrder.status === "Entregue") {
             try {
                 const savedLabels = localStorage.getItem("lavanpro_labels");
                 if (savedLabels) {
                     const labels = JSON.parse(savedLabels);
                     const cleanId = String(selectedOrder.id).replace("#", "").trim();
-                    const linkedLabel = labels.find((l: any) => String(l.currentOrderId).trim() === cleanId);
+                    const linkedLabel = labels.find((l: any) => String(l.currentOrderId || "").trim() === cleanId);
 
                     if (linkedLabel) {
-                        const confirmRelease = window.confirm(`O pedido ${selectedOrder.id} está vinculado à etiqueta ${linkedLabel.code}. Deseja desvincular e liberar a etiqueta agora?`);
-                        if (confirmRelease) {
-                            const updatedLabels = labels.map((l: any) =>
-                                l.id === linkedLabel.id ? { ...l, status: "available", currentOrderId: null } : l
+                        const updatedLabels = labels.map((l: any) =>
+                            l.id === linkedLabel.id ? { ...l, status: "available", currentOrderId: null } : l
+                        );
+                        localStorage.setItem("lavanpro_labels", JSON.stringify(updatedLabels));
+
+                        try {
+                            const savedHistory = localStorage.getItem("lavanpro_label_history") || "[]";
+                            const history = JSON.parse(savedHistory);
+                            const updatedHistory = history.map((h: any) =>
+                                h.labelId === linkedLabel.id && h.releasedAt === null
+                                    ? { ...h, releasedAt: new Date().toISOString() }
+                                    : h
                             );
-                            localStorage.setItem("lavanpro_labels", JSON.stringify(updatedLabels));
+                            localStorage.setItem("lavanpro_label_history", JSON.stringify(updatedHistory));
+                            pushDataToServer('lavanpro_label_history');
+                        } catch (err) {
+                            console.error("Erro ao atualizar histórico da etiqueta:", err);
                         }
+
+                        pushDataToServer('lavanpro_labels');
+                        window.dispatchEvent(new Event("storage"));
                     }
                 }
-            } catch (e) {}
+            } catch (e) {
+                console.error("Erro ao desvincular etiqueta:", e);
+            }
         }
 
-        setOrders(prev => prev.map(o => o.id === selectedOrder.id ? selectedOrder : o));
+        const updatedOrdersList = orders.map(o => o.id === selectedOrder.id ? selectedOrder : o);
+        localStorage.setItem("lavanpro_orders_v3", JSON.stringify(updatedOrdersList));
+
+        setOrders(updatedOrdersList);
         setSelectedOrder(null);
         setIsStatusDropdown(false);
+
+        // Sincroniza com o servidor imediatamente
+        pushDataToServer('lavanpro_orders_v3');
     };
 
     return (
         <AccessGuard permission="orders">
-            <div className="flex h-screen bg-brand-bg text-brand-text font-sans">
+            <div className="flex min-h-screen bg-brand-bg text-brand-text font-sans">
                 <Sidebar />
-                <div className="flex-1 flex flex-col overflow-hidden">
-                    <main className="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar">
-                        <div className="max-w-[1600px] mx-auto space-y-6">
+                <div className="flex-1 flex flex-col h-screen overflow-hidden">
+                    <MobileHeader title="Pedidos" />
+                    <main className="flex-1 overflow-y-auto responsive-px py-6 lg:py-8 custom-scrollbar">
+                        <div className="max-w-[1600px] mx-auto space-y-6 safe-bottom">
 
                             {/* Header */}
                             <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -455,14 +546,18 @@ export default function OrdersPage() {
                                         Fluxo completo de ordens de serviço
                                     </p>
                                 </motion.div>
-                                <div className="flex items-center gap-3">
-                                    <UnitSelector showAllOption={true} />
-                                    <button onClick={() => setIsHistoryOpen(true)} className="px-4 py-2 bg-brand-card border border-brand-darkBorder rounded-lg text-xs font-bold text-brand-text hover:bg-brand-darkBorder transition-all flex items-center gap-2">
-                                        <History className="size-4" /> Histórico
-                                    </button>
-                                    <button onClick={() => setIsNewOrderOpen(true)} className="px-5 py-2 bg-brand-primary text-white rounded-lg text-xs font-bold hover:bg-brand-primaryHover transition-all shadow-lg shadow-brand-primary/20 flex items-center gap-2">
-                                        <Plus className="size-4" /> Novo Pedido
-                                    </button>
+                                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                                    <div className="w-full sm:w-64">
+                                        <UnitSelector showAllOption={true} />
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                        <button onClick={() => setIsHistoryOpen(true)} className="px-4 py-2 bg-brand-card border border-brand-darkBorder rounded-lg text-xs font-bold text-brand-text hover:bg-brand-darkBorder transition-all flex items-center gap-2">
+                                            <History className="size-4" /> Histórico
+                                        </button>
+                                        <button onClick={() => setIsNewOrderOpen(true)} className="px-5 py-2 bg-brand-primary text-white rounded-lg text-xs font-bold hover:bg-brand-primaryHover transition-all shadow-lg shadow-brand-primary/20 flex items-center gap-2">
+                                            <Plus className="size-4" /> Novo Pedido
+                                        </button>
+                                    </div>
                                 </div>
                             </header>
 
@@ -584,14 +679,14 @@ export default function OrdersPage() {
                                                         </td>
                                                         <td className="p-4 pr-6 text-right">
                                                             <div className="flex justify-end gap-2">
-                                                                <button 
+                                                                <button
                                                                     onClick={(e) => { e.stopPropagation(); handleDeleteOrder(order.id); }}
                                                                     className="p-2.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 rounded-lg border border-rose-500/20 transition-all opacity-0 group-hover:opacity-100"
                                                                     title="Excluir Pedido"
                                                                 >
                                                                     <Trash2 className="size-4" />
                                                                 </button>
-                                                                <button 
+                                                                <button
                                                                     onClick={(e) => { e.stopPropagation(); setSelectedOrder(order); }}
                                                                     className="p-2.5 bg-brand-primary/10 hover:bg-brand-primary/20 text-brand-primary rounded-lg border border-brand-primary/20 transition-all opacity-0 group-hover:opacity-100"
                                                                     title="Editar Pedido"
@@ -617,9 +712,9 @@ export default function OrdersPage() {
                     {/* --- MODAL: Novo Pedido (REFORMULADO PREMIUM) --- */}
                     {isNewOrderOpen && (
                         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-                            <motion.div 
-                                initial={{ opacity: 0, scale: 0.9, y: 30 }} 
-                                animate={{ opacity: 1, scale: 1, y: 0 }} 
+                            <motion.div
+                                initial={{ opacity: 0, scale: 0.9, y: 30 }}
+                                animate={{ opacity: 1, scale: 1, y: 0 }}
                                 exit={{ opacity: 0, scale: 0.9, y: 30 }}
                                 className="bg-[#0f111a]/95 w-full max-w-3xl rounded-[2.5rem] border border-white/10 shadow-[0_32px_64px_-16px_rgba(0,0,0,0.6)] flex flex-col max-h-[94vh] overflow-hidden"
                             >
@@ -655,9 +750,9 @@ export default function OrdersPage() {
                                                         <div className="absolute left-5 top-1/2 -translate-y-1/2 transition-colors">
                                                             <User className="size-4 text-brand-muted group-focus-within:text-brand-primary" />
                                                         </div>
-                                                        <input 
-                                                            type="text" 
-                                                            placeholder="Ex: João da Silva" 
+                                                        <input
+                                                            type="text"
+                                                            placeholder="Ex: João da Silva"
                                                             value={customerSearch}
                                                             onFocus={() => setShowCustSuggestions(true)}
                                                             onClick={e => e.stopPropagation()}
@@ -675,7 +770,7 @@ export default function OrdersPage() {
                                                         {/* Sugestões de Clientes */}
                                                         <AnimatePresence>
                                                             {showCustSuggestions && filteredCustomers.length > 0 && (
-                                                                <motion.div 
+                                                                <motion.div
                                                                     initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }}
                                                                     className="absolute left-0 right-0 top-full mt-2 bg-[#161925] border border-white/10 rounded-2xl shadow-2xl z-[70] overflow-hidden"
                                                                 >
@@ -700,9 +795,9 @@ export default function OrdersPage() {
                                                             <div className="absolute left-5 top-1/2 -translate-y-1/2 transition-colors">
                                                                 <Icon className="size-4 text-brand-muted group-focus-within:text-brand-primary" />
                                                             </div>
-                                                            <input 
-                                                                type={type} 
-                                                                placeholder={placeholder} 
+                                                            <input
+                                                                type={type}
+                                                                placeholder={placeholder}
                                                                 value={(newOrder as any)[field]}
                                                                 onChange={e => setNewOrder(n => ({ ...n, [field]: e.target.value }))}
                                                                 className="w-full pl-14 pr-5 py-4 bg-white/[0.03] border border-white/5 rounded-2xl text-sm font-bold text-white placeholder:text-brand-muted focus:bg-white/[0.05] focus:border-brand-primary/50 focus:outline-none transition-all"
@@ -725,8 +820,8 @@ export default function OrdersPage() {
                                                         <div className="absolute left-5 top-1/2 -translate-y-1/2">
                                                             <Home className="size-4 text-brand-muted group-focus-within:text-brand-primary" />
                                                         </div>
-                                                        <select 
-                                                            value={newOrder.delivery} 
+                                                        <select
+                                                            value={newOrder.delivery}
                                                             onChange={e => setNewOrder(n => ({ ...n, delivery: e.target.value }))}
                                                             className="w-full pl-14 pr-12 py-4 bg-white/[0.03] border border-white/5 rounded-2xl text-sm font-bold text-white focus:border-brand-primary/50 outline-none appearance-none cursor-pointer"
                                                         >
@@ -740,8 +835,8 @@ export default function OrdersPage() {
                                                         <div className="absolute left-5 top-1/2 -translate-y-1/2">
                                                             <CalendarDays className="size-4 text-brand-muted group-focus-within:text-brand-primary" />
                                                         </div>
-                                                        <input 
-                                                            type="date" 
+                                                        <input
+                                                            type="date"
                                                             value={newOrder.estimatedDelivery}
                                                             onChange={e => setNewOrder(n => ({ ...n, estimatedDelivery: e.target.value }))}
                                                             className="w-full pl-14 pr-5 py-4 bg-white/[0.03] border border-white/5 rounded-2xl text-sm font-bold text-white focus:border-brand-primary/50 outline-none transition-all [color-scheme:dark]"
@@ -769,63 +864,63 @@ export default function OrdersPage() {
                                                     {newOrder.items.map((item, idx) => (
                                                         <div key={idx} className={`group relative bg-white/[0.02] border border-white/5 rounded-[2rem] p-6 flex flex-col gap-5 transition-all hover:bg-white/[0.04] hover:border-brand-primary/30 ${activeServiceIdx === idx ? 'z-[110]' : 'z-10'}`}>
                                                             <div className="flex items-center gap-4">
-                                                                                <div className="flex-1 relative">
-                                                                                    <div className="absolute left-0 top-1/2 -translate-y-1/2">
-                                                                                        <Search className="size-4 text-brand-muted" />
-                                                                                    </div>
-                                                                                    <input 
-                                                                                        type="text"
-                                                                                        placeholder="Nome do serviço..."
-                                                                                        value={item.service}
-                                                                                        onClick={e => e.stopPropagation()}
-                                                                                        onChange={e => {
-                                                                                            handleItemChange(idx, "service", e.target.value);
-                                                                                            setActiveServiceIdx(idx);
-                                                                                            setShowServiceSuggestions(true);
-                                                                                        }}
-                                                                                        onFocus={() => {
-                                                                                            setActiveServiceIdx(idx);
-                                                                                            setShowServiceSuggestions(true);
-                                                                                        }}
-                                                                                        className="w-full bg-transparent pl-7 text-sm font-black text-white outline-none placeholder:text-brand-muted"
-                                                                                    />
+                                                                <div className="flex-1 relative">
+                                                                    <div className="absolute left-0 top-1/2 -translate-y-1/2">
+                                                                        <Search className="size-4 text-brand-muted" />
+                                                                    </div>
+                                                                    <input
+                                                                        type="text"
+                                                                        placeholder="Nome do serviço..."
+                                                                        value={item.service}
+                                                                        onClick={e => e.stopPropagation()}
+                                                                        onChange={e => {
+                                                                            handleItemChange(idx, "service", e.target.value);
+                                                                            setActiveServiceIdx(idx);
+                                                                            setShowServiceSuggestions(true);
+                                                                        }}
+                                                                        onFocus={() => {
+                                                                            setActiveServiceIdx(idx);
+                                                                            setShowServiceSuggestions(true);
+                                                                        }}
+                                                                        className="w-full bg-transparent pl-7 text-sm font-black text-white outline-none placeholder:text-brand-muted"
+                                                                    />
 
-                                                                                    <AnimatePresence>
-                                                                                        {showServiceSuggestions && activeServiceIdx === idx && (
-                                                                                            <motion.div 
-                                                                                                initial={{ opacity: 0, y: 10 }}
-                                                                                                animate={{ opacity: 1, y: 0 }}
-                                                                                                exit={{ opacity: 0, y: 10 }}
-                                                                                                className="absolute top-[calc(100%+12px)] left-0 w-full min-w-[320px] bg-[#1a1d29] border border-white/10 rounded-2xl shadow-[0_32px_64px_-16px_rgba(0,0,0,0.8)] z-[120] overflow-hidden max-h-[280px] overflow-y-auto custom-scrollbar backdrop-blur-3xl"
-                                                                                            >
-                                                                                                {currentServices
-                                                                                                    .filter(s => s.name.toLowerCase().includes(item.service.toLowerCase()))
-                                                                                                    .map((s, sIdx) => (
-                                                                                                        <button 
-                                                                                                            key={sIdx}
-                                                                                                            onClick={(e) => {
-                                                                                                                e.stopPropagation();
-                                                                                                                handleItemChange(idx, "service", s.name);
-                                                                                                                setShowServiceSuggestions(false);
-                                                                                                                setActiveServiceIdx(null);
-                                                                                                            }}
-                                                                                                            className="w-full text-left px-5 py-4 hover:bg-white/5 transition-colors border-b border-white/5 last:border-0 flex justify-between items-center gap-4 group/item"
-                                                                                                        >
-                                                                                                            <span className="text-xs font-bold text-white group-hover/item:text-brand-primary transition-colors flex-1">{s.name}</span>
-                                                                                                            <span className="text-[10px] font-black text-emerald-400 bg-emerald-400/10 px-2 py-1 rounded-lg shrink-0">{formatCurrency(s.price)}</span>
-                                                                                                        </button>
-                                                                                                    ))}
-                                                                                                {currentServices.filter(s => s.name.toLowerCase().includes(item.service.toLowerCase())).length === 0 && (
-                                                                                                    <div className="px-5 py-3 text-[10px] text-brand-muted italic">Serviço novo (preço manual)</div>
-                                                                                                )}
-                                                                                            </motion.div>
-                                                                                        )}
-                                                                                    </AnimatePresence>
-                                                                                </div>
+                                                                    <AnimatePresence>
+                                                                        {showServiceSuggestions && activeServiceIdx === idx && (
+                                                                            <motion.div
+                                                                                initial={{ opacity: 0, y: 10 }}
+                                                                                animate={{ opacity: 1, y: 0 }}
+                                                                                exit={{ opacity: 0, y: 10 }}
+                                                                                className="absolute top-[calc(100%+12px)] left-0 w-full min-w-[320px] bg-[#1a1d29] border border-white/10 rounded-2xl shadow-[0_32px_64px_-16px_rgba(0,0,0,0.8)] z-[120] overflow-hidden max-h-[280px] overflow-y-auto custom-scrollbar backdrop-blur-3xl"
+                                                                            >
+                                                                                {currentServices
+                                                                                    .filter(s => s.name.toLowerCase().includes(item.service.toLowerCase()))
+                                                                                    .map((s, sIdx) => (
+                                                                                        <button
+                                                                                            key={sIdx}
+                                                                                            onClick={(e) => {
+                                                                                                e.stopPropagation();
+                                                                                                handleItemChange(idx, "service", s.name);
+                                                                                                setShowServiceSuggestions(false);
+                                                                                                setActiveServiceIdx(null);
+                                                                                            }}
+                                                                                            className="w-full text-left px-5 py-4 hover:bg-white/5 transition-colors border-b border-white/5 last:border-0 flex justify-between items-center gap-4 group/item"
+                                                                                        >
+                                                                                            <span className="text-xs font-bold text-white group-hover/item:text-brand-primary transition-colors flex-1">{s.name}</span>
+                                                                                            <span className="text-[10px] font-black text-emerald-400 bg-emerald-400/10 px-2 py-1 rounded-lg shrink-0">{formatCurrency(s.price)}</span>
+                                                                                        </button>
+                                                                                    ))}
+                                                                                {currentServices.filter(s => s.name.toLowerCase().includes(item.service.toLowerCase())).length === 0 && (
+                                                                                    <div className="px-5 py-3 text-[10px] text-brand-muted italic">Serviço novo (preço manual)</div>
+                                                                                )}
+                                                                            </motion.div>
+                                                                        )}
+                                                                    </AnimatePresence>
+                                                                </div>
                                                                 <div className="text-right">
                                                                     <div className="flex items-center gap-2 bg-black/40 rounded-lg px-2 py-1">
                                                                         <span className="text-[10px] font-black text-brand-muted">R$</span>
-                                                                        <input 
+                                                                        <input
                                                                             type="number"
                                                                             value={item.unitPrice}
                                                                             onChange={e => handleItemChange(idx, "unitPrice", e.target.value)}
@@ -834,7 +929,7 @@ export default function OrdersPage() {
                                                                     </div>
                                                                 </div>
                                                             </div>
-                                                            
+
                                                             <div className="flex items-center justify-between">
                                                                 <div className="flex items-center bg-black/40 rounded-lg p-1">
                                                                     <button onClick={() => handleItemChange(idx, "qty", Math.max(1, item.qty - 1))} className="size-8 flex items-center justify-center text-brand-muted hover:text-white">-</button>
@@ -886,12 +981,12 @@ export default function OrdersPage() {
                                                         <div className="absolute left-5 top-5">
                                                             <StickyNote className="size-4 text-brand-muted group-focus-within:text-brand-primary" />
                                                         </div>
-                                                        <textarea 
-                                                            rows={3} 
-                                                            placeholder="Observações especiais..." 
+                                                        <textarea
+                                                            rows={3}
+                                                            placeholder="Observações especiais..."
                                                             value={newOrder.observations}
                                                             onChange={e => setNewOrder(n => ({ ...n, observations: e.target.value }))}
-                                                            className="w-full pl-14 pr-5 py-4 bg-white/[0.03] border border-white/5 rounded-2xl text-sm font-bold text-white placeholder:text-brand-muted focus:bg-white/[0.05] focus:border-brand-primary/50 outline-none transition-all resize-none shadow-inner" 
+                                                            className="w-full pl-14 pr-5 py-4 bg-white/[0.03] border border-white/5 rounded-2xl text-sm font-bold text-white placeholder:text-brand-muted focus:bg-white/[0.05] focus:border-brand-primary/50 outline-none transition-all resize-none shadow-inner"
                                                         />
                                                     </div>
                                                 </div>
@@ -901,8 +996,8 @@ export default function OrdersPage() {
                                 </div>
 
                                 <div className="px-10 py-8 bg-white/[0.02] border-t border-white/5">
-                                    <button 
-                                        onClick={handleCreateOrder} 
+                                    <button
+                                        onClick={handleCreateOrder}
                                         disabled={!newOrder.client || newOrder.items.length === 0}
                                         className="w-full group relative py-6 bg-brand-primary text-white rounded-[1.75rem] font-black text-sm tracking-[0.2em] uppercase overflow-hidden transition-all hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50 shadow-[0_20px_40px_-10px_rgba(139,92,246,0.4)]"
                                     >
@@ -950,17 +1045,17 @@ export default function OrdersPage() {
                     {/* --- MODAL: Detalhes do Pedido (REFORMULADO PREMIUM) --- */}
                     {selectedOrder && (
                         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-                            <motion.div 
-                                initial={{ opacity: 0, scale: 0.9, y: 30 }} 
-                                animate={{ opacity: 1, scale: 1, y: 0 }} 
+                            <motion.div
+                                initial={{ opacity: 0, scale: 0.9, y: 30 }}
+                                animate={{ opacity: 1, scale: 1, y: 0 }}
                                 exit={{ opacity: 0, scale: 0.9, y: 30 }}
                                 className="bg-[#0f111a]/95 w-full max-w-4xl rounded-[2.5rem] border border-white/10 shadow-[0_32px_64px_-16px_rgba(0,0,0,0.6)] flex flex-col max-h-[94vh] overflow-hidden"
                             >
                                 {/* Header Minimalista */}
-                                <div className="px-10 py-8 border-b border-white/5 flex justify-between items-center bg-white/[0.02]">
-                                    <div className="flex items-center gap-6">
-                                        <div className="size-16 rounded-2xl bg-brand-primary/20 flex items-center justify-center border border-brand-primary/30 shadow-[0_0_30px_rgba(139,92,246,0.2)]">
-                                            <Package className="size-8 text-brand-primary" />
+                                <div className="px-6 py-5 border-b border-white/5 flex justify-between items-center bg-white/[0.02]">
+                                    <div className="flex items-center gap-4">
+                                        <div className="size-12 rounded-2xl bg-brand-primary/20 flex items-center justify-center border border-brand-primary/30 shadow-[0_0_30px_rgba(139,92,246,0.2)]">
+                                            <Package className="size-6 text-brand-primary" />
                                         </div>
                                         <div>
                                             <div className="flex items-center gap-3">
@@ -971,7 +1066,7 @@ export default function OrdersPage() {
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-3">
-                                        <button 
+                                        <button
                                             onClick={() => handleDeleteOrder(selectedOrder.id)}
                                             className="p-4 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 rounded-2xl text-rose-500 transition-all flex items-center gap-2 group/del"
                                             title="Excluir Pedido"
@@ -979,18 +1074,37 @@ export default function OrdersPage() {
                                             <Trash2 className="size-5 group-hover/del:scale-110 transition-transform" />
                                         </button>
                                         <button className="p-4 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl text-brand-muted hover:text-white transition-all"><Printer className="size-5" /></button>
-                                        <button onClick={() => { setSelectedOrder(null); router.push(`/labels?order=${selectedOrder.id.replace('#', '')}`); }} className="px-5 py-4 bg-brand-primary/10 hover:bg-brand-primary/20 border border-brand-primary/20 rounded-2xl text-brand-primary font-black text-xs tracking-widest uppercase transition-all flex items-center gap-3">
-                                            <QrCode className="size-5" /> Vincular QR
-                                        </button>
+                                        {(() => {
+                                            try {
+                                                const savedLabels = localStorage.getItem("lavanpro_labels");
+                                                if (savedLabels) {
+                                                    const allLabels = JSON.parse(savedLabels);
+                                                    const cleanId = String(selectedOrder.id).replace("#", "").trim();
+                                                    const linked = allLabels.find((l: any) => String(l.currentOrderId || "").trim() === cleanId && l.status === "assigned");
+                                                    if (linked) {
+                                                        return (
+                                                            <div className="px-5 py-4 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl text-emerald-400 font-black text-xs tracking-widest uppercase flex items-center gap-3 cursor-default" title={`Já vinculado à ${linked.code}`}>
+                                                                <QrCode className="size-5" /> {linked.code} ✓
+                                                            </div>
+                                                        );
+                                                    }
+                                                }
+                                            } catch { }
+                                            return (
+                                                <button onClick={() => { setSelectedOrder(null); router.push(`/labels?order=${selectedOrder.id.replace('#', '')}`); }} className="px-5 py-4 bg-brand-primary/10 hover:bg-brand-primary/20 border border-brand-primary/20 rounded-2xl text-brand-primary font-black text-xs tracking-widest uppercase transition-all flex items-center gap-3">
+                                                    <QrCode className="size-5" /> Vincular QR
+                                                </button>
+                                            );
+                                        })()}
                                         <button onClick={() => setSelectedOrder(null)} className="p-4 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl text-brand-muted hover:text-white transition-all"><X className="size-5" /></button>
                                     </div>
                                 </div>
 
-                                <div className="flex-1 overflow-y-auto custom-scrollbar p-10 space-y-12">
-                                    
+                                <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-8">
+
                                     {/* Status Flow Moderno */}
-                                    <section className="bg-white/[0.03] border border-white/10 rounded-[2.5rem] p-8 shadow-inner">
-                                        <div className="flex items-center justify-between mb-8">
+                                    <section className="bg-white/[0.03] border border-white/10 rounded-3xl p-6 shadow-inner">
+                                        <div className="flex items-center justify-between mb-6">
                                             <div className="flex items-center gap-3">
                                                 <div className="relative size-3">
                                                     <span className="absolute inset-0 rounded-full bg-brand-primary animate-ping opacity-20" />
@@ -999,7 +1113,7 @@ export default function OrdersPage() {
                                                 <h4 className="text-[11px] font-black uppercase tracking-[0.3em] text-brand-primary">Estágio da Operação</h4>
                                             </div>
                                             <div className="relative">
-                                                <button 
+                                                <button
                                                     onClick={() => setIsStatusDropdown(!isStatusDropdown)}
                                                     className={`group flex items-center gap-4 px-6 py-3 rounded-2xl text-xs font-black border transition-all ${selectedOrder.textColor} bg-white/5 border-white/10 hover:border-brand-primary/50 shadow-lg`}
                                                 >
@@ -1008,9 +1122,9 @@ export default function OrdersPage() {
                                                 </button>
                                                 <AnimatePresence>
                                                     {isStatusDropdown && (
-                                                        <motion.div 
-                                                            initial={{ opacity: 0, y: 10, scale: 0.95 }} 
-                                                            animate={{ opacity: 1, y: 0, scale: 1 }} 
+                                                        <motion.div
+                                                            initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                                                            animate={{ opacity: 1, y: 0, scale: 1 }}
                                                             exit={{ opacity: 0, y: 10, scale: 0.95 }}
                                                             className="absolute right-0 top-full mt-4 w-64 bg-[#161925] border border-white/10 rounded-[1.5rem] shadow-[0_32px_64px_rgba(0,0,0,0.6)] overflow-hidden z-[70] p-2"
                                                         >
@@ -1030,18 +1144,18 @@ export default function OrdersPage() {
                                             {/* Linha de fundo */}
                                             <div className="absolute top-[22px] left-4 right-4 h-1.5 bg-white/[0.05] rounded-full" />
                                             {/* Linha de progresso ativa */}
-                                            <motion.div 
+                                            <motion.div
                                                 initial={{ width: 0 }}
-                                                animate={{ width: `calc(${selectedOrder.progress}% - 32px)` }} 
-                                                className={`absolute top-[22px] left-4 h-1.5 rounded-full shadow-[0_0_20px_rgba(139,92,246,0.4)] ${selectedOrder.bgColor}`} 
+                                                animate={{ width: `calc(${selectedOrder.progress}% - 32px)` }}
+                                                className={`absolute top-[22px] left-4 h-1.5 rounded-full shadow-[0_0_20px_rgba(139,92,246,0.4)] ${selectedOrder.bgColor}`}
                                             />
-                                            
+
                                             <div className="relative flex justify-between">
                                                 {["Recebido", "Triagem", "Lavagem", "Secagem", "Finaliz.", "Pronto", "Entregue"].map((label, idx) => {
                                                     const stepProgress = (idx / 6) * 100;
                                                     const isActive = selectedOrder.progress >= stepProgress;
                                                     const isCurrent = selectedOrder.status === label || (label === "Finaliz." && selectedOrder.status === "Em Finalização") || (label === "Triagem" && selectedOrder.status === "Em Triagem") || (label === "Lavagem" && selectedOrder.status === "Em Lavagem") || (label === "Secagem" && selectedOrder.status === "Em Secagem");
-                                                    
+
                                                     return (
                                                         <div key={label} className="flex flex-col items-center group">
                                                             <div className={`size-12 rounded-full border-[5px] ${isActive ? 'bg-[#0f111a] border-brand-primary shadow-[0_0_15px_rgba(139,92,246,0.3)]' : 'bg-[#0f111a] border-white/5'} flex items-center justify-center transition-all duration-700 z-10 ${isCurrent ? 'scale-125 border-brand-primary shadow-[0_0_30px_rgba(139,92,246,0.5)]' : ''}`}>
@@ -1055,14 +1169,14 @@ export default function OrdersPage() {
                                         </div>
                                     </section>
 
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                                         {/* Coluna 1: Dados do Cliente e Logística */}
-                                        <div className="space-y-12">
+                                        <div className="space-y-8">
                                             <section>
-                                                <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-brand-muted mb-6 flex items-center gap-3">
+                                                <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-brand-muted mb-4 flex items-center gap-2">
                                                     <div className="size-1.5 rounded-full bg-brand-primary" /> Perfil do Cliente
                                                 </h4>
-                                                <div className="bg-white/[0.02] border border-white/5 rounded-[2rem] overflow-hidden divide-y divide-white/5">
+                                                <div className="bg-white/[0.02] border border-white/5 rounded-3xl overflow-hidden divide-y divide-white/5">
                                                     {[
                                                         { icon: User, label: "Titular", field: "client", type: "text" },
                                                         { icon: Phone, label: "WhatsApp", field: "phone", type: "text" },
@@ -1074,8 +1188,8 @@ export default function OrdersPage() {
                                                             </div>
                                                             <div className="flex-1">
                                                                 <p className="text-[9px] font-black uppercase tracking-widest text-brand-muted mb-1">{label}</p>
-                                                                <input 
-                                                                    type={type} 
+                                                                <input
+                                                                    type={type}
                                                                     value={(selectedOrder as any)[field]}
                                                                     onChange={e => setSelectedOrder({ ...selectedOrder, [field]: e.target.value })}
                                                                     className="w-full bg-transparent text-sm font-bold text-white outline-none focus:text-brand-primary transition-colors"
@@ -1087,14 +1201,14 @@ export default function OrdersPage() {
                                             </section>
 
                                             <section>
-                                                <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-brand-muted mb-6 flex items-center gap-3">
+                                                <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-brand-muted mb-4 flex items-center gap-2">
                                                     <div className="size-1.5 rounded-full bg-brand-primary" /> Planejamento Logístico
                                                 </h4>
                                                 <div className="grid grid-cols-2 gap-4">
                                                     <div className="p-5 bg-white/[0.02] border border-white/5 rounded-3xl group">
                                                         <p className="text-[9px] font-black uppercase tracking-widest text-brand-muted mb-3">Modalidade</p>
-                                                        <select 
-                                                            value={selectedOrder.delivery} 
+                                                        <select
+                                                            value={selectedOrder.delivery}
                                                             onChange={e => setSelectedOrder({ ...selectedOrder, delivery: e.target.value })}
                                                             className="w-full bg-transparent text-xs font-black text-white outline-none appearance-none cursor-pointer"
                                                         >
@@ -1104,8 +1218,8 @@ export default function OrdersPage() {
                                                     </div>
                                                     <div className="p-5 bg-white/[0.02] border border-white/5 rounded-3xl">
                                                         <p className="text-[9px] font-black uppercase tracking-widest text-brand-muted mb-3">Estimativa</p>
-                                                        <input 
-                                                            type="date" 
+                                                        <input
+                                                            type="date"
                                                             value={selectedOrder.estimatedDelivery}
                                                             onChange={e => setSelectedOrder({ ...selectedOrder, estimatedDelivery: e.target.value })}
                                                             className="w-full bg-transparent text-xs font-black text-white outline-none [color-scheme:dark]"
@@ -1116,10 +1230,10 @@ export default function OrdersPage() {
                                         </div>
 
                                         {/* Coluna 2: Itens e Pagamento */}
-                                        <div className="space-y-12">
+                                        <div className="space-y-8">
                                             <section>
-                                                <div className="flex items-center justify-between mb-6">
-                                                    <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-brand-muted flex items-center gap-3">
+                                                <div className="flex items-center justify-between mb-4">
+                                                    <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-brand-muted flex items-center gap-2">
                                                         <div className="size-1.5 rounded-full bg-brand-primary" /> Especificação do Pedido
                                                     </h4>
                                                     <button onClick={handleAddSelectedItem} className="flex items-center gap-2 px-4 py-2 bg-brand-primary/10 hover:bg-brand-primary/20 border border-brand-primary/30 rounded-xl transition-all group">
@@ -1127,8 +1241,8 @@ export default function OrdersPage() {
                                                         <span className="text-[10px] font-black uppercase tracking-widest text-brand-primary">Adicionar</span>
                                                     </button>
                                                 </div>
-                                                <div className="bg-white/[0.02] border border-white/5 rounded-[2.5rem] overflow-hidden shadow-inner">
-                                                    <div className="p-8 space-y-6 max-h-[400px] overflow-y-auto pr-6 custom-scrollbar">
+                                                <div className="bg-white/[0.02] border border-white/5 rounded-3xl overflow-hidden shadow-inner">
+                                                    <div className="p-6 space-y-4 max-h-[300px] overflow-y-auto pr-4 custom-scrollbar">
                                                         {selectedOrder.items.map((item: OrderItem, idx: number) => (
                                                             <div key={idx} className={`group/item relative bg-white/[0.03] border border-white/5 rounded-3xl p-6 flex flex-col gap-6 transition-all hover:bg-white/[0.05] ${activeServiceIdx === idx ? 'z-[110]' : 'z-10'}`}>
                                                                 <div className="flex items-center gap-6">
@@ -1136,7 +1250,7 @@ export default function OrdersPage() {
                                                                         <div className="absolute left-0 top-1/2 -translate-y-1/2">
                                                                             <Search className="size-4 text-brand-muted" />
                                                                         </div>
-                                                                        <input 
+                                                                        <input
                                                                             type="text"
                                                                             placeholder="Serviço..."
                                                                             value={item.service}
@@ -1145,10 +1259,10 @@ export default function OrdersPage() {
                                                                             onChange={e => handleSelectedItemChange(idx, "service", e.target.value)}
                                                                             className="w-full bg-transparent pl-8 text-sm font-black text-white outline-none placeholder:text-brand-muted"
                                                                         />
-                                                                        
+
                                                                         <AnimatePresence>
                                                                             {showServiceSuggestions && activeServiceIdx === idx && (
-                                                                                <motion.div 
+                                                                                <motion.div
                                                                                     initial={{ opacity: 0, y: 10 }}
                                                                                     animate={{ opacity: 1, y: 0 }}
                                                                                     exit={{ opacity: 0, y: 10 }}
@@ -1157,7 +1271,7 @@ export default function OrdersPage() {
                                                                                     {currentServices
                                                                                         .filter(s => s.name.toLowerCase().includes(item.service.toLowerCase()))
                                                                                         .map((s, sIdx) => (
-                                                                                            <button 
+                                                                                            <button
                                                                                                 key={sIdx}
                                                                                                 onClick={(e) => {
                                                                                                     e.stopPropagation();
@@ -1205,7 +1319,7 @@ export default function OrdersPage() {
                                             </section>
 
                                             <section>
-                                                <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-brand-muted mb-6 flex items-center gap-3">
+                                                <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-brand-muted mb-4 flex items-center gap-2">
                                                     <div className="size-1.5 rounded-full bg-brand-primary" /> Gestão Financeira
                                                 </h4>
                                                 <div className="grid grid-cols-2 gap-4">
@@ -1218,7 +1332,20 @@ export default function OrdersPage() {
                                                     </div>
                                                     <div className="p-5 bg-white/[0.02] border border-white/5 rounded-3xl">
                                                         <p className="text-[9px] font-black uppercase tracking-widest text-brand-muted mb-3">Status Atual</p>
-                                                        <select value={selectedOrder.paymentStatus} onChange={e => setSelectedOrder({ ...selectedOrder, paymentStatus: e.target.value })}
+                                                        <select value={selectedOrder.paymentStatus}
+                                                            onChange={e => {
+                                                                const status = e.target.value;
+                                                                const now = new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+                                                                setSelectedOrder({
+                                                                    ...selectedOrder,
+                                                                    paymentStatus: status,
+                                                                    lastUpdatedBy: staffName,
+                                                                    history: [
+                                                                        ...selectedOrder.history,
+                                                                        { time: now, status: `Pagamento: ${status}`, note: `Status de pagamento alterado para ${status}.`, staffName }
+                                                                    ]
+                                                                });
+                                                            }}
                                                             className="w-full bg-transparent text-xs font-black text-white outline-none appearance-none cursor-pointer">
                                                             {PAYMENT_STATUSES.map(p => <option key={p} className="bg-[#161925]">{p}</option>)}
                                                         </select>
@@ -1229,25 +1356,25 @@ export default function OrdersPage() {
                                     </div>
 
                                     {/* Observações e Timeline */}
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-12 pt-4">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                                         <section>
-                                            <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-brand-muted mb-6 flex items-center gap-3">
+                                            <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-brand-muted mb-4 flex items-center gap-2">
                                                 <div className="size-1.5 rounded-full bg-brand-primary" /> Notas do Operador
                                             </h4>
-                                            <textarea 
-                                                rows={4} 
-                                                placeholder="Adicionar detalhes técnicos..." 
+                                            <textarea
+                                                rows={3}
+                                                placeholder="Adicionar detalhes técnicos..."
                                                 value={selectedOrder.observations}
                                                 onChange={e => setSelectedOrder({ ...selectedOrder, observations: e.target.value })}
-                                                className="w-full p-6 bg-white/[0.03] border border-white/5 rounded-[2rem] text-sm font-medium text-white placeholder:text-brand-muted focus:bg-white/[0.05] focus:border-brand-primary/50 outline-none transition-all resize-none shadow-inner" 
+                                                className="w-full p-5 bg-white/[0.03] border border-white/5 rounded-2xl text-sm font-medium text-white placeholder:text-brand-muted focus:bg-white/[0.05] focus:border-brand-primary/50 outline-none transition-all resize-none shadow-inner"
                                             />
                                         </section>
 
                                         <section>
-                                            <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-brand-muted mb-6 flex items-center gap-3">
+                                            <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-brand-muted mb-4 flex items-center gap-2">
                                                 <div className="size-1.5 rounded-full bg-brand-primary" /> Histórico de Eventos
                                             </h4>
-                                            <div className="space-y-5 max-h-[160px] overflow-y-auto px-2 custom-scrollbar">
+                                            <div className="space-y-4 max-h-[120px] overflow-y-auto px-2 custom-scrollbar">
                                                 {selectedOrder.history.map((h: HistoryEntry, idx: number) => (
                                                     <div key={idx} className="relative pl-8 pb-5 last:pb-0">
                                                         <div className="absolute left-0 top-1.5 w-px h-full bg-white/5" />
@@ -1255,7 +1382,10 @@ export default function OrdersPage() {
                                                         <div className="flex flex-col">
                                                             <div className="flex items-center justify-between">
                                                                 <span className="text-xs font-black text-white uppercase tracking-wider">{h.status}</span>
-                                                                <span className="text-[9px] text-brand-muted font-black bg-white/5 px-2.5 py-1 rounded-full">{h.time}</span>
+                                                                <div className="flex items-center gap-2">
+                                                                    {h.staffName && <span className="text-[8px] font-black uppercase text-brand-primary bg-brand-primary/10 px-2 py-0.5 rounded-md border border-brand-primary/20">{h.staffName}</span>}
+                                                                    <span className="text-[9px] text-brand-muted font-black bg-white/5 px-2.5 py-1 rounded-full">{h.time}</span>
+                                                                </div>
                                                             </div>
                                                             {h.note && <p className="text-[10px] text-brand-muted mt-2 font-medium leading-relaxed italic">"{h.note}"</p>}
                                                         </div>
@@ -1266,10 +1396,10 @@ export default function OrdersPage() {
                                     </div>
                                 </div>
 
-                                <div className="p-10 bg-white/[0.02] border-t border-white/5">
-                                    <button 
+                                <div className="p-6 bg-white/[0.02] border-t border-white/5">
+                                    <button
                                         onClick={handleSaveOrder}
-                                        className="w-full group relative py-6 bg-brand-primary text-white rounded-[1.75rem] font-black text-sm tracking-[0.3em] uppercase overflow-hidden transition-all hover:scale-[1.01] active:scale-[0.99] shadow-[0_24px_48px_-12px_rgba(139,92,246,0.5)]"
+                                        className="w-full group relative py-4 bg-brand-primary text-white rounded-2xl font-black text-sm tracking-[0.3em] uppercase overflow-hidden transition-all hover:scale-[1.01] active:scale-[0.99] shadow-[0_24px_48px_-12px_rgba(139,92,246,0.5)]"
                                     >
                                         <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
                                         <span className="relative flex items-center justify-center gap-4">

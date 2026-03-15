@@ -1,11 +1,12 @@
 export interface OrderItem { service: string; qty: number; unitPrice: number; }
-export interface HistoryEntry { time: string; status: string; note: string; }
+export interface HistoryEntry { time: string; status: string; note: string; staffName?: string; }
 export interface Order {
     id: string; client: string; phone: string; email: string; address: string;
     paymentMethod: string; paymentStatus: string; delivery: string;
     items: OrderItem[]; status: string; progress: number; bgColor: string;
     textColor: string; observations: string; estimatedDelivery: string;
     history: HistoryEntry[]; createdAt: string; unitId: string;
+    createdBy?: string; lastUpdatedBy?: string;
 }
 
 export const SERVICES = [

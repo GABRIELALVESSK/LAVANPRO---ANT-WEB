@@ -23,6 +23,8 @@ import {
   ShoppingBag,
   MessageSquare,
   RefreshCw,
+  Menu,
+  X,
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -33,8 +35,57 @@ import { usePermissions } from "@/hooks/usePermissions";
 import { syncData } from "@/lib/dataSync";
 import { useSubscription, PlanTier } from "@/hooks/useSubscription";
 import { useTheme } from "next-themes";
-import { useEffect, useState } from "react";
+import { useEffect, useState, createContext, useContext } from "react";
 import { UnitSelector } from "@/components/unit-selector";
+import { useIsMobile } from "@/hooks/useIsMobile";
+
+// ─── Sidebar Context (controla abrir/fechar no mobile) ─────────────
+const SidebarContext = createContext<{
+  isOpen: boolean;
+  toggle: () => void;
+  close: () => void;
+}>({ isOpen: false, toggle: () => {}, close: () => {} });
+
+export function useSidebar() {
+  return useContext(SidebarContext);
+}
+
+export function SidebarProvider({ children }: { children: React.ReactNode }) {
+  const [isOpen, setIsOpen] = useState(false);
+  return (
+    <SidebarContext.Provider value={{ isOpen, toggle: () => setIsOpen(p => !p), close: () => setIsOpen(false) }}>
+      {children}
+    </SidebarContext.Provider>
+  );
+}
+
+// ─── Mobile Header (hamburger + title) ─────────────────────────────
+export function MobileHeader({ title }: { title?: string }) {
+  const { toggle } = useSidebar();
+  const { isMobile, isTablet } = useIsMobile();
+
+  if (!isMobile && !isTablet) return null;
+
+  return (
+    <div className="mobile-top-bar lg:hidden">
+      <button
+        onClick={toggle}
+        className="p-2 -ml-1 rounded-xl bg-brand-card border border-brand-darkBorder text-brand-text hover:bg-brand-primary/10 transition-colors"
+        aria-label="Abrir menu"
+      >
+        <Menu className="size-5" />
+      </button>
+      <div className="flex items-center gap-2 min-w-0 flex-1">
+        <div className="size-7 bg-brand-primary rounded-lg flex items-center justify-center shrink-0">
+          <WashingMachine className="size-4 text-white" />
+        </div>
+        <span className="text-sm font-bold text-brand-text truncate uppercase tracking-tight">
+          {title || "LavanPro"}
+        </span>
+      </div>
+    </div>
+  );
+}
 
 // All possible navigation items with their required permission key
 const ALL_NAV_ITEMS = [
@@ -66,10 +117,17 @@ export function Sidebar() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [isPlansModalOpen, setIsPlansModalOpen] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
+  const { isMobile, isTablet } = useIsMobile();
+  const { isOpen, close } = useSidebar();
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  // Drawer fecha ao trocar de rota
+  useEffect(() => {
+    close();
+  }, [pathname]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -104,7 +162,7 @@ export function Sidebar() {
 
   // Filter navigation items based on actual permissions
   const visibleItems = ALL_NAV_ITEMS.filter((item) => {
-    if (item.permission === null) return true; // Dashboard always visible
+    if (item.permission === null) return true;
     return canAccessRoute(item.href);
   });
 
@@ -123,166 +181,228 @@ export function Sidebar() {
     groups.push({ label, items });
   }
 
+  // ─── Conteúdo interno da sidebar (reutilizado no desktop e no drawer) ───
+  const sidebarContent = (
+    <>
+      {/* Logo */}
+      <div className="p-6 pb-4">
+        <div className="flex items-center gap-3 text-brand-text mb-6">
+          <div className="size-9 bg-brand-primary rounded-xl flex items-center justify-center shadow-lg shadow-brand-primary/30">
+            <WashingMachine className="size-5 text-white" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h2 className="text-base font-bold leading-tight tracking-tight uppercase">LavanPro</h2>
+            <p className="text-[10px] text-brand-muted font-medium">Sistema de Gestão</p>
+          </div>
+          {/* Botão fechar no mobile */}
+          {(isMobile || isTablet) && (
+            <button onClick={close} className="p-1.5 rounded-lg text-brand-muted hover:text-brand-text hover:bg-brand-card transition-colors">
+              <X className="size-5" />
+            </button>
+          )}
+        </div>
+
+        {/* Unit Selector */}
+        <div className="mb-6 relative">
+          <UnitSelector onUnitChange={(id) => {
+            localStorage.setItem("lavanpro_selected_unit", id);
+            window.dispatchEvent(new CustomEvent("unit-changed", { detail: id }));
+          }} />
+        </div>
+
+        {/* Nav Groups */}
+        <nav className="space-y-5">
+          {groups.map((group) => (
+            <div key={group.label}>
+              <p className="text-[9px] font-bold uppercase tracking-[0.15em] text-brand-muted mb-2 px-1">
+                {group.label}
+              </p>
+              <div className="space-y-0.5">
+                {group.items.map((item) => {
+                  const Icon = item.icon;
+                  const isActive = pathname === item.href;
+
+                  let isLocked = false;
+                  if (isStarter && PREMIUM_ROUTES.includes(item.href)) {
+                    isLocked = true;
+                  } else if (ENTERPRISE_ONLY_ROUTES.includes(item.href) && !isEnterprise) {
+                    isLocked = true;
+                  }
+
+                  return isLocked ? (
+                    <button
+                      key={item.href}
+                      onClick={() => setIsPlansModalOpen(true)}
+                      className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl transition-all duration-200 text-brand-muted hover:bg-brand-card/50 opacity-80`}
+                      title="Recurso Premium"
+                    >
+                      <div className="flex items-center gap-3">
+                        <Icon className="size-4 shrink-0 text-brand-muted/70" />
+                        <span className="text-sm font-medium">{item.label}</span>
+                      </div>
+                      <Lock className="size-3.5 text-amber-500/70" />
+                    </button>
+                  ) : (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 ${isActive
+                        ? "bg-brand-primary text-white shadow-[0_4px_14px_rgba(139,92,246,0.35)]"
+                        : "text-brand-muted hover:text-brand-text hover:bg-brand-card"
+                        }`}
+                    >
+                      <Icon className="size-4 shrink-0" />
+                      <span className="text-sm font-medium">{item.label}</span>
+                      {isActive && (
+                        <span className="ml-auto size-1.5 rounded-full bg-white/60" />
+                      )}
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </nav>
+      </div>
+
+      {/* Bottom */}
+      <div className="mt-auto p-5 border-t border-brand-darkBorder space-y-4">
+        {/* Manual Sync */}
+        {(usePermissions().isOwner) && (
+          <button
+            onClick={handleSyncData}
+            disabled={isSyncing}
+            className="w-full flex items-center justify-center gap-2 px-3 py-2.5 bg-brand-primary/10 border border-brand-primary/30 rounded-xl text-brand-primary hover:bg-brand-primary/20 transition-all font-bold text-xs disabled:opacity-50"
+          >
+            <RefreshCw className={`size-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
+            {isSyncing ? "Sincronizando..." : "Sincronizar Agora"}
+          </button>
+        )}
+
+        {/* Theme toggle */}
+        {mounted && (
+          <div className="flex items-center justify-between bg-brand-card rounded-xl p-1 border border-brand-darkBorder">
+            <button
+              onClick={() => setTheme("light")}
+              className={`p-2 rounded-lg flex-1 flex justify-center transition-colors ${theme === "light"
+                ? "bg-brand-bg text-brand-primary shadow-sm"
+                : "text-brand-muted hover:text-brand-text"
+                }`}
+              title="Tema Claro"
+            >
+              <Sun className="size-4" />
+            </button>
+            <button
+              onClick={() => setTheme("system")}
+              className={`p-2 rounded-lg flex-1 flex justify-center transition-colors ${theme === "system"
+                ? "bg-brand-bg text-brand-primary shadow-sm"
+                : "text-brand-muted hover:text-brand-text"
+                }`}
+              title="Tema do Sistema"
+            >
+              <Monitor className="size-4" />
+            </button>
+            <button
+              onClick={() => setTheme("dark")}
+              className={`p-2 rounded-lg flex-1 flex justify-center transition-colors ${theme === "dark"
+                ? "bg-brand-bg text-brand-primary shadow-sm"
+                : "text-brand-muted hover:text-brand-text"
+                }`}
+              title="Tema Escuro"
+            >
+              <Moon className="size-4" />
+            </button>
+          </div>
+        )}
+
+        {/* User info */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3 min-w-0">
+            <input 
+              type="file" 
+              id="user-avatar-upload" 
+              className="hidden" 
+              accept="image/*"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) {
+                  const reader = new FileReader();
+                  reader.onloadend = () => {
+                    const dataUrl = reader.result as string;
+                    if (user?.id) {
+                      localStorage.setItem(`lavanpro_user_avatar_${user.id}`, dataUrl);
+                      window.dispatchEvent(new Event("storage"));
+                    }
+                  };
+                  reader.readAsDataURL(file);
+                }
+              }}
+            />
+            <label 
+              htmlFor="user-avatar-upload"
+              className="size-9 rounded-full bg-brand-primary/20 flex items-center justify-center overflow-hidden relative shrink-0 cursor-pointer group hover:ring-2 hover:ring-brand-primary transition-all shadow-lg"
+              title="Alterar foto de perfil"
+            >
+              {(() => {
+                const saved = typeof window !== 'undefined' && user?.id ? localStorage.getItem(`lavanpro_user_avatar_${user.id}`) : null;
+                return saved ? (
+                  <img src={saved} alt="User avatar" className="w-full h-full object-cover transition-transform group-hover:scale-110" />
+                ) : (
+                  <Image
+                    src="https://picsum.photos/seed/avatar/100/100"
+                    alt="User avatar"
+                    fill
+                    className="object-cover group-hover:scale-110 transition-transform"
+                    referrerPolicy="no-referrer"
+                  />
+                );
+              })()}
+              <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                 <Users className="size-3 text-white" />
+              </div>
+            </label>
+            <div className="overflow-hidden">
+              <p className="text-sm font-bold text-brand-text truncate">
+                {user?.user_metadata?.full_name || user?.email?.split("@")[0] || "Usuário"}
+              </p>
+              <p className="text-[11px] text-brand-muted truncate text-ellipsis w-24">
+                {user?.email || "carregando..."}
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={handleLogout}
+            className="p-2 text-brand-muted hover:text-rose-400 hover:bg-rose-400/10 rounded-lg transition-colors shrink-0"
+            title="Sair do sistema"
+          >
+            <LogOut className="size-4" />
+          </button>
+        </div>
+      </div>
+    </>
+  );
+
   return (
     <>
-      <aside className="w-64 bg-brand-bg border-r border-brand-darkBorder flex flex-col shrink-0 min-h-screen">
-        {/* Logo */}
-        <div className="p-6 pb-4">
-          <div className="flex items-center gap-3 text-brand-text mb-6">
-            <div className="size-9 bg-brand-primary rounded-xl flex items-center justify-center shadow-lg shadow-brand-primary/30">
-              <WashingMachine className="size-5 text-white" />
-            </div>
-            <div>
-              <h2 className="text-base font-bold leading-tight tracking-tight">Lavanderia Pro</h2>
-              <p className="text-[10px] text-brand-muted font-medium">Sistema de Gestão</p>
-            </div>
-          </div>
-
-          {/* Unit Selector (Centralized control) */}
-          <div className="mb-6 relative">
-            <UnitSelector onUnitChange={(id) => {
-              localStorage.setItem("lavanpro_selected_unit", id);
-              window.dispatchEvent(new CustomEvent("unit-changed", { detail: id }));
-            }} />
-          </div>
-
-          {/* Nav Groups */}
-          <nav className="space-y-5">
-            {groups.map((group) => (
-              <div key={group.label}>
-                <p className="text-[9px] font-bold uppercase tracking-[0.15em] text-brand-muted mb-2 px-1">
-                  {group.label}
-                </p>
-                <div className="space-y-0.5">
-                  {group.items.map((item) => {
-                    const Icon = item.icon;
-                    const isActive = pathname === item.href;
-
-                    // Logic to check if route is locked based on current plan:
-                    let isLocked = false;
-                    if (isStarter && PREMIUM_ROUTES.includes(item.href)) {
-                      isLocked = true;
-                    } else if (ENTERPRISE_ONLY_ROUTES.includes(item.href) && !isEnterprise) {
-                      isLocked = true;
-                    }
-
-                    return isLocked ? (
-                      <button
-                        key={item.href}
-                        onClick={() => setIsPlansModalOpen(true)}
-                        className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl transition-all duration-200 text-brand-muted hover:bg-brand-card/50 opacity-80`}
-                        title="Recurso Premium"
-                      >
-                        <div className="flex items-center gap-3">
-                          <Icon className="size-4 shrink-0 text-brand-muted/70" />
-                          <span className="text-sm font-medium">{item.label}</span>
-                        </div>
-                        <Lock className="size-3.5 text-amber-500/70" />
-                      </button>
-                    ) : (
-                      <Link
-                        key={item.href}
-                        href={item.href}
-                        className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 ${isActive
-                          ? "bg-brand-primary text-white shadow-[0_4px_14px_rgba(139,92,246,0.35)]"
-                          : "text-brand-muted hover:text-brand-text hover:bg-brand-card"
-                          }`}
-                      >
-                        <Icon className="size-4 shrink-0" />
-                        <span className="text-sm font-medium">{item.label}</span>
-                        {isActive && (
-                          <span className="ml-auto size-1.5 rounded-full bg-white/60" />
-                        )}
-                      </Link>
-                    );
-                  })}
-                </div>
-              </div>
-            ))}
-          </nav>
-        </div>
-
-        {/* Bottom */}
-        <div className="mt-auto p-5 border-t border-brand-darkBorder space-y-4">
-          {/* Manual Sync (Only for Owners or if no sync rows) */}
-          {(usePermissions().isOwner) && (
-            <button
-              onClick={handleSyncData}
-              disabled={isSyncing}
-              className="w-full flex items-center justify-center gap-2 px-3 py-2.5 bg-brand-primary/10 border border-brand-primary/30 rounded-xl text-brand-primary hover:bg-brand-primary/20 transition-all font-bold text-xs disabled:opacity-50"
-            >
-              <RefreshCw className={`size-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
-              {isSyncing ? "Sincronizando..." : "Sincronizar Agora"}
-            </button>
-          )}
-
-          {/* Theme toggle */}
-          {mounted && (
-            <div className="flex items-center justify-between bg-brand-card rounded-xl p-1 border border-brand-darkBorder">
-              <button
-                onClick={() => setTheme("light")}
-                className={`p-2 rounded-lg flex-1 flex justify-center transition-colors ${theme === "light"
-                  ? "bg-brand-bg text-brand-primary shadow-sm"
-                  : "text-brand-muted hover:text-brand-text"
-                  }`}
-                title="Tema Claro"
-              >
-                <Sun className="size-4" />
-              </button>
-              <button
-                onClick={() => setTheme("system")}
-                className={`p-2 rounded-lg flex-1 flex justify-center transition-colors ${theme === "system"
-                  ? "bg-brand-bg text-brand-primary shadow-sm"
-                  : "text-brand-muted hover:text-brand-text"
-                  }`}
-                title="Tema do Sistema"
-              >
-                <Monitor className="size-4" />
-              </button>
-              <button
-                onClick={() => setTheme("dark")}
-                className={`p-2 rounded-lg flex-1 flex justify-center transition-colors ${theme === "dark"
-                  ? "bg-brand-bg text-brand-primary shadow-sm"
-                  : "text-brand-muted hover:text-brand-text"
-                  }`}
-                title="Tema Escuro"
-              >
-                <Moon className="size-4" />
-              </button>
-            </div>
-          )}
-
-          {/* User info */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3 min-w-0">
-              <div className="size-9 rounded-full bg-brand-primary/20 flex items-center justify-center overflow-hidden relative shrink-0">
-                <Image
-                  src="https://picsum.photos/seed/avatar/100/100"
-                  alt="User avatar"
-                  fill
-                  className="object-cover"
-                  referrerPolicy="no-referrer"
-                />
-              </div>
-              <div className="overflow-hidden">
-                <p className="text-sm font-bold text-brand-text truncate">
-                  {user?.user_metadata?.full_name || user?.email?.split("@")[0] || "Usuário"}
-                </p>
-                <p className="text-[11px] text-brand-muted truncate text-ellipsis w-24">
-                  {user?.email || "carregando..."}
-                </p>
-              </div>
-            </div>
-            <button
-              onClick={handleLogout}
-              className="p-2 text-brand-muted hover:text-rose-400 hover:bg-rose-400/10 rounded-lg transition-colors shrink-0"
-              title="Sair do sistema"
-            >
-              <LogOut className="size-4" />
-            </button>
-          </div>
-        </div>
+      {/* ─── DESKTOP: Sidebar normal (inalterada) ─── */}
+      <aside className="hidden lg:flex w-64 bg-brand-bg border-r border-brand-darkBorder flex-col shrink-0 min-h-screen">
+        {sidebarContent}
       </aside>
+
+      {/* ─── MOBILE / TABLET: Drawer off-canvas ─── */}
+      {(isMobile || isTablet) && (
+        <>
+          {/* Overlay */}
+          <div
+            className={`mobile-drawer-overlay ${isOpen ? 'open' : ''}`}
+            onClick={close}
+          />
+          {/* Drawer */}
+          <div className={`mobile-drawer bg-brand-bg border-r border-brand-darkBorder flex flex-col ${isOpen ? 'open' : ''}`}>
+            {sidebarContent}
+          </div>
+        </>
+      )}
 
       {/* Plans Modal Overlay for Upsell */}
       {isPlansModalOpen && (

@@ -1,6 +1,6 @@
 "use client";
 
-import { Sidebar } from "@/components/sidebar";
+import { Sidebar, MobileHeader } from "@/components/sidebar";
 import { AccessGuard } from "@/components/access-guard";
 import { PlanGuard } from "@/components/plan-guard";
 import {
@@ -17,21 +17,24 @@ import Webcam from "react-webcam";
 import { useSearchParams, useRouter } from "next/navigation";
 import QRCodeLib from "qrcode";
 import ReactQRCode from "react-qr-code";
+import { Order, OrderItem, HistoryEntry } from "@/lib/orders-data";
+import { useAuth } from "@/hooks/useAuth";
+import { syncData, pushDataToServer } from "@/lib/dataSync";
+
+const STATUS_CONFIG: Record<string, { color: string; bg: string; progress: number; textColor: string }> = {
+    "Recebido": { color: "text-slate-400", bg: "bg-slate-400", progress: 5, textColor: "text-slate-400" },
+    "Em Triagem": { color: "text-violet-400", bg: "bg-violet-500", progress: 16, textColor: "text-violet-400" },
+    "Em Lavagem": { color: "text-brand-primary", bg: "bg-brand-primary", progress: 32, textColor: "text-brand-primary" },
+    "Em Secagem": { color: "text-amber-500", bg: "bg-amber-500", progress: 50, textColor: "text-amber-500" },
+    "Em Finalização": { color: "text-blue-400", bg: "bg-blue-400", progress: 72, textColor: "text-blue-400" },
+    "Pronto": { color: "text-teal-400", bg: "bg-teal-400", progress: 90, textColor: "text-teal-400" },
+    "Entregue": { color: "text-emerald-500", bg: "bg-emerald-500", progress: 100, textColor: "text-emerald-500" },
+    "Cancelado": { color: "text-rose-500", bg: "bg-rose-500", progress: 0, textColor: "text-rose-500" },
+};
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type OrderStatus = "Recebido" | "Em Triagem" | "Em Lavagem" | "Em Secagem" | "Em Finalização" | "Pronto" | "Entregue" | "Cancelado";
 type LabelStatus = "available" | "assigned";
-
-interface OrderItem { name: string; qty: number; category: string; }
-
-interface MockOrder {
-    id: string;
-    clientName: string;
-    clientPhone: string;
-    status: OrderStatus;
-    items: OrderItem[];
-    createdAt: string;
-}
 
 interface ReusableLabel {
     id: string;
@@ -49,7 +52,7 @@ interface LabelHistory {
 }
 
 // ─── Seed Data (CLEANED - ONLY REAL DATA) ──────────────────────────────────
-const SEED_ORDERS_DB: MockOrder[] = [];
+const SEED_ORDERS_DB: Order[] = [];
 const INITIAL_LABELS: ReusableLabel[] = [];
 const INITIAL_HISTORY: LabelHistory[] = [];
 
@@ -77,7 +80,7 @@ function formatDate(iso: string) {
 
 // ─── Print Modal ──────────────────────────────────────────────────────────────
 // ─── Print Modal ──────────────────────────────────────────────────────────────
-function PrintModal({ label, order, onClose }: { label: ReusableLabel; order: MockOrder | null; onClose: () => void }) {
+function PrintModal({ label, order, onClose }: { label: ReusableLabel; order: Order | null; onClose: () => void }) {
     const [printing, setPrinting] = useState(false);
     const [printType, setPrintType] = useState<"label" | "order">("label");
     const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string>("");
@@ -175,8 +178,8 @@ function PrintModal({ label, order, onClose }: { label: ReusableLabel; order: Mo
                                 <p className="font-black text-xl tracking-[0.2em] bg-zinc-100 py-2 border-t border-b border-black">{label.code}</p>
                                 {order && (
                                     <div className="text-[12px] space-y-1 text-left font-black pt-2">
-                                        <div className="flex justify-between border-b border-black"><span>ORDEM:</span> <span>#{order.id}</span></div>
-                                        <div className="flex justify-between"><span>CLIENTE:</span> <span className="truncate max-w-[150px]">{order.clientName}</span></div>
+                                        <div className="flex justify-between border-b border-black"><span>ORDEM:</span> <span>{order.id}</span></div>
+                                        <div className="flex justify-between"><span>CLIENTE:</span> <span className="truncate max-w-[150px]">{order.client}</span></div>
                                     </div>
                                 )}
                             </div>
@@ -190,11 +193,11 @@ function PrintModal({ label, order, onClose }: { label: ReusableLabel; order: Mo
                                 <div className="text-left space-y-3 font-black">
                                     <div className="flex justify-between text-xl border-b-2 border-black pb-1">
                                         <span>ORDEM:</span>
-                                        <span>#{order.id}</span>
+                                        <span>{order.id}</span>
                                     </div>
                                     <div className="flex flex-col">
                                         <span className="text-[10px]">CLIENTE:</span>
-                                        <span className="text-lg leading-none">{order.clientName}</span>
+                                        <span className="text-lg leading-none">{order.client}</span>
                                     </div>
                                     <div className="flex justify-between border-t border-black pt-2">
                                         <span>ENTRADA:</span>
@@ -207,7 +210,7 @@ function PrintModal({ label, order, onClose }: { label: ReusableLabel; order: Mo
                                     <div className="space-y-2">
                                         {order.items.map((item, i) => (
                                             <div key={i} className="flex justify-between font-black items-start leading-tight text-[11px]">
-                                                <span className="flex-1 pr-4">{item.name}</span>
+                                                <span className="flex-1 pr-4">{item.service}</span>
                                                 <span className="whitespace-nowrap">[{item.qty}]</span>
                                             </div>
                                         ))}
@@ -269,6 +272,9 @@ export default function ReusableLabelsPage() {
 
 function LabelsContent() {
     const router = useRouter();
+    const { user } = useAuth();
+    const staffName = user?.user_metadata?.full_name || user?.email?.split("@")[0] || "Administrador";
+
     const [labels, setLabels] = useState<ReusableLabel[]>(() => {
         if (typeof window === "undefined") return INITIAL_LABELS;
         try {
@@ -290,7 +296,7 @@ function LabelsContent() {
     const [scanModal, setScanModal] = useState<ReusableLabel | null>(null);
     const [linkOrderId, setLinkOrderId] = useState("");
     const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null);
-    const [globalOrders, setGlobalOrders] = useState<MockOrder[]>(SEED_ORDERS_DB);
+    const [globalOrders, setGlobalOrders] = useState<Order[]>(SEED_ORDERS_DB);
     const [isCameraActive, setIsCameraActive] = useState(false);
     const [isGenerating, setIsGenerating] = useState(false);
     const [genQty, setGenQty] = useState(5);
@@ -341,27 +347,31 @@ function LabelsContent() {
 
     // ── Sincronizar com Banco de Pedidos Global ──
     useEffect(() => {
-        const syncOrders = () => {
+        const syncGlobalData = () => {
             const saved = localStorage.getItem("lavanpro_orders_v3");
             if (saved) {
                 try {
                     const rawOrders = JSON.parse(saved);
-                    // Mapeia do formato da página Orders para o formato local
-                    const mapped: MockOrder[] = rawOrders.map((o: any) => ({
-                        id: String(o.id).replace("#", ""),
-                        clientName: o.client,
-                        clientPhone: o.phone,
-                        status: o.status,
-                        items: o.items.map((it: any) => ({ name: it.service, qty: it.qty, category: "—" })),
-                        createdAt: o.createdAt
-                    }));
-                    setGlobalOrders(mapped);
+                    setGlobalOrders(rawOrders);
                 } catch (e) { console.error("Erro ao sincronizar pedidos:", e); }
             }
+            const savedLabels = localStorage.getItem("lavanpro_labels");
+            if (savedLabels) {
+                try {
+                    setLabels(JSON.parse(savedLabels));
+                } catch (e) {}
+            }
         };
-        syncOrders();
-        window.addEventListener("storage", syncOrders);
-        return () => window.removeEventListener("storage", syncOrders);
+
+        syncGlobalData();
+        syncData(); // Puxa do servidor no mount
+
+        window.addEventListener("storage", syncGlobalData);
+        window.addEventListener("data-synced", syncGlobalData);
+        return () => {
+            window.removeEventListener("storage", syncGlobalData);
+            window.removeEventListener("data-synced", syncGlobalData);
+        };
     }, []);
 
     const showToast = useCallback((msg: string, type: "success" | "error" = "success") => {
@@ -439,6 +449,7 @@ function LabelsContent() {
                 return [...prev, ...newLabels];
             });
             setIsGenerating(false);
+            pushDataToServer('lavanpro_labels');
             showToast(`Criamos mais ${qty} etiquetas para seu estoque!`);
         }, 800);
     };
@@ -459,6 +470,7 @@ function LabelsContent() {
             if (selectedLabel?.id === labelId) {
                 setSelectedLabel(null);
             }
+            pushDataToServer('lavanpro_labels');
             showToast(`Etiqueta ${label.code} removida.`);
         }
     };
@@ -540,6 +552,10 @@ function LabelsContent() {
         // Priority 1: Handle as ORDER
         if (identifiedOrder) {
             const cleanOrderId = identifiedOrder.replace("#", "");
+            if (!cleanOrderId.startsWith("ORD")) {
+                // If it's just numbers, prefix with ORD- or search for it
+                // Logic based on how your system IDs look
+            }
             console.log("[Scanner] Identificado como PEDIDO:", cleanOrderId);
             
             // Check if it's actually a TAG name that holds this order
@@ -547,7 +563,7 @@ function LabelsContent() {
             
             setIsCameraActive(false);
             showToast(`Pedido ${cleanOrderId} localizado!`, "success");
-            router.push(`/pedido/${cleanOrderId}`);
+            router.push(`/orders?search=${cleanOrderId}`); // Changed to point to orders page filter
             return;
         }
 
@@ -571,7 +587,7 @@ function LabelsContent() {
                     const orderId = foundLabel.currentOrderId.replace("#", "");
                     console.log("[Scanner] TAG vinculada ao pedido:", orderId);
                     showToast(`Etiqueta ${foundLabel.code} -> Pedido ${orderId}`);
-                    router.push(`/pedido/${orderId}`);
+                    router.push(`/orders?search=${orderId}`); // Changed to point to orders page filter
                 } else {
                     console.log("[Scanner] TAG disponível para vínculo:", foundLabel.code);
                     setScanModal(foundLabel);
@@ -717,51 +733,94 @@ function LabelsContent() {
     const assignLabel = (label: ReusableLabel, orderId: string) => {
         const trimmedId = orderId.trim().toUpperCase().replace("#", "");
         if (!trimmedId) { showToast("Informe o código do pedido.", "error"); return; }
-        const alreadyLinked = labels.find(l => l.currentOrderId === trimmedId && l.id !== label.id);
-        if (alreadyLinked) { showToast(`O pedido ${trimmedId} já está vinculado à Etiqueta ${alreadyLinked.displayNumber}.`, "error"); return; }
 
-        // Se o pedido não estiver no banco, adiciona um registro mínimo
-        if (!globalOrders.find(o => o.id === trimmedId)) {
-            const newOrderStub = {
-                id: trimmedId, clientName: "Cliente Manual", clientPhone: "—",
-                status: "Recebido" as OrderStatus, createdAt: new Date().toISOString(), items: []
-            };
-            setGlobalOrders(prev => [...prev, newOrderStub]);
+        // Impede vínculo se a etiqueta já está vinculada a outro pedido
+        if (label.status === "assigned" && label.currentOrderId) {
+            showToast(`Esta etiqueta já está vinculada ao pedido ${label.currentOrderId}. Libere-a primeiro.`, "error");
+            return;
         }
 
-        setLabels(prev => prev.map(l => l.id === label.id
-            ? { ...l, status: "assigned", currentOrderId: trimmedId }
+        // Impede vínculo se o pedido já está vinculado a outra etiqueta
+        const alreadyLinked = labels.find(l => {
+            const lOrderId = String(l.currentOrderId || "").replace("#", "").trim();
+            return lOrderId === trimmedId && l.id !== label.id && l.status === "assigned";
+        });
+        if (alreadyLinked) { showToast(`O pedido ${trimmedId} já está vinculado à Etiqueta ${alreadyLinked.code}. Não é possível criar duplicidade.`, "error"); return; }
+
+        // Se o pedido não estiver no banco, adiciona um registro mínimo
+        if (!globalOrders.find(o => String(o.id).replace("#", "") === trimmedId)) {
+            const newOrderStub: any = {
+                id: trimmedId, client: "Cliente Manual", phone: "—",
+                status: "Recebido" as OrderStatus, createdAt: new Date().toISOString(), items: [],
+                history: [{ time: new Date().toLocaleTimeString(), status: "Etiqueta Vinculada", note: `Vinculado à TAG ${label.code}`, staffName }]
+            };
+            setGlobalOrders(prev => [...prev, newOrderStub]);
+            // Importante: salvar este stub para que outros vejam
+            const currentOrders = JSON.parse(localStorage.getItem("lavanpro_orders_v3") || "[]");
+            localStorage.setItem("lavanpro_orders_v3", JSON.stringify([...currentOrders, newOrderStub]));
+            pushDataToServer('lavanpro_orders_v3');
+        }
+
+        const updatedLabels = labels.map(l => l.id === label.id
+            ? { ...l, status: "assigned" as const, currentOrderId: trimmedId }
             : l
-        ));
+        );
+        localStorage.setItem("lavanpro_labels", JSON.stringify(updatedLabels));
+        
+        setLabels(updatedLabels);
         setHistory(prev => [...prev, { labelId: label.id, orderId: trimmedId, assignedAt: new Date().toISOString(), releasedAt: null }]);
         setSelectedLabel(prev => prev?.id === label.id ? { ...prev, status: "assigned", currentOrderId: trimmedId } : prev);
         setScanModal(prev => prev?.id === label.id ? { ...prev, status: "assigned", currentOrderId: trimmedId } : prev);
         setLinkOrderId("");
+        pushDataToServer('lavanpro_labels');
         showToast(`Etiqueta ${label.code} vinculada ao pedido ${trimmedId}!`);
     };
 
-    const handleStageAdvancement = (label: ReusableLabel, order: MockOrder, newStage: OrderStatus) => {
+    const handleStageAdvancement = (label: ReusableLabel, order: Order, newStage: OrderStatus) => {
         // 1. Atualiza no localStorage global de pedidos
         try {
             const savedOrders = localStorage.getItem("lavanpro_orders_v3");
             if (savedOrders) {
                 const rawOrders = JSON.parse(savedOrders);
-                const updatedOrders = rawOrders.map((o: any) =>
-                    String(o.id).replace("#", "") === order.id ? { ...o, status: newStage } : o
-                );
-                localStorage.setItem("lavanpro_orders_v3", JSON.stringify(updatedOrders));
+                const cfg = STATUS_CONFIG[newStage];
+                const now = new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+                const cleanOrderId = String(order.id).replace("#", "").trim();
 
-                // Dispara evento de storage para atualizar o estado local 'globalOrders'
+                const updatedOrders = rawOrders.map((o: any) => {
+                    const oCleanId = String(o.id).replace("#", "").trim();
+                    if (oCleanId === cleanOrderId) {
+                        return { 
+                            ...o, 
+                            status: newStage,
+                            progress: cfg?.progress ?? o.progress,
+                            bgColor: cfg?.bg ?? o.bgColor,
+                            textColor: cfg?.textColor ?? o.textColor,
+                            lastUpdatedBy: staffName,
+                            history: [
+                                ...(o.history || []),
+                                { time: now, status: newStage, note: `Status alterado via scan de etiqueta.`, staffName }
+                            ]
+                        };
+                    }
+                    return o;
+                });
+                localStorage.setItem("lavanpro_orders_v3", JSON.stringify(updatedOrders));
+                
+                // Atualiza o estado React diretamente para refletir na UI
+                setGlobalOrders(updatedOrders);
+
+                // PUSH IMEDIATO
+                pushDataToServer('lavanpro_orders_v3');
+
+                // Dispara evento de storage para atualizar outras abas
                 window.dispatchEvent(new Event("storage"));
             }
         } catch (e) { console.error("Erro ao atualizar status do pedido:", e); }
 
-        // 2. Se for "Entregue", perguntar se quer desvincular
+        // 2. Se for "Entregue", desvincular automaticamente a etiqueta
         if (newStage === "Entregue") {
-            const confirmRelease = window.confirm(`O pedido ${order.id} foi marcado como Entregue. Deseja liberar a etiqueta ${label.code} agora?`);
-            if (confirmRelease) {
-                releaseLabel(label);
-            }
+            releaseLabel(label);
+            showToast(`Pedido ${order.id} entregue! Etiqueta ${label.code} liberada automaticamente.`);
         } else {
             showToast(`Status do pedido ${order.id} alterado para ${newStage}.`);
         }
@@ -769,10 +828,13 @@ function LabelsContent() {
 
     // ── Release label ───────────────────────
     const releaseLabel = (label: ReusableLabel) => {
-        setLabels(prev => prev.map(l => l.id === label.id
-            ? { ...l, status: "available", currentOrderId: null }
+        const updated = labels.map(l => l.id === label.id
+            ? { ...l, status: "available" as const, currentOrderId: null }
             : l
-        ));
+        );
+        localStorage.setItem("lavanpro_labels", JSON.stringify(updated));
+        
+        setLabels(updated);
         setHistory(prev => prev.map(h =>
             h.labelId === label.id && h.releasedAt === null
                 ? { ...h, releasedAt: new Date().toISOString() }
@@ -780,6 +842,7 @@ function LabelsContent() {
         ));
         setSelectedLabel(prev => prev?.id === label.id ? { ...prev, status: "available", currentOrderId: null } : prev);
         setScanModal(null);
+        pushDataToServer('lavanpro_labels');
         showToast(`Etiqueta ${label.code} liberada! Disponível para reuso.`);
     };
 
@@ -792,8 +855,15 @@ function LabelsContent() {
         });
     }, [labels, search, filterStatus]);
 
-    const getOrderForLabel = (label: ReusableLabel) =>
-        label.currentOrderId ? globalOrders.find(o => o.id === label.currentOrderId) ?? null : null;
+    const getOrderForLabel = (label: ReusableLabel) => {
+        if (!label.currentOrderId) return null;
+        const targetId = label.currentOrderId;
+        const matches = globalOrders.filter(o => String(o.id).replace("#", "") === targetId);
+        if (matches.length === 0) return null;
+        // Prioritize real orders over stubs
+        const realOrder = matches.find(o => o.client !== "Cliente Manual");
+        return realOrder || matches[0];
+    };
 
     const availableCount = labels.filter(l => l.status === "available").length;
     const assignedCount = labels.filter(l => l.status === "assigned").length;
@@ -810,12 +880,13 @@ function LabelsContent() {
 
     return (
         <AccessGuard permission="labels">
-            <div className="flex h-screen bg-brand-bg text-brand-text font-sans">
+            <div className="flex min-h-screen bg-brand-bg text-brand-text font-sans">
                 <Sidebar />
                 <PlanGuard moduleName="Etiquetagem QR" requiredPlan="pro">
-                    <div className="flex-1 flex flex-col overflow-hidden">
-                        <main className="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar">
-                            <div className="max-w-[1600px] mx-auto space-y-6">
+                    <div className="flex-1 flex flex-col h-screen overflow-hidden">
+                        <MobileHeader title="Etiquetagem QR" />
+                        <main className="flex-1 overflow-y-auto responsive-px py-6 lg:py-8 custom-scrollbar">
+                            <div className="max-w-[1600px] mx-auto space-y-6 safe-bottom">
 
                                 {/* Header */}
                                 <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -1044,19 +1115,19 @@ function LabelsContent() {
                                                                     <h3 className="font-bold text-sm text-brand-text flex items-center gap-2">
                                                                         <SearchCode className="size-4 text-brand-primary" /> Pedido Vinculado
                                                                     </h3>
-                                                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${getStatusColor(selectedOrder.status)}`}>{selectedOrder.status}</span>
+                                                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${getStatusColor(selectedOrder.status as OrderStatus)}`}>{selectedOrder.status}</span>
                                                                 </div>
                                                                 <div className="space-y-1 text-sm">
                                                                     <p className="font-black text-brand-primary text-base">{selectedOrder.id}</p>
-                                                                    <p className="flex items-center gap-2 text-brand-muted"><Users className="size-3.5" /> {selectedOrder.clientName}</p>
-                                                                    <p className="text-xs text-brand-muted">{selectedOrder.clientPhone}</p>
+                                                                    <p className="flex items-center gap-2 text-brand-muted"><Users className="size-3.5" /> {selectedOrder.client}</p>
+                                                                    <p className="text-xs text-brand-muted">{selectedOrder.phone}</p>
                                                                 </div>
                                                                 <div className="border-t border-brand-darkBorder pt-3">
                                                                     <p className="text-[10px] font-bold uppercase tracking-wider text-brand-muted mb-2">Itens do Pedido</p>
                                                                     <div className="space-y-1.5">
                                                                         {selectedOrder.items.map((item, i) => (
                                                                             <div key={i} className="flex items-center justify-between text-xs">
-                                                                                <span className="text-brand-muted">{item.name}</span>
+                                                                                <span className="text-brand-muted">{item.service}</span>
                                                                                 <span className="font-bold text-brand-text bg-brand-card border border-brand-darkBorder px-2 py-0.5 rounded-lg">x{item.qty}</span>
                                                                             </div>
                                                                         ))}
@@ -1104,7 +1175,7 @@ function LabelsContent() {
                                                                     />
                                                                     <datalist id="orders-datalist">
                                                                         {globalOrders.filter(o => !labels.some(l => l.currentOrderId === o.id)).map(o => (
-                                                                            <option key={o.id} value={o.id}>{o.id} — {o.clientName}</option>
+                                                                            <option key={o.id} value={o.id}>{o.id} — {o.client}</option>
                                                                         ))}
                                                                     </datalist>
                                                                 </div>
@@ -1193,8 +1264,8 @@ function LabelsContent() {
                                                     className="w-full px-3 py-2.5 bg-brand-bg border border-brand-darkBorder rounded-xl text-sm text-brand-text placeholder:text-brand-muted focus:outline-none focus:ring-2 focus:ring-brand-primary"
                                                 />
                                                 <datalist id="scan-orders-datalist">
-                                                    {globalOrders.filter(o => !labels.some(l => l.currentOrderId === o.id)).map((o: MockOrder) => (
-                                                        <option key={o.id} value={o.id}>{o.id} — {o.clientName}</option>
+                                                    {globalOrders.filter(o => !labels.some(l => l.currentOrderId === o.id)).map((o: Order) => (
+                                                        <option key={o.id} value={o.id}>{o.id} — {o.client}</option>
                                                     ))}
                                                 </datalist>
                                                 <button onClick={() => linkOrderId && assignLabel(scanLabelState, linkOrderId)} disabled={!linkOrderId}
@@ -1208,13 +1279,13 @@ function LabelsContent() {
                                             <div className="bg-brand-bg border border-brand-darkBorder rounded-2xl p-4 space-y-2">
                                                 <div className="flex items-center justify-between mb-1">
                                                     <p className="font-black text-brand-primary">{scanOrder.id}</p>
-                                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${getStatusColor(scanOrder.status)}`}>{scanOrder.status}</span>
+                                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${getStatusColor(scanOrder.status as OrderStatus)}`}>{scanOrder.status}</span>
                                                 </div>
-                                                <p className="text-sm flex items-center gap-2 text-brand-muted"><Users className="size-3.5" /> {scanOrder.clientName}</p>
+                                                <p className="text-sm flex items-center gap-2 text-brand-muted"><Users className="size-3.5" /> {scanOrder.client}</p>
                                                 <div className="border-t border-brand-darkBorder pt-2 mt-2">
                                                     {scanOrder.items.map((item, i) => (
                                                         <div key={i} className="flex justify-between text-xs py-0.5">
-                                                            <span className="text-brand-muted">{item.name}</span>
+                                                            <span className="text-brand-muted">{item.service}</span>
                                                             <span className="font-bold text-brand-text">x{item.qty}</span>
                                                         </div>
                                                     ))}

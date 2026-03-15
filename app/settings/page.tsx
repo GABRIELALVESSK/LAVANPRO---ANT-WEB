@@ -5,12 +5,13 @@ import { useState, useEffect, Suspense, useMemo } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/lib/supabase";
-import { Sidebar } from "@/components/sidebar";
+import { Sidebar, MobileHeader } from "@/components/sidebar";
 import { SettingsSidebar, SettingsMobileNav } from "@/components/settings/settings-sidebar";
 import { motion, AnimatePresence } from "framer-motion";
 import dynamic from "next/dynamic";
 import type { SettingsTab } from "@/components/settings/settings-sidebar";
 import { PaymentSuccessModal } from "@/components/settings/payment-success-modal";
+import { pushDataToServer, syncData } from "@/lib/dataSync";
 
 // Dynamically import all tabs with no SSR to avoid 500 errors
 const CompanyDataTab = dynamic(() => import("@/components/settings/company-data-tab").then(m => m.CompanyDataTab), { ssr: false });
@@ -102,6 +103,7 @@ function SettingsContent() {
     email: "contato@lavanderiapro.com",
     phone: "(11) 3000-4000",
     website: "",
+    logo: "",
   });
 
   const [operationalForm, setOperationalForm] = useState({
@@ -128,20 +130,22 @@ function SettingsContent() {
 
   // Load data from localStorage on mount
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    const loadLocalSettings = () => {
+      const savedCompany = localStorage.getItem("lavanpro_company");
+      if (savedCompany) { try { setCompanyForm(JSON.parse(savedCompany)); } catch { } }
+      const savedOperational = localStorage.getItem("lavanpro_operational");
+      if (savedOperational) { try { setOperationalForm(JSON.parse(savedOperational)); } catch { } }
+      const savedSystem = localStorage.getItem("lavanpro_system");
+      if (savedSystem) { try { setSystemForm(JSON.parse(savedSystem)); } catch { } }
+    };
+
+    loadLocalSettings();
     
-    const savedCompany = localStorage.getItem("lavanpro_company");
-    if (savedCompany) {
-      try { setCompanyForm(JSON.parse(savedCompany)); } catch { /* ignore */ }
-    }
-    const savedOperational = localStorage.getItem("lavanpro_operational");
-    if (savedOperational) {
-      try { setOperationalForm(JSON.parse(savedOperational)); } catch { /* ignore */ }
-    }
-    const savedSystem = localStorage.getItem("lavanpro_system");
-    if (savedSystem) {
-      try { setSystemForm(JSON.parse(savedSystem)); } catch { /* ignore */ }
-    }
+    // Puxa do servidor
+    syncData();
+
+    window.addEventListener("data-synced", loadLocalSettings);
+    return () => window.removeEventListener("data-synced", loadLocalSettings);
   }, []);
 
   // Set default tab for non-admins
@@ -166,6 +170,10 @@ function SettingsContent() {
       localStorage.setItem("lavanpro_company", JSON.stringify(companyForm));
       localStorage.setItem("lavanpro_operational", JSON.stringify(operationalForm));
       localStorage.setItem("lavanpro_system", JSON.stringify(systemForm));
+      
+      // Sincroniza com o servidor imediatamente
+      await pushDataToServer();
+      
       showToast("Todas as alterações foram salvas com sucesso!", "success");
     } catch {
       showToast("Erro ao salvar alterações.", "error");
@@ -189,9 +197,10 @@ function SettingsContent() {
       <div className="flex min-h-screen bg-brand-bg text-brand-text font-sans selection:bg-brand-primary/30 selection:text-white">
         <Sidebar />
         <div className="flex-1 flex flex-col h-screen overflow-hidden">
-          <header className="flex items-center justify-between px-8 py-4 border-b border-brand-darkBorder sticky top-0 bg-brand-bg/90 backdrop-blur-md z-20">
+          <MobileHeader title="Configurações" />
+          <header className="flex flex-col sm:flex-row sm:items-center justify-between responsive-px py-4 border-b border-brand-darkBorder sticky top-0 bg-brand-bg/90 backdrop-blur-md z-20 gap-4">
             <div>
-              <h1 className="text-2xl font-black text-brand-text tracking-tight">Configurações</h1>
+              <h1 className="text-2xl font-black text-brand-text tracking-tight hidden lg:block">Configurações</h1>
               <p className="text-sm text-brand-muted">
                 {TAB_TITLES[activeTab]}
               </p>
@@ -233,7 +242,7 @@ function SettingsContent() {
 
             {/* Content area */}
             <main className="flex-1 overflow-y-auto">
-              <div className="px-8 py-8 max-w-4xl pb-24">
+              <div className="responsive-px py-6 lg:py-8 max-w-4xl pb-24 safe-bottom">
                 {/* Mobile nav */}
                 <SettingsMobileNav
                   activeTab={activeTab}

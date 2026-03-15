@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { supabase } from './supabase'
 
 /**
@@ -16,6 +17,14 @@ const SYNC_KEYS = [
     'lavanpro_orders_v3',
     'lavanpro_customers',
     'lavanpro_finance_transactions',
+    'lavanpro_stock_products_v2',
+    'lavanpro_stock_movements_v2',
+    'lavanpro_company',
+    'lavanpro_operational',
+    'lavanpro_system',
+    'lavanpro_services_pro',
+    'lavanpro_labels',
+    'lavanpro_label_history',
 ] as const;
 
 type SyncKey = typeof SYNC_KEYS[number];
@@ -26,12 +35,20 @@ const KEY_MAP: Record<SyncKey, string> = {
     'lavanpro_orders_v3': 'orders',
     'lavanpro_customers': 'customers',
     'lavanpro_finance_transactions': 'finance',
+    'lavanpro_stock_products_v2': 'stock_products',
+    'lavanpro_stock_movements_v2': 'stock_movements',
+    'lavanpro_company': 'company',
+    'lavanpro_operational': 'operational',
+    'lavanpro_system': 'system',
+    'lavanpro_services_pro': 'services',
+    'lavanpro_labels': 'labels',
+    'lavanpro_label_history': 'label_history',
 };
 
 /**
  * Verifica se o usuário logado é Owner ou Colaborador
  */
-async function isUserOwner(): Promise<boolean> {
+export async function isUserOwner(): Promise<boolean> {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.user) return false;
 
@@ -57,11 +74,8 @@ export async function pushDataToServer(specificKey?: SyncKey): Promise<void> {
     if (typeof window === 'undefined') return;
 
     try {
-        const owner = await isUserOwner();
-        if (!owner) {
-            console.log('[DataSync] Colaborador não pode fazer push de dados.');
-            return;
-        }
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.user) return;
 
         const keysToSync = specificKey ? [specificKey] : [...SYNC_KEYS];
 
@@ -112,31 +126,71 @@ export async function pullDataFromServer(): Promise<void> {
                 continue;
             }
 
-            if (data && (Array.isArray(data) ? data.length > 0 : Object.keys(data).length > 0)) {
-                localStorage.setItem(localKey, JSON.stringify(data));
-                console.log(`[DataSync] ✅ ${serverKey} carregado do servidor (${Array.isArray(data) ? data.length : 1} items)`);
+            if (data !== null) {
+                const serverString = JSON.stringify(data);
+                const rawLocal = localStorage.getItem(localKey);
+
+                // SEGURANÇA: Se o local tem dados e o servidor está vindo vazio '[]', 
+                // não sobrescrevemos o local imediatamente. Damos preferência ao local 
+                // se for a primeira vez sincronizando após correção de SQL.
+                if ((serverString === '[]' || serverString === '{}') && rawLocal && rawLocal !== '[]' && rawLocal !== '{}') {
+                    console.log(`[DataSync] ⚠️ Servidor vazio para ${serverKey}, mantendo dados locais e preparando push.`);
+                    await pushDataToServer(localKey);
+                    continue;
+                }
+
+                // Apenas sobrescreve o navegador se houver MUDANÇAS!
+                if (serverString !== rawLocal) {
+                    localStorage.setItem(localKey, serverString);
+                    // Avisa a interface do sistema que a nuvem mudou algo
+                    window.dispatchEvent(new CustomEvent('data-synced'));
+                    if (localKey === 'lavanpro_units') {
+                        window.dispatchEvent(new CustomEvent('refresh-units'));
+                    }
+                }
             }
         }
-
-        // Notificar componentes que os dados foram atualizados
-        window.dispatchEvent(new CustomEvent('data-synced'));
-        window.dispatchEvent(new CustomEvent('refresh-units'));
     } catch (err) {
         console.error('[DataSync] Erro no pull:', err);
     }
 }
 
+// Controle do pooling em tempo real
+let isRealtimeStarted = false;
+
 /**
- * SYNC: Sincroniza automaticamente
- * - Owner → Push (localStorage → Supabase)
- * - Colaborador → Pull (Supabase → localStorage)
+ * SYNC: Sincroniza ativamente sempre mantendo o navegador do usuário fiel à nuvem
  */
 export async function syncData(): Promise<void> {
-    const owner = await isUserOwner();
-
-    if (owner) {
-        await pushDataToServer();
-    } else {
-        await pullDataFromServer();
+    await pullDataFromServer();
+    
+    if (typeof window !== 'undefined' && !isRealtimeStarted) {
+        isRealtimeStarted = true;
+        setInterval(() => {
+            pullDataFromServer();
+        }, 10000); // 10 Segundos é mais seguro
     }
+}
+
+/**
+ * Hook para manter os dados atualizados automaticamente
+ */
+export function useAutoSync(intervalMs = 60000) {
+    useEffect(() => {
+        syncData();
+
+        const timer = setInterval(() => {
+            pullDataFromServer();
+        }, intervalMs);
+
+        const handleFocus = () => {
+            pullDataFromServer();
+        };
+        window.addEventListener('focus', handleFocus);
+
+        return () => {
+            clearInterval(timer);
+            window.removeEventListener('focus', handleFocus);
+        };
+    }, [intervalMs]);
 }
