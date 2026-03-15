@@ -24,6 +24,7 @@ import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { useSubscription } from "@/hooks/useSubscription";
 import { PlanGuard } from "@/components/plan-guard";
+import { AccessGuard } from "@/components/access-guard";
 import { Order } from "@/lib/orders-data";
 import { calculateDashboardMetrics } from "@/lib/dashboard-utils";
 import { UnitSelector } from "@/components/unit-selector";
@@ -81,6 +82,10 @@ export default function Page() {
 
     loadAndPurge();
 
+    // Listen for sync events
+    const handleSync = () => loadAndPurge();
+    window.addEventListener("data-synced", handleSync);
+    
     // Cleanup other mock legacy data
     const savedCust = localStorage.getItem("lavanpro_customers");
     if (savedCust) {
@@ -90,6 +95,10 @@ export default function Page() {
             if (filtered.length !== parsed.length) localStorage.setItem("lavanpro_customers", JSON.stringify(filtered));
         } catch(e) {}
     }
+
+    return () => {
+        window.removeEventListener("data-synced", handleSync);
+    };
   }, []);
 
   const metrics = useMemo(() => {
@@ -176,8 +185,9 @@ export default function Page() {
   ];
 
   return (
-    <div className="flex min-h-screen bg-brand-bg text-brand-text font-sans">
-      <Sidebar />
+    <AccessGuard permission="dashboard">
+      <div className="flex min-h-screen bg-brand-bg text-brand-text font-sans">
+        <Sidebar />
       <div className="flex-1 flex flex-col h-screen overflow-hidden">
         <main className="flex-1 overflow-y-auto bg-brand-bg custom-scrollbar">
           {/* Stats & Filters */}
@@ -308,5 +318,6 @@ export default function Page() {
       `}</style>
       </div>
     </div>
+    </AccessGuard>
   );
 }

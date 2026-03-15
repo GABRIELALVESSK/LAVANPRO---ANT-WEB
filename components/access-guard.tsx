@@ -16,20 +16,23 @@ interface AccessGuardProps {
  * Automatically redirects unauthorized users to /dashboard.
  */
 export function AccessGuard({ permission, children }: AccessGuardProps) {
-    const { hasPermission, loading, isOwner } = usePermissions();
+    const { hasPermission, loading, isOwner, getAccessibleRoutes } = usePermissions();
     const router = useRouter();
 
     const allowed = loading || isOwner || hasPermission(permission);
 
     useEffect(() => {
         if (!loading && !allowed) {
-            // Short delay so the user sees the blocked message before redirect
+            // Find a safe place to redirect (not the current route)
+            const routes = getAccessibleRoutes();
+            const fallback = routes.find(r => r !== "/login") || "/login";
+            
             const timer = setTimeout(() => {
-                router.replace("/dashboard");
+                router.replace(fallback);
             }, 2500);
             return () => clearTimeout(timer);
         }
-    }, [loading, allowed, router]);
+    }, [loading, allowed, router, getAccessibleRoutes]);
 
     if (loading) {
         return (

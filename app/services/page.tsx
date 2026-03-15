@@ -208,7 +208,7 @@ export default function ServicesPage() {
         v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
     return (
-        <AccessGuard permission="settings">
+        <AccessGuard permission="services">
             <div className="flex h-screen bg-brand-bg text-brand-text font-sans">
                 <Sidebar />
                 <div className="flex-1 flex flex-col overflow-hidden">

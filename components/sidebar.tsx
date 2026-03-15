@@ -21,7 +21,8 @@ import {
   Lock,
   Check,
   ShoppingBag,
-  MessageSquare
+  MessageSquare,
+  RefreshCw,
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -29,6 +30,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
 import { usePermissions } from "@/hooks/usePermissions";
+import { syncData } from "@/lib/dataSync";
 import { useSubscription, PlanTier } from "@/hooks/useSubscription";
 import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
@@ -36,16 +38,16 @@ import { UnitSelector } from "@/components/unit-selector";
 
 // All possible navigation items with their required permission key
 const ALL_NAV_ITEMS = [
-  { href: "/dashboard", icon: LayoutDashboard, label: "Visão Geral", group: "Principal", permission: null },
+  { href: "/dashboard", icon: LayoutDashboard, label: "Visão Geral", group: "Principal", permission: "dashboard" as const },
   { href: "/reports", icon: BarChart3, label: "Relatórios", group: "Principal", permission: "reports" as const },
   { href: "/orders", icon: ReceiptText, label: "Pedidos", group: "Principal", permission: "orders" as const },
   { href: "/customers", icon: Users, label: "Clientes", group: "Principal", permission: "customers" as const },
-  { href: "/services", icon: ShoppingBag, label: "Serviços", group: "Principal", permission: "settings" as const },
+  { href: "/services", icon: ShoppingBag, label: "Serviços", group: "Principal", permission: "services" as const },
   { href: "/finance", icon: Wallet, label: "Financeiro", group: "Principal", permission: "finance" as const },
   { href: "/stock", icon: Package, label: "Estoque", group: "Operações", permission: "stock" as const },
   { href: "/team", icon: UserCog, label: "Equipe", group: "Operações", permission: "team" as const },
   { href: "/labels", icon: QrCode, label: "Etiquetagem QR", group: "Operações", permission: "labels" as const },
-  { href: "/chat", icon: MessageSquare, label: "Mensagens IA", group: "Operações", permission: "settings" as const },
+  { href: "/chat", icon: MessageSquare, label: "Mensagens IA", group: "Operações", permission: "chat" as const },
   { href: "/settings", icon: Settings, label: "Configurações", group: "Operações", permission: "settings" as const },
 ];
 
@@ -61,6 +63,7 @@ export function Sidebar() {
   const { isStarter, isEnterprise, plan } = useSubscription();
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
   const [isPlansModalOpen, setIsPlansModalOpen] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
 
@@ -71,6 +74,19 @@ export function Sidebar() {
   const handleLogout = async () => {
     await supabase.auth.signOut();
     router.push("/login");
+  };
+
+  const handleSyncData = async () => {
+    setIsSyncing(true);
+    try {
+      await syncData();
+      alert("Sincronização concluída com sucesso!");
+    } catch (err) {
+      console.error("Sync error:", err);
+      alert("Erro ao sincronizar dados.");
+    } finally {
+      setIsSyncing(false);
+    }
   };
 
   const handleUpgrade = async (newPlan: PlanTier) => {
@@ -188,6 +204,18 @@ export function Sidebar() {
 
         {/* Bottom */}
         <div className="mt-auto p-5 border-t border-brand-darkBorder space-y-4">
+          {/* Manual Sync (Only for Owners or if no sync rows) */}
+          {(usePermissions().isOwner) && (
+            <button
+              onClick={handleSyncData}
+              disabled={isSyncing}
+              className="w-full flex items-center justify-center gap-2 px-3 py-2.5 bg-brand-primary/10 border border-brand-primary/30 rounded-xl text-brand-primary hover:bg-brand-primary/20 transition-all font-bold text-xs disabled:opacity-50"
+            >
+              <RefreshCw className={`size-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
+              {isSyncing ? "Sincronizando..." : "Sincronizar Agora"}
+            </button>
+          )}
+
           {/* Theme toggle */}
           {mounted && (
             <div className="flex items-center justify-between bg-brand-card rounded-xl p-1 border border-brand-darkBorder">

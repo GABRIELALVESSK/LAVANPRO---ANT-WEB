@@ -7,14 +7,17 @@ import { supabase } from "@/lib/supabase";
 const ROLES = ["Administrador", "Gerente", "Atendente", "Estoquista"] as const;
 
 const PERMISSIONS = [
+    { key: "dashboard", label: "Visão Geral", description: "Acesso ao painel principal e métricas" },
     { key: "orders", label: "Pedidos", description: "Criar, editar e visualizar pedidos" },
     { key: "customers", label: "Clientes", description: "Gerenciar cadastro de clientes" },
+    { key: "services", label: "Serviços", description: "Gerenciar catálogo de serviços e preços" },
     { key: "finance", label: "Financeiro", description: "Acesso a relatórios financeiros" },
     { key: "stock", label: "Estoque", description: "Controle de insumos e produtos" },
     { key: "reports", label: "Relatórios", description: "Visualizar relatórios gerenciais" },
     { key: "team", label: "Equipe", description: "Gerenciar colaboradores" },
-    { key: "settings", label: "Configurações", description: "Alterar configurações do sistema" },
+    { key: "chat", label: "Mensagens IA", description: "Acesso ao assistente de mensagens" },
     { key: "labels", label: "Etiquetagem QR", description: "Gerar e vincular QR codes" },
+    { key: "settings", label: "Configurações", description: "Alterar configurações do sistema" },
 ] as const;
 
 type PermissionKey = (typeof PERMISSIONS)[number]["key"];
@@ -22,10 +25,10 @@ type RoleName = (typeof ROLES)[number];
 type PermissionMatrix = Record<RoleName, Record<PermissionKey, boolean>>;
 
 const DEFAULT_MATRIX: PermissionMatrix = {
-    Administrador: { orders: true, customers: true, finance: true, stock: true, reports: true, team: true, settings: true, labels: true },
-    Gerente: { orders: true, customers: true, finance: true, stock: true, reports: true, team: true, settings: false, labels: true },
-    Atendente: { orders: true, customers: true, finance: false, stock: false, reports: false, team: false, settings: false, labels: true },
-    Estoquista: { orders: false, customers: false, finance: false, stock: true, reports: false, team: false, settings: false, labels: false },
+    Administrador: { dashboard: true, orders: true, customers: true, services: true, finance: true, stock: true, reports: true, team: true, chat: true, labels: true, settings: true },
+    Gerente: { dashboard: true, orders: true, customers: true, services: true, finance: true, stock: true, reports: true, team: true, chat: true, labels: true, settings: false },
+    Atendente: { dashboard: true, orders: true, customers: true, services: true, finance: false, stock: false, reports: false, team: false, chat: false, labels: true, settings: false },
+    Estoquista: { dashboard: false, orders: false, customers: false, services: false, finance: false, stock: true, reports: false, team: false, chat: false, labels: false, settings: false },
 };
 
 export function AccessProfilesTab() {

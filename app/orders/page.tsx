@@ -77,15 +77,24 @@ export default function OrdersPage() {
     });
 
     useEffect(() => {
-        try {
-            const saved = localStorage.getItem("lavanpro_orders_v3");
-            if (saved) {
-                setOrders(JSON.parse(saved));
+        const loadOrders = () => {
+            try {
+                const saved = localStorage.getItem("lavanpro_orders_v3");
+                if (saved) {
+                    setOrders(JSON.parse(saved));
+                }
+            } catch (e) {
+                console.error("Error loading orders from localStorage:", e);
             }
-        } catch (e) {
-            console.error("Error loading orders from localStorage:", e);
-        }
+        };
+
+        loadOrders();
+        
+        const handleSync = () => loadOrders();
+        window.addEventListener("data-synced", handleSync);
         setIsLoaded(true);
+
+        return () => window.removeEventListener("data-synced", handleSync);
     }, []);
 
     useEffect(() => {

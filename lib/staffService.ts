@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { getUnits } from './units-data'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export type Role = 'Administrador' | 'Gerente' | 'Atendente' | 'Operador de Máquinas' | 'Motorista'
@@ -49,13 +50,19 @@ async function getEffectiveOwnerId(): Promise<string> {
 // ─── CRUD ─────────────────────────────────────────────────────────────────────
 
 export async function fetchStaff(unit?: string): Promise<Staff[]> {
+    const ownerId = await getEffectiveOwnerId();
+    
     let query = supabase
         .from('staff')
         .select('*')
+        .eq('owner_id', ownerId)
         .order('created_at', { ascending: false })
 
     if (unit && unit !== 'all') {
-        query = query.eq('unit', unit);
+        const allUnits = getUnits();
+        const foundUnit = allUnits.find(u => u.id === unit);
+        const resolvedUnitName = foundUnit ? foundUnit.name : unit;
+        query = query.eq('unit', resolvedUnitName);
     }
 
     const { data, error } = await query;

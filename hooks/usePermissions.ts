@@ -7,18 +7,19 @@ import { supabase } from "@/lib/supabase";
 // ---- Shared types ----
 const ROLES = ["Administrador", "Gerente", "Atendente", "Estoquista"] as const;
 
-type PermissionKey = "orders" | "customers" | "finance" | "stock" | "reports" | "team" | "settings" | "labels";
+type PermissionKey = "orders" | "customers" | "finance" | "stock" | "reports" | "team" | "settings" | "labels" | "dashboard" | "services" | "chat";
 type RoleName = (typeof ROLES)[number];
 type PermissionMatrix = Record<RoleName, Record<PermissionKey, boolean>>;
 
 const DEFAULT_MATRIX: PermissionMatrix = {
-    Administrador: { orders: true, customers: true, finance: true, stock: true, reports: true, team: true, settings: true, labels: true },
-    Gerente: { orders: true, customers: true, finance: true, stock: true, reports: true, team: true, settings: false, labels: true },
-    Atendente: { orders: true, customers: true, finance: false, stock: false, reports: false, team: false, settings: false, labels: true },
-    Estoquista: { orders: false, customers: false, finance: false, stock: true, reports: false, team: false, settings: false, labels: false },
+    Administrador: { orders: true, customers: true, finance: true, stock: true, reports: true, team: true, settings: true, labels: true, dashboard: true, services: true, chat: true },
+    Gerente: { orders: true, customers: true, finance: true, stock: true, reports: true, team: true, settings: false, labels: true, dashboard: true, services: true, chat: true },
+    Atendente: { orders: true, customers: true, finance: false, stock: false, reports: false, team: false, settings: false, labels: true, dashboard: true, services: true, chat: false },
+    Estoquista: { orders: false, customers: false, finance: false, stock: true, reports: false, team: false, settings: false, labels: false, dashboard: false, services: false, chat: false },
 };
 
 const ROUTE_PERMISSION_MAP: Record<string, PermissionKey> = {
+    "/dashboard": "dashboard",
     "/orders": "orders",
     "/customers": "customers",
     "/finance": "finance",
@@ -27,9 +28,11 @@ const ROUTE_PERMISSION_MAP: Record<string, PermissionKey> = {
     "/team": "team",
     "/settings": "settings",
     "/labels": "labels",
+    "/services": "services",
+    "/chat": "chat",
 };
 
-const ALWAYS_ALLOWED_ROUTES = ["/dashboard"];
+const ALWAYS_ALLOWED_ROUTES = ["/login"];
 
 function normaliseRole(role: string | null | undefined): RoleName {
     if (!role) return "Atendente";

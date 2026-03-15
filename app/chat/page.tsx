@@ -224,7 +224,7 @@ export default function WhatsAppWebPage() {
     };
 
     return (
-        <AccessGuard permission="settings">
+        <AccessGuard permission="chat">
             <title>Mensagens IA Enterprise | LavanPro</title>
             <div className="flex h-screen bg-[#0c0c0e] text-[#e9edef] font-sans selection:bg-brand-primary/30">
                 <Sidebar />
