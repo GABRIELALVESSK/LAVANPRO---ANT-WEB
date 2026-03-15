@@ -15,8 +15,6 @@ import { useState, useEffect, useMemo } from "react";
 import { UnitSelector } from "@/components/unit-selector";
 import { useRouter } from "next/navigation";
 import { useUnit } from "@/hooks/useUnit";
-import { useAuth } from "@/hooks/useAuth";
-import { notifyDataChanged } from "@/lib/dataSync";
 
 const StatusColors: Record<string, string> = {
     "Recebido": "bg-slate-500",
@@ -49,7 +47,6 @@ function formatCurrency(v: number) { return v.toLocaleString("pt-BR", { style: "
 export default function OrdersPage() {
     const router = useRouter();
     const [orders, setOrders] = useState<Order[]>([]);
-    const { user } = useAuth();
     const [isLoaded, setIsLoaded] = useState(false);
     const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
     const [isNewOrderOpen, setIsNewOrderOpen] = useState(false);
@@ -93,10 +90,7 @@ export default function OrdersPage() {
 
         loadOrders();
         
-        const handleSync = () => {
-            console.log("[OrdersPage] Externally synced, reloading...");
-            loadOrders();
-        };
+        const handleSync = () => loadOrders();
         window.addEventListener("data-synced", handleSync);
         setIsLoaded(true);
 
@@ -104,15 +98,7 @@ export default function OrdersPage() {
     }, []);
 
     useEffect(() => {
-        if (isLoaded) {
-            // Evita sobrescrever com vazio se já existir dado no localStorage (segurança contra race conditions)
-            const current = localStorage.getItem("lavanpro_orders_v3");
-            if (orders.length === 0 && current && current !== "[]") {
-                return;
-            }
-            localStorage.setItem("lavanpro_orders_v3", JSON.stringify(orders));
-            notifyDataChanged();
-        }
+        if (isLoaded) localStorage.setItem("lavanpro_orders_v3", JSON.stringify(orders));
     }, [orders, isLoaded]);
 
     // Init filters from URL
@@ -247,8 +233,6 @@ export default function OrdersPage() {
         setAllCustomers(updatedCusts);
         localStorage.setItem("lavanpro_customers", JSON.stringify(updatedCusts));
 
-        const currentUserName = user?.user_metadata?.full_name || user?.email?.split("@")[0] || "Sistema";
-
         const freshOrder: Order = {
             id: orderId,
             client: newOrder.client, phone: newOrder.phone, email: newOrder.email,
@@ -258,11 +242,9 @@ export default function OrdersPage() {
             bgColor: "bg-brand-primary", textColor: "text-brand-primary",
             observations: newOrder.observations,
             estimatedDelivery: newOrder.estimatedDelivery,
-            history: [{ time: timeStr, status: "Triagem", note: "Pedido criado.", staffName: currentUserName }],
+            history: [{ time: timeStr, status: "Triagem", note: "Pedido criado." }],
             createdAt: dateStr,
-            unitId: activeUnit === "all" ? "default" : activeUnit,
-            createdBy: currentUserName,
-            lastUpdatedBy: currentUserName
+            unitId: activeUnit === "all" ? "default" : activeUnit
         };
         
         setOrders(prev => [freshOrder, ...prev]);
@@ -390,19 +372,13 @@ export default function OrdersPage() {
             }
         }
 
-        const currentUserName = user?.user_metadata?.full_name || user?.email?.split("@")[0] || "Sistema";
-
         const updated: Order = {
             ...selectedOrder,
             status: statusOption,
             progress: cfg?.progress ?? selectedOrder.progress,
             bgColor: cfg?.bg ?? selectedOrder.bgColor,
             textColor: cfg?.textColor ?? selectedOrder.textColor,
-            lastUpdatedBy: currentUserName,
-            history: [
-                ...selectedOrder.history, 
-                { time: now, status: statusOption, note: statusOption === "Em Lavagem" ? "Iniciado processo e estoque baixado." : `Status alterado para ${statusOption}`, staffName: currentUserName }
-            ],
+            history: [...selectedOrder.history, { time: now, status: statusOption, note: statusOption === "Em Lavagem" ? "Iniciado processo e estoque baixado." : "" }],
         };
         setSelectedOrder(updated);
         setIsStatusDropdown(false);
@@ -1242,22 +1218,7 @@ export default function OrdersPage() {
                                                     </div>
                                                     <div className="p-5 bg-white/[0.02] border border-white/5 rounded-3xl">
                                                         <p className="text-[9px] font-black uppercase tracking-widest text-brand-muted mb-3">Status Atual</p>
-                                                        <select 
-                                                            value={selectedOrder.paymentStatus} 
-                                                            onChange={e => {
-                                                                const newStatus = e.target.value;
-                                                                const currentUserName = user?.user_metadata?.full_name || user?.email?.split("@")[0] || "Sistema";
-                                                                const now = new Date().toTimeString().slice(0, 5);
-                                                                setSelectedOrder({ 
-                                                                    ...selectedOrder, 
-                                                                    paymentStatus: newStatus,
-                                                                    lastUpdatedBy: currentUserName,
-                                                                    history: [
-                                                                        ...selectedOrder.history,
-                                                                        { time: now, status: selectedOrder.status, note: `Pagamento atualizado para: ${newStatus}`, staffName: currentUserName }
-                                                                    ]
-                                                                });
-                                                            }}
+                                                        <select value={selectedOrder.paymentStatus} onChange={e => setSelectedOrder({ ...selectedOrder, paymentStatus: e.target.value })}
                                                             className="w-full bg-transparent text-xs font-black text-white outline-none appearance-none cursor-pointer">
                                                             {PAYMENT_STATUSES.map(p => <option key={p} className="bg-[#161925]">{p}</option>)}
                                                         </select>

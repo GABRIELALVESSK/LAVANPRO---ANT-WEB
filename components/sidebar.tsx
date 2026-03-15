@@ -123,47 +123,17 @@ export function Sidebar() {
     groups.push({ label, items });
   }
 
-  const [companyInfo, setCompanyInfo] = useState({ name: "Lavanderia Pro", logo: "" });
-
-  useEffect(() => {
-    const loadInfo = () => {
-      const saved = localStorage.getItem("lavanpro_company");
-      if (saved) {
-        try {
-          const parsed = JSON.parse(saved);
-          setCompanyInfo({ 
-            name: parsed.nomeFantasia || "Lavanderia Pro", 
-            logo: parsed.logo || "" 
-          });
-        } catch (e) {}
-      }
-    };
-    loadInfo();
-    window.addEventListener("storage", loadInfo);
-    window.addEventListener("data-changed", loadInfo);
-    return () => {
-      window.removeEventListener("storage", loadInfo);
-      window.removeEventListener("data-changed", loadInfo);
-    };
-  }, []);
-
   return (
     <>
       <aside className="w-64 bg-brand-bg border-r border-brand-darkBorder flex flex-col shrink-0 min-h-screen">
         {/* Logo */}
         <div className="p-6 pb-4">
           <div className="flex items-center gap-3 text-brand-text mb-6">
-            {companyInfo.logo ? (
-              <div className="size-9 rounded-xl overflow-hidden shadow-lg border border-brand-darkBorder">
-                <img src={companyInfo.logo} alt="Company Logo" className="w-full h-full object-cover" />
-              </div>
-            ) : (
-              <div className="size-9 bg-brand-primary rounded-xl flex items-center justify-center shadow-lg shadow-brand-primary/30">
-                <WashingMachine className="size-5 text-white" />
-              </div>
-            )}
+            <div className="size-9 bg-brand-primary rounded-xl flex items-center justify-center shadow-lg shadow-brand-primary/30">
+              <WashingMachine className="size-5 text-white" />
+            </div>
             <div>
-              <h2 className="text-base font-bold leading-tight tracking-tight uppercase truncate max-w-[140px]">LavanPro</h2>
+              <h2 className="text-base font-bold leading-tight tracking-tight">Lavanderia Pro</h2>
               <p className="text-[10px] text-brand-muted font-medium">Sistema de Gestão</p>
             </div>
           </div>
@@ -285,50 +255,15 @@ export function Sidebar() {
           {/* User info */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3 min-w-0">
-              <input 
-                type="file" 
-                id="user-avatar-upload" 
-                className="hidden" 
-                accept="image/*"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) {
-                    const reader = new FileReader();
-                    reader.onloadend = () => {
-                      const dataUrl = reader.result as string;
-                      if (user?.id) {
-                        localStorage.setItem(`lavanpro_user_avatar_${user.id}`, dataUrl);
-                        // Force update
-                        window.dispatchEvent(new Event("storage"));
-                      }
-                    };
-                    reader.readAsDataURL(file);
-                  }
-                }}
-              />
-              <label 
-                htmlFor="user-avatar-upload"
-                className="size-9 rounded-full bg-brand-primary/20 flex items-center justify-center overflow-hidden relative shrink-0 cursor-pointer group hover:ring-2 hover:ring-brand-primary transition-all"
-                title="Alterar foto"
-              >
-                {(() => {
-                  const saved = user?.id ? localStorage.getItem(`lavanpro_user_avatar_${user.id}`) : null;
-                  return saved ? (
-                    <img src={saved} alt="User avatar" className="w-full h-full object-cover" />
-                  ) : (
-                    <Image
-                      src="https://picsum.photos/seed/avatar/100/100"
-                      alt="User avatar"
-                      fill
-                      className="object-cover group-hover:scale-110 transition-transform"
-                      referrerPolicy="no-referrer"
-                    />
-                  );
-                })()}
-                <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                   <Users className="size-3 text-white" />
-                </div>
-              </label>
+              <div className="size-9 rounded-full bg-brand-primary/20 flex items-center justify-center overflow-hidden relative shrink-0">
+                <Image
+                  src="https://picsum.photos/seed/avatar/100/100"
+                  alt="User avatar"
+                  fill
+                  className="object-cover"
+                  referrerPolicy="no-referrer"
+                />
+              </div>
               <div className="overflow-hidden">
                 <p className="text-sm font-bold text-brand-text truncate">
                   {user?.user_metadata?.full_name || user?.email?.split("@")[0] || "Usuário"}

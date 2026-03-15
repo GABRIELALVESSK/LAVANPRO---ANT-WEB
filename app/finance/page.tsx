@@ -12,7 +12,6 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useMemo, useEffect } from "react";
 import { useUnit } from "@/hooks/useUnit";
-import { notifyDataChanged } from "@/lib/dataSync";
 // ─── Types ────────────────────────────────────────────────────────────────────
 type TransactionType = "RECEITA" | "DESPESA";
 type TransactionStatus = "PAGO" | "PENDENTE" | "ATRASADO";
@@ -194,39 +193,21 @@ export default function FinancePage() {
 
     // Load from localStorage
     useEffect(() => {
-        const loadData = () => {
-            const saved = localStorage.getItem("lavanpro_finance_transactions");
-            if (saved) {
-                try {
-                    setTransactions(JSON.parse(saved));
-                } catch (e) {
-                    console.error("Erro ao carregar transações:", e);
-                }
+        const saved = localStorage.getItem("lavanpro_finance_transactions");
+        if (saved) {
+            try {
+                setTransactions(JSON.parse(saved));
+            } catch (e) {
+                console.error("Erro ao carregar transações:", e);
             }
-        };
-
-        loadData();
-
-        const handleSync = () => {
-            console.log("[FinancePage] Externally synced, reloading...");
-            loadData();
-        };
-        window.addEventListener("data-synced", handleSync);
+        }
         setIsLoaded(true);
-
-        return () => window.removeEventListener("data-synced", handleSync);
     }, []);
 
     // Save to localStorage
     useEffect(() => {
         if (isLoaded) {
-            // Seguranca contra sobrescrita de dados existentes por array vazio no mount
-            const current = localStorage.getItem("lavanpro_finance_transactions");
-            if (transactions.length === 0 && current && current !== "[]") {
-                return;
-            }
             localStorage.setItem("lavanpro_finance_transactions", JSON.stringify(transactions));
-            notifyDataChanged();
         }
     }, [transactions, isLoaded]);
 

@@ -16,14 +16,6 @@ const SYNC_KEYS = [
     'lavanpro_orders_v3',
     'lavanpro_customers',
     'lavanpro_finance_transactions',
-    'lavanpro_stock_products_v2',
-    'lavanpro_stock_movements_v2',
-    'lavanpro_services_pro',
-    'lavanpro_labels',
-    'lavanpro_label_history',
-    'lavanpro_company',
-    'lavanpro_operational',
-    'lavanpro_system',
 ] as const;
 
 type SyncKey = typeof SYNC_KEYS[number];
@@ -34,14 +26,6 @@ const KEY_MAP: Record<SyncKey, string> = {
     'lavanpro_orders_v3': 'orders',
     'lavanpro_customers': 'customers',
     'lavanpro_finance_transactions': 'finance',
-    'lavanpro_stock_products_v2': 'stock_products',
-    'lavanpro_stock_movements_v2': 'stock_movements',
-    'lavanpro_services_pro': 'services',
-    'lavanpro_labels': 'labels',
-    'lavanpro_label_history': 'label_history',
-    'lavanpro_company': 'settings_company',
-    'lavanpro_operational': 'settings_operational',
-    'lavanpro_system': 'settings_system',
 };
 
 /**
@@ -66,67 +50,57 @@ async function isUserOwner(): Promise<boolean> {
 }
 
 /**
- * Notifica o sistema que dados locais mudaram e precisam ser subidos
+ * PUSH: Admin salva dados do localStorage para o Supabase
+ * Chamado quando admin faz alterações (cria pedido, cadastra unidade, etc.)
  */
-export function notifyDataChanged() {
-    if (typeof window === 'undefined') return;
-    window.dispatchEvent(new CustomEvent('local-data-changed'));
-}
-
-/**
- * PUSH: Salva dados do localStorage para o Supabase
- */
-let pushTimeout: NodeJS.Timeout | null = null;
 export async function pushDataToServer(specificKey?: SyncKey): Promise<void> {
     if (typeof window === 'undefined') return;
 
-    // Debounce de 2 segundos para evitar excesso de requisições
-    if (pushTimeout) clearTimeout(pushTimeout);
-    
-    return new Promise((resolve) => {
-        pushTimeout = setTimeout(async () => {
+    try {
+        const owner = await isUserOwner();
+        if (!owner) {
+            console.log('[DataSync] Colaborador não pode fazer push de dados.');
+            return;
+        }
+
+        const keysToSync = specificKey ? [specificKey] : [...SYNC_KEYS];
+
+        for (const localKey of keysToSync) {
+            const raw = localStorage.getItem(localKey);
+            if (!raw) continue;
+
             try {
-                const { data: { session } } = await supabase.auth.getSession();
-                if (!session?.user) return;
+                const parsed = JSON.parse(raw);
+                const serverKey = KEY_MAP[localKey];
 
-                const keysToSync = specificKey ? [specificKey] : [...SYNC_KEYS];
+                const { error } = await supabase.rpc('set_laundry_data', {
+                    p_key: serverKey,
+                    p_value: parsed,
+                });
 
-                for (const localKey of keysToSync) {
-                    const raw = localStorage.getItem(localKey);
-                    if (!raw) continue;
-
-                    try {
-                        const parsed = JSON.parse(raw);
-                        const serverKey = KEY_MAP[localKey];
-
-                        await supabase.rpc('set_laundry_data', {
-                            p_key: serverKey,
-                            p_value: parsed,
-                        });
-                    } catch (parseErr) {
-                        console.error(`[DataSync] Erro ao parsear ${localKey}:`, parseErr);
-                    }
+                if (error) {
+                    console.error(`[DataSync] Erro ao salvar ${serverKey}:`, error.message);
+                } else {
+                    console.log(`[DataSync] ✅ ${serverKey} sincronizado (${Array.isArray(parsed) ? parsed.length : 1} items)`);
                 }
-                console.log('[DataSync] 🚀 Backup concluído no servidor');
-                resolve();
-            } catch (err) {
-                console.error('[DataSync] Erro no push:', err);
-                resolve();
+            } catch (parseErr) {
+                console.error(`[DataSync] Erro ao parsear ${localKey}:`, parseErr);
             }
-        }, 2000);
-    });
+        }
+    } catch (err) {
+        console.error('[DataSync] Erro no push:', err);
+    }
 }
 
 /**
- * PULL: Carrega dados do Supabase para o localStorage
+ * PULL: Colaborador carrega dados do Supabase para o localStorage
+ * Chamado quando o colaborador faz login ou abre o app
  */
-export async function pullDataFromServer(specificKey?: string): Promise<void> {
+export async function pullDataFromServer(): Promise<void> {
     if (typeof window === 'undefined') return;
 
     try {
-        const keysToPull = specificKey ? [SYNC_KEYS.find(k => KEY_MAP[k] === specificKey) as SyncKey].filter(Boolean) : [...SYNC_KEYS];
-
-        for (const localKey of keysToPull) {
+        for (const localKey of SYNC_KEYS) {
             const serverKey = KEY_MAP[localKey];
 
             const { data, error } = await supabase.rpc('get_laundry_data', {
@@ -138,64 +112,31 @@ export async function pullDataFromServer(specificKey?: string): Promise<void> {
                 continue;
             }
 
-            if (data) {
-                const currentLocal = localStorage.getItem(localKey);
-                const serverDataStr = JSON.stringify(data);
-                
-                if (currentLocal !== serverDataStr) {
-                    localStorage.setItem(localKey, serverDataStr);
-                    console.log(`[DataSync] ✅ ${serverKey} atualizado pelo servidor`);
-                    
-                    window.dispatchEvent(new CustomEvent('data-synced', { detail: { key: serverKey } }));
-                    if (serverKey === 'units') window.dispatchEvent(new CustomEvent('refresh-units'));
-                }
+            if (data && (Array.isArray(data) ? data.length > 0 : Object.keys(data).length > 0)) {
+                localStorage.setItem(localKey, JSON.stringify(data));
+                console.log(`[DataSync] ✅ ${serverKey} carregado do servidor (${Array.isArray(data) ? data.length : 1} items)`);
             }
         }
+
+        // Notificar componentes que os dados foram atualizados
+        window.dispatchEvent(new CustomEvent('data-synced'));
+        window.dispatchEvent(new CustomEvent('refresh-units'));
     } catch (err) {
         console.error('[DataSync] Erro no pull:', err);
     }
 }
 
 /**
- * SYNC: Sincroniza bidirecionalmente
+ * SYNC: Sincroniza automaticamente
+ * - Owner → Push (localStorage → Supabase)
+ * - Colaborador → Pull (Supabase → localStorage)
  */
 export async function syncData(): Promise<void> {
     const owner = await isUserOwner();
-    await pullDataFromServer();
+
     if (owner) {
         await pushDataToServer();
+    } else {
+        await pullDataFromServer();
     }
-}
-
-/**
- * REALTIME: Escuta mudanças no Supabase e atualiza localmente NA HORA
- */
-export function setupRealtimeSync(ownerId: string) {
-  if (!ownerId) return;
-
-  console.log(`[DataSync] 📡 Realtime Ativo para Owner: ${ownerId}`);
-
-  const channel = supabase
-    .channel(`laundry_updates_${ownerId}`)
-    .on(
-      'postgres_changes',
-      {
-        event: '*', // Escuta INSERT, UPDATE e DELETE
-        schema: 'public',
-        table: 'laundry_data',
-        filter: `owner_id=eq.${ownerId}`,
-      },
-      (payload) => {
-        const key = (payload.new as any)?.data_key || (payload.old as any)?.data_key;
-        if (key) {
-           console.log(`[DataSync] 🔔 Servidor alterou ${key}, atualizando interface...`);
-           pullDataFromServer(key);
-        }
-      }
-    )
-    .subscribe();
-
-  return () => {
-    supabase.removeChannel(channel);
-  };
 }

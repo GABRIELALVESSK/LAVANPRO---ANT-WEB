@@ -10,7 +10,6 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect, useMemo } from "react";
 import { useUnit } from "@/hooks/useUnit";
-import { notifyDataChanged } from "@/lib/dataSync";
 
 // --- Types ---
 type ChargeType = "UNIDADE" | "QUILO" | "PECA" | "FIXO";
@@ -77,76 +76,55 @@ export default function ServicesPage() {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingId, setEditingId] = useState<string | null>(null);
     const [formData, setFormData] = useState<ServiceFormData & { unitId: string }>(blankService(activeUnit));
-    const [activeTab, setActiveTab] = useState<"geral" | "receita">("geral");    // Load from LocalStorage
+    const [activeTab, setActiveTab] = useState<"geral" | "receita">("geral");
+
+    // Load from LocalStorage
     useEffect(() => {
-        const loadServices = () => {
-            const saved = localStorage.getItem("lavanpro_services_pro");
-            if (saved) {
-                try {
-                    setServices(JSON.parse(saved));
-                } catch (e) {
-                    console.error("Error loading services", e);
-                }
-            } else {
-                const seed: Service[] = [
-                    {
-                        id: "1",
-                        name: "Lavagem de Edredom Casal",
-                        category: "Edredons & Cobertores",
-                        chargeType: "UNIDADE",
-                        price: 55.0,
-                        recipe: [
-                            { id: "r1", productId: "PROD-101", name: "Sabão Líquido Omo Pro", quantity: 0.1, unit: "L", unitCost: 14.50 },
-                            { id: "r2", productId: "PROD-102", name: "Amaciante Comfort Pro", quantity: 0.08, unit: "L", unitCost: 12.00 },
-                        ],
-                        executionTime: "48h",
-                        unitId: "default"
-                    },
-                    {
-                        id: "2",
-                        name: "Terno Completo (Limpeza a Seco)",
-                        category: "Roupas Finas",
-                        chargeType: "UNIDADE",
-                        price: 45.0,
-                        recipe: [],
-                        costOverride: 12.50,
-                        executionTime: "72h",
-                        unitId: "default"
-                    },
-                    {
-                        id: "3",
-                        name: "Lavagem de Roupa de Cor (Cid)",
-                        category: "Lavanderia",
-                        chargeType: "QUILO",
-                        price: 18.5,
-                        recipe: [
-                            { id: "r4", productId: "PROD-101", name: "Sabão Líquido Omo Pro", quantity: 0.05, unit: "L", unitCost: 14.50 },
-                        ],
-                        executionTime: "48h",
-                        unitId: "default"
-                    },
-                ];
-                setServices(seed);
-                localStorage.setItem("lavanpro_services_pro", JSON.stringify(seed));
-                notifyDataChanged();
+        const saved = localStorage.getItem("lavanpro_services_pro");
+        if (saved) {
+            try {
+                setServices(JSON.parse(saved));
+            } catch (e) {
+                console.error("Error loading services", e);
             }
-        };
-
-        loadServices();
-
-        const handleSync = () => {
-            console.log("[ServicesPage] Externally synced, reloading...");
-            loadServices();
-        };
-
-        window.addEventListener("data-synced", handleSync);
-        return () => window.removeEventListener("data-synced", handleSync);
+        } else {
+            const seed: Service[] = [
+                {
+                    id: "1",
+                    name: "Lavagem de Edredom Casal",
+                    category: "Edredons & Cobertores",
+                    chargeType: "UNIDADE",
+                    price: 55.0,
+                    recipe: [
+                        { id: "r1", productId: "PROD-101", name: "Sabão Líquido Omo Pro", quantity: 0.1, unit: "L", unitCost: 14.50 },
+                        { id: "r2", productId: "PROD-102", name: "Amaciante Comfort Pro", quantity: 0.05, unit: "L", unitCost: 12.00 },
+                        { id: "r3", productId: "PROD-105", name: "Saco Plástico G", quantity: 1, unit: "un", unitCost: 0.80 },
+                    ],
+                    executionTime: "72h",
+                    description: "Tratamento profundo com secagem industrial.",
+                    unitId: "default"
+                },
+                {
+                    id: "2",
+                    name: "Lavagem de Roupa de Cor (Cid)",
+                    category: "Lavanderia",
+                    chargeType: "QUILO",
+                    price: 18.5,
+                    recipe: [
+                        { id: "r4", productId: "PROD-101", name: "Sabão Líquido Omo Pro", quantity: 0.05, unit: "L", unitCost: 14.50 },
+                    ],
+                    executionTime: "48h",
+                    unitId: "default"
+                },
+            ];
+            setServices(seed);
+            localStorage.setItem("lavanpro_services_pro", JSON.stringify(seed));
+        }
     }, []);
 
     const saveToLocalStorage = (newServices: Service[]) => {
         localStorage.setItem("lavanpro_services_pro", JSON.stringify(newServices));
         setServices(newServices);
-        notifyDataChanged();
     };
 
     const calculateTotalCost = (service: Service | ServiceFormData) => {

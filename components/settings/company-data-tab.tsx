@@ -10,7 +10,6 @@ interface CompanyFormData {
     email: string;
     phone: string;
     website: string;
-    logo: string;
 }
 
 interface CompanyDataTabProps {
@@ -21,34 +20,6 @@ interface CompanyDataTabProps {
 export function CompanyDataTab({ form, onChange }: CompanyDataTabProps) {
     const update = (field: keyof CompanyFormData, value: string) => {
         onChange({ ...form, [field]: value });
-    };
-
-    const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (file) {
-            if (file.size > 2 * 1024 * 1024) {
-                alert("O arquivo é muito grande! Máximo 2MB.");
-                return;
-            }
-
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                onChange({ ...form, logo: reader.result as string });
-            };
-            reader.readAsDataURL(file);
-        }
-    };
-
-    const formatCNPJ = (value: string) => {
-        const x = value.replace(/\D/g, '').match(/(\d{0,2})(\d{0,3})(\d{0,3})(\d{0,4})(\d{0,2})/);
-        if (!x) return value;
-        return !x[2] ? x[1] : x[1] + '.' + x[2] + '.' + x[3] + '/' + x[4] + (x[5] ? '-' + x[5] : '');
-    };
-
-    const formatPhone = (value: string) => {
-        const x = value.replace(/\D/g, '').match(/(\d{0,2})(\d{0,5})(\d{0,4})/);
-        if (!x) return value;
-        return !x[2] ? x[1] : '(' + x[1] + ') ' + x[2] + (x[3] ? '-' + x[3] : '');
     };
 
     return (
@@ -68,32 +39,8 @@ export function CompanyDataTab({ form, onChange }: CompanyDataTabProps) {
             <div className="bg-brand-card p-6 rounded-xl border border-brand-darkBorder">
                 <label className="text-xs font-bold uppercase tracking-wider text-brand-muted mb-3 block">Logo da Empresa</label>
                 <div className="flex items-center gap-6">
-                    <div className="relative">
-                        <input
-                            type="file"
-                            accept="image/*"
-                            onChange={handleFileUpload}
-                            className="hidden"
-                            id="logo-upload"
-                        />
-                        <label 
-                            htmlFor="logo-upload"
-                            className="size-24 rounded-xl bg-brand-bg border-2 border-dashed border-brand-darkBorder flex items-center justify-center text-brand-muted hover:border-brand-primary/50 hover:text-brand-primary transition-colors cursor-pointer group overflow-hidden"
-                        >
-                            {form.logo ? (
-                                <img src={form.logo} alt="Logo preview" className="w-full h-full object-cover transition-transform group-hover:scale-110" />
-                            ) : (
-                                <Upload className="size-8 group-hover:scale-110 transition-transform" />
-                            )}
-                        </label>
-                        {form.logo && (
-                            <button 
-                                onClick={() => onChange({ ...form, logo: "" })}
-                                className="absolute -top-2 -right-2 size-6 bg-rose-500 text-white rounded-full flex items-center justify-center shadow-lg hover:bg-rose-600 transition-colors"
-                            >
-                                <span className="text-[10px] font-bold">✕</span>
-                            </button>
-                        )}
+                    <div className="size-24 rounded-xl bg-brand-bg border-2 border-dashed border-brand-darkBorder flex items-center justify-center text-brand-muted hover:border-brand-primary/50 hover:text-brand-primary transition-colors cursor-pointer group">
+                        <Upload className="size-8 group-hover:scale-110 transition-transform" />
                     </div>
                     <div className="text-sm text-brand-muted space-y-1">
                         <p className="font-semibold text-brand-text">Arraste uma imagem ou clique para upload</p>
@@ -133,9 +80,8 @@ export function CompanyDataTab({ form, onChange }: CompanyDataTabProps) {
                             className="w-full px-4 py-2.5 bg-brand-bg border border-brand-darkBorder rounded-lg focus:ring-2 focus:ring-brand-primary transition-all outline-none text-sm text-brand-text"
                             type="text"
                             placeholder="00.000.000/0001-00"
-                            maxLength={18}
                             value={form.cnpj}
-                            onChange={(e) => update("cnpj", formatCNPJ(e.target.value))}
+                            onChange={(e) => update("cnpj", e.target.value)}
                         />
                     </div>
                     <div className="space-y-2">
@@ -169,10 +115,9 @@ export function CompanyDataTab({ form, onChange }: CompanyDataTabProps) {
                         <input
                             className="w-full px-4 py-2.5 bg-brand-bg border border-brand-darkBorder rounded-lg focus:ring-2 focus:ring-brand-primary transition-all outline-none text-sm text-brand-text"
                             type="text"
-                            placeholder="(00) 00000-0000"
-                            maxLength={15}
+                            placeholder="(00) 0000-0000"
                             value={form.phone}
-                            onChange={(e) => update("phone", formatPhone(e.target.value))}
+                            onChange={(e) => update("phone", e.target.value)}
                         />
                     </div>
                     <div className="space-y-2 md:col-span-2">

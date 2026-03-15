@@ -17,7 +17,6 @@ import Webcam from "react-webcam";
 import { useSearchParams, useRouter } from "next/navigation";
 import QRCodeLib from "qrcode";
 import ReactQRCode from "react-qr-code";
-import { notifyDataChanged } from "@/lib/dataSync";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type OrderStatus = "Recebido" | "Em Triagem" | "Em Lavagem" | "Em Secagem" | "Em Finalização" | "Pronto" | "Entregue" | "Cancelado";
@@ -296,8 +295,6 @@ function LabelsContent() {
     const [isGenerating, setIsGenerating] = useState(false);
     const [genQty, setGenQty] = useState(5);
     const [manualCode, setManualCode] = useState("");
-    const [labelToDelete, setLabelToDelete] = useState<ReusableLabel | null>(null);
-    const [isDeleting, setIsDeleting] = useState(false);
     const readerRef = useRef<BrowserQRCodeReader | null>(null);
     const webcamRef = useRef<any>(null);
     const scanLogicRef = useRef<any>(null);
@@ -367,32 +364,6 @@ function LabelsContent() {
         return () => window.removeEventListener("storage", syncOrders);
     }, []);
 
-    const [isLoaded, setIsLoaded] = useState(false);
-
-    // ── Load from LocalStorage ──
-    useEffect(() => {
-        const loadData = () => {
-            try {
-                const savedLabels = localStorage.getItem("lavanpro_labels");
-                if (savedLabels) setLabels(JSON.parse(savedLabels));
-                
-                const savedHistory = localStorage.getItem("lavanpro_label_history");
-                if (savedHistory) setHistory(JSON.parse(savedHistory));
-            } catch (e) { console.error("Erro ao carregar labels:", e); }
-        };
-
-        loadData();
-
-        const handleSync = () => {
-            console.log("[LabelsPage] Externally synced, reloading...");
-            loadData();
-        };
-
-        window.addEventListener("data-synced", handleSync);
-        setIsLoaded(true);
-        return () => window.removeEventListener("data-synced", handleSync);
-    }, []);
-
     const showToast = useCallback((msg: string, type: "success" | "error" = "success") => {
         setToast({ msg, type });
         setTimeout(() => setToast(null), 3000);
@@ -400,29 +371,11 @@ function LabelsContent() {
 
     // ── Persistir labels e histórico no localStorage ──
     useEffect(() => {
-        if (!isLoaded) return;
-        
-        // Seguranca contra sobrescrita de dados existentes por array vazio no mount
-        const current = localStorage.getItem("lavanpro_labels");
-        if (labels.length === 0 && current && current !== "[]") {
-            return;
-        }
-
         localStorage.setItem("lavanpro_labels", JSON.stringify(labels));
-        notifyDataChanged();
-    }, [labels, isLoaded]);
-
+    }, [labels]);
     useEffect(() => {
-        if (!isLoaded) return;
-
-        const current = localStorage.getItem("lavanpro_label_history");
-        if (history.length === 0 && current && current !== "[]") {
-            return;
-        }
-
         localStorage.setItem("lavanpro_label_history", JSON.stringify(history));
-        notifyDataChanged();
-    }, [history, isLoaded]);
+    }, [history]);
 
     const searchParams = useSearchParams();
 
@@ -491,24 +444,22 @@ function LabelsContent() {
     };
 
     // ── Delete Label ────────────────────────
-    const deleteLabel = async (label: ReusableLabel) => {
-        setIsDeleting(true);
-        try {
-            // Remove a etiqueta do estado
-            setLabels(prev => prev.filter(l => l.id !== label.id));
-            
-            // Se estiver selecionada, limpa a seleção
-            if (selectedLabel?.id === label.id) {
+    const deleteLabel = (labelId: string) => {
+        const label = labels.find(l => l.id === labelId);
+        if (!label) return;
+        if (label.status === "assigned") {
+            showToast("Não é possível deletar uma etiqueta em uso.", "error");
+            return;
+        }
+
+        // Simpler delete logic to avoid any issues with window.confirm
+        const confirmed = window.confirm(`Remover etiqueta ${label.code} permanentemente?`);
+        if (confirmed) {
+            setLabels(prev => prev.filter(l => l.id !== labelId));
+            if (selectedLabel?.id === labelId) {
                 setSelectedLabel(null);
             }
-            
-            showToast(`Etiqueta ${label.code} removida permanentemente.`);
-            setLabelToDelete(null);
-        } catch (e) {
-            console.error("Erro ao deletar etiqueta:", e);
-            showToast("Erro ao excluir etiqueta.", "error");
-        } finally {
-            setIsDeleting(false);
+            showToast(`Etiqueta ${label.code} removida.`);
         }
     };
 
@@ -988,16 +939,18 @@ function LabelsContent() {
 
                                                                 {/* Botões de Ação (Ajustados para z-index correto e tamanho menor) */}
                                                                 <div className="absolute top-1 left-1 flex gap-1 z-10">
-                                                                    <button
-                                                                        onClick={(e) => {
-                                                                            e.stopPropagation();
-                                                                            setLabelToDelete(label);
-                                                                        }}
-                                                                        className="size-6 rounded-md bg-rose-500 text-white flex items-center justify-center hover:bg-rose-600 shadow-md transition-all active:scale-90"
-                                                                        title="Excluir"
-                                                                    >
-                                                                        <Trash2 className="size-3" />
-                                                                    </button>
+                                                                    {isAvail && (
+                                                                        <button
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                deleteLabel(label.id);
+                                                                            }}
+                                                                            className="size-6 rounded-md bg-rose-500 text-white flex items-center justify-center hover:bg-rose-600 shadow-md transition-all active:scale-90"
+                                                                            title="Excluir"
+                                                                        >
+                                                                            <Trash2 className="size-3" />
+                                                                        </button>
+                                                                    )}
                                                                     <button
                                                                         onClick={(e) => {
                                                                             e.stopPropagation();
@@ -1063,12 +1016,14 @@ function LabelsContent() {
                                                                 <ReactQRCode value={selectedLabelState.code} size={60} />
                                                             </div>
                                                             <div className="flex gap-2">
+                                                                {selectedLabelState.status === "available" && (
                                                                     <button
-                                                                        onClick={() => setLabelToDelete(selectedLabelState)}
+                                                                        onClick={() => deleteLabel(selectedLabelState.id)}
                                                                         className="h-10 px-4 rounded-xl bg-rose-500/10 text-rose-500 hover:bg-rose-500 hover:text-white transition-all border border-rose-500/20 flex items-center gap-2 font-bold text-xs"
                                                                     >
                                                                         <Trash2 className="size-4" /> EXCLUIR
                                                                     </button>
+                                                                )}
                                                                 <button
                                                                     onClick={() => setPrintLabel(selectedLabelState)}
                                                                     className="h-10 px-5 rounded-xl bg-brand-primary text-white shadow-lg shadow-brand-primary/20 hover:opacity-90 transition-all flex items-center gap-2 font-black text-xs tracking-wider"
@@ -1433,49 +1388,6 @@ function LabelsContent() {
 
                                     <div className="text-center text-brand-muted text-[10px] uppercase font-black tracking-widest opacity-50">
                                         Ou use um leitor USB externo
-                                    </div>
-                                </div>
-                            </motion.div>
-                        </div>
-                    )}
-                </AnimatePresence>
-
-                {/* Delete Confirmation Modal */}
-                <AnimatePresence>
-                    {labelToDelete && (
-                        <div className="fixed inset-0 z-[250] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-                            <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }}
-                                className="bg-brand-card w-full max-w-md rounded-2xl border border-rose-500/30 shadow-2xl overflow-hidden">
-                                <div className="p-6 text-center space-y-4">
-                                    <div className="size-16 bg-rose-500/10 rounded-full flex items-center justify-center mx-auto">
-                                        <Trash2 className="size-8 text-rose-500" />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <h3 className="text-xl font-black text-white">Excluir Etiqueta {labelToDelete.code}?</h3>
-                                        <p className="text-sm text-brand-muted">
-                                            Esta ação é permanente e removerá a etiqueta <b>{labelToDelete.displayNumber}</b> do sistema.
-                                            {labelToDelete.status === "assigned" && (
-                                                <span className="block mt-2 text-rose-400 font-bold bg-rose-500/10 p-2 rounded-lg text-xs border border-rose-500/20">
-                                                    ⚠️ Esta etiqueta está vinculada a um pedido em aberto!
-                                                </span>
-                                            )}
-                                        </p>
-                                    </div>
-                                    <div className="flex gap-3 pt-2">
-                                        <button 
-                                            onClick={() => setLabelToDelete(null)}
-                                            disabled={isDeleting}
-                                            className="flex-1 py-3 bg-brand-bg border border-brand-darkBorder rounded-xl font-bold text-brand-muted hover:text-white transition-all"
-                                        >
-                                            Cancelar
-                                        </button>
-                                        <button 
-                                            onClick={() => deleteLabel(labelToDelete)}
-                                            disabled={isDeleting}
-                                            className="flex-1 py-3 bg-rose-500 text-white rounded-xl font-black hover:bg-rose-600 transition-all shadow-lg shadow-rose-500/20 flex items-center justify-center gap-2"
-                                        >
-                                            {isDeleting ? <div className="size-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : "Confirmar Exclusão"}
-                                        </button>
                                     </div>
                                 </div>
                             </motion.div>

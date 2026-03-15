@@ -49,7 +49,7 @@ const DEFAULT_UNIT: Unit = {
     state: "SP",
     zipCode: "01001-000",
     openingHours: DEFAULT_OPENING_HOURS,
-    responsible: "Administrador",
+    responsible: "Gabriel Alves",
     status: 'active',
     createdAt: new Date().toISOString(),
     isMain: true
