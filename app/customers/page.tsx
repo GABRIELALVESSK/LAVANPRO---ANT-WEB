@@ -11,6 +11,7 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useMemo, useEffect } from "react";
 import { useUnit } from "@/hooks/useUnit";
+import { notifyDataChanged } from "@/lib/dataSync";
 
 import { Customer, seedCustomers } from "../../lib/customers-data";
 
@@ -227,17 +228,36 @@ export default function CustomersPage() {
     const [orders, setOrders] = useState<any[]>([]);
 
     useEffect(() => {
-        const saved = localStorage.getItem("lavanpro_customers");
-        if (saved) { try { setCustomers(JSON.parse(saved)); } catch { } }
-        
-        const savedOrders = localStorage.getItem("lavanpro_orders_v3");
-        if (savedOrders) { try { setOrders(JSON.parse(savedOrders)); } catch { } }
+        const loadData = () => {
+            const saved = localStorage.getItem("lavanpro_customers");
+            if (saved) { try { setCustomers(JSON.parse(saved)); } catch { } }
+            
+            const savedOrders = localStorage.getItem("lavanpro_orders_v3");
+            if (savedOrders) { try { setOrders(JSON.parse(savedOrders)); } catch { } }
+        };
 
+        loadData();
+        
+        const handleSync = () => {
+            console.log("[CustomersPage] Externally synced, reloading...");
+            loadData();
+        };
+        window.addEventListener("data-synced", handleSync);
         setIsLoaded(true);
+
+        return () => window.removeEventListener("data-synced", handleSync);
     }, []);
 
     useEffect(() => {
-        if (isLoaded) localStorage.setItem("lavanpro_customers", JSON.stringify(customers));
+        if (isLoaded) {
+            // Seguranca contra sobrescrita de dados existentes por array vazio no mount
+            const current = localStorage.getItem("lavanpro_customers");
+            if (customers.length === 0 && current && current !== "[]") {
+                return;
+            }
+            localStorage.setItem("lavanpro_customers", JSON.stringify(customers));
+            notifyDataChanged();
+        }
     }, [customers, isLoaded]);
 
     const [search, setSearch] = useState("");

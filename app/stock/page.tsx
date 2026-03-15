@@ -11,6 +11,7 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect, useMemo } from "react";
 import { useUnit } from "@/hooks/useUnit";
+import { notifyDataChanged } from "@/lib/dataSync";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Product {
@@ -267,16 +268,39 @@ export default function StockPage() {
         setProductForm(prev => ({ ...prev, unitId: activeUnit !== "all" ? activeUnit : "default" }));
     }, [activeUnit]);
 
+    // Load data from localStorage
     useEffect(() => {
-        const savedProducts = localStorage.getItem("lavanpro_stock_products_v2");
-        const savedMovements = localStorage.getItem("lavanpro_stock_movements_v2");
-        if (savedProducts) { try { setProducts(JSON.parse(savedProducts)); } catch { } }
-        if (savedMovements) { try { setMovements(JSON.parse(savedMovements)); } catch { } }
+        const loadData = () => {
+            const savedProducts = localStorage.getItem("lavanpro_stock_products_v2");
+            const savedMovements = localStorage.getItem("lavanpro_stock_movements_v2");
+            if (savedProducts) { try { setProducts(JSON.parse(savedProducts)); } catch { } }
+            if (savedMovements) { try { setMovements(JSON.parse(savedMovements)); } catch { } }
+        };
+
+        loadData();
+
+        // Escuta atualizações vindas do servidor (via DataSynchronizer)
+        const handleSync = () => {
+            console.log("[StockPage] Externally synced, reloading...");
+            loadData();
+        };
+
+        window.addEventListener('data-synced', handleSync);
+        return () => window.removeEventListener('data-synced', handleSync);
     }, []);
 
+    // Save data to localStorage and notify changes
     useEffect(() => {
+        // Evita salvar/notificar no primeiro render se o estado estiver vazio
+        // e já existir algo no localStorage (para não sobrescrever o que veio do servidor)
+        const currentProducts = localStorage.getItem("lavanpro_stock_products_v2");
+        if (products.length === 0 && currentProducts && currentProducts !== "[]") {
+            return;
+        }
+
         localStorage.setItem("lavanpro_stock_products_v2", JSON.stringify(products));
         localStorage.setItem("lavanpro_stock_movements_v2", JSON.stringify(movements));
+        notifyDataChanged();
     }, [products, movements]);
 
     const handleProductChange = (f: keyof ProductFormData, v: any) => setProductForm(prev => ({ ...prev, [f]: v }));

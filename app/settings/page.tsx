@@ -11,6 +11,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import dynamic from "next/dynamic";
 import type { SettingsTab } from "@/components/settings/settings-sidebar";
 import { PaymentSuccessModal } from "@/components/settings/payment-success-modal";
+import { notifyDataChanged } from "@/lib/dataSync";
 
 // Dynamically import all tabs with no SSR to avoid 500 errors
 const CompanyDataTab = dynamic(() => import("@/components/settings/company-data-tab").then(m => m.CompanyDataTab), { ssr: false });
@@ -102,6 +103,7 @@ function SettingsContent() {
     email: "contato@lavanderiapro.com",
     phone: "(11) 3000-4000",
     website: "",
+    logo: "",
   });
 
   const [operationalForm, setOperationalForm] = useState({
@@ -166,6 +168,7 @@ function SettingsContent() {
       localStorage.setItem("lavanpro_company", JSON.stringify(companyForm));
       localStorage.setItem("lavanpro_operational", JSON.stringify(operationalForm));
       localStorage.setItem("lavanpro_system", JSON.stringify(systemForm));
+      notifyDataChanged();
       showToast("Todas as alterações foram salvas com sucesso!", "success");
     } catch {
       showToast("Erro ao salvar alterações.", "error");

@@ -7,6 +7,7 @@ import { Filters } from "@/components/filters";
 import { UnitSelector } from "@/components/unit-selector";
 import { useEffect, useState, useMemo } from "react";
 import { useUnit } from "@/hooks/useUnit";
+import { useAuth } from "@/hooks/useAuth";
 import { Download, Wallet, Activity, Users } from "lucide-react";
 import {
   AreaChart,
@@ -57,6 +58,7 @@ function CustomTooltip({ active, payload, label, prefix = "R$ " }: any) {
 export default function ReportsPage() {
   const [activeRange, setActiveRange] = useState("30d");
   const { unitId: selectedUnit } = useUnit();
+  const { user } = useAuth();
   const [customDates, setCustomDates] = useState({
     start: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
     end: new Date().toISOString().split("T")[0],
@@ -277,20 +279,32 @@ export default function ReportsPage() {
         .slice(0, 5);
   }, [filteredOrders]);
 
-  // 6. Produtividade (Just a placeholder based on unit distribution)
+  // 6. Produtividade por Colaborador Real
   const produtividadeData = useMemo(() => {
     const map: Record<string, number> = {};
-    filteredOrders.forEach(o => {
-        const unit = o.unitId || "Default";
-        map[unit] = (map[unit] || 0) + o.items.reduce((s: number, i: any) => s + (Number(i.qty) || 0), 0);
-    });
     
-    return Object.entries(map).map(([id, pecas]) => {
-        const unit = units.find(u => u.id === id);
-        // Map to unit.responsible or unit.name or "Default/Admin"
-        const displayName = unit ? (unit.responsible || unit.name) : (id === "default" || id === "Default" ? "Gabriel Alves" : id);
-        return { name: displayName, pecas };
+    filteredOrders.forEach(o => {
+        // Determinamos o colaborador principal deste pedido
+        // Prioridade: createdBy > Primeiro staffName no histórico > Responsável da Unidade > Administrador
+        let collaborator = o.createdBy || (o as any).lastUpdatedBy;
+        
+        if (!collaborator && o.history) {
+          const firstWithStaff = o.history.find((h: any) => h.staffName);
+          if (firstWithStaff) collaborator = firstWithStaff.staffName;
+        }
+        
+        if (!collaborator) {
+          const unit = units.find(u => u.id === o.unitId);
+          collaborator = unit?.responsible || "Administrador";
+        }
+
+        const pecas = o.items.reduce((s: number, i: any) => s + (Number(i.qty) || 0), 0);
+        map[collaborator!] = (map[collaborator!] || 0) + pecas;
     });
+
+    return Object.entries(map)
+      .map(([name, pecas]) => ({ name, pecas }))
+      .sort((a, b) => b.pecas - a.pecas);
   }, [filteredOrders, units]);
 
   const tabs = [
