@@ -12,12 +12,11 @@ import dynamic from "next/dynamic";
 import type { SettingsTab } from "@/components/settings/settings-sidebar";
 import { PaymentSuccessModal } from "@/components/settings/payment-success-modal";
 import { useBusinessData } from "@/components/business-data-provider";
-import { syncSave } from "@/lib/dataSync";
-import { pushDataToServer, syncData } from "@/lib/dataSync";
+
 
 // Dynamically import all tabs with no SSR to avoid 500 errors
 const CompanyDataTab = dynamic(() => import("@/components/settings/company-data-tab").then(m => m.CompanyDataTab), { ssr: false });
-const UnitDataTab = dynamic(() => import("@/components/settings/unit-data-tab").then(m => m.UnitDataTab), { ssr: false });
+const UnitDataTab = dynamic(() => import("@/components/settings/unit-data-tab"), { ssr: false });
 const UsersTab = dynamic(() => import("@/components/settings/users-tab").then(m => m.UsersTab), { ssr: false });
 const AccessProfilesTab = dynamic(() => import("@/components/settings/access-profiles-tab").then(m => m.AccessProfilesTab), { ssr: false });
 const OperationalPrefsTab = dynamic(() => import("@/components/settings/operational-prefs-tab").then(m => m.OperationalPrefsTab), { ssr: false });
@@ -96,7 +95,7 @@ function SettingsContent() {
     }
   }, [user]);
 
-  const { data: bizData } = useBusinessData();
+  const { data: bizData, saveData } = useBusinessData();
 
   // Form states synced with Provider
   const [companyForm, setCompanyForm] = useState(bizData.company || {
@@ -150,10 +149,10 @@ function SettingsContent() {
   const handleSaveAll = async () => {
     setIsSavingAll(true);
     try {
-      // Sincroniza todas as chaves com o servidor via syncSave para garantir Realtime
-      await syncSave('lavanpro_company', companyForm);
-      await syncSave('lavanpro_operational', operationalForm);
-      await syncSave('lavanpro_system', systemForm);
+      // Sincroniza todas as chaves com o servidor via saveData para garantir Realtime
+      await saveData('lavanpro_company', companyForm);
+      await saveData('lavanpro_operational', operationalForm);
+      await saveData('lavanpro_system', systemForm);
       
       showToast("Todas as configurações foram sincronizadas com a nuvem!", "success");
     } catch (e) {

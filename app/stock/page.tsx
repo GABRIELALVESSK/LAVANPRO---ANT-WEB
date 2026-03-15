@@ -13,7 +13,7 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect, useMemo } from "react";
 import { useUnit } from "@/hooks/useUnit";
-import { pushDataToServer, syncData } from "@/lib/dataSync";
+import { useBusinessData } from "@/components/business-data-provider";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Product {
@@ -247,14 +247,12 @@ function MovementModal({ products, preselectProductId, onSave, onCancel, unitId 
 }
 
 // ─── Main Component ────────────────────────────────────────────────────────────
-import { useBusinessData } from "@/components/business-data-provider";
-import { syncSave } from "@/lib/dataSync";
 
 // ... (types and helpers unchanged)
 
 export default function StockPage() {
     const { unitId: activeUnit } = useUnit();
-    const { data: bizData } = useBusinessData();
+    const { data: bizData, saveData } = useBusinessData();
     
     // Remote data from Provider
     const products = (bizData.stock_products || []) as Product[];
@@ -291,7 +289,7 @@ export default function StockPage() {
             updatedProducts = [...products, { ...productForm, id, unitId: activeUnit !== "all" ? activeUnit : "default" } as Product];
         }
         
-        await syncSave('lavanpro_stock_products_v2', updatedProducts);
+        await saveData('lavanpro_stock_products_v2', updatedProducts);
         setIsProductModalOpen(false);
     };
 
@@ -309,8 +307,8 @@ export default function StockPage() {
         });
 
         // Batch save both to ensure consistency
-        await syncSave('lavanpro_stock_movements_v2', newMovements);
-        await syncSave('lavanpro_stock_products_v2', updatedProducts);
+        await saveData('lavanpro_stock_movements_v2', newMovements);
+        await saveData('lavanpro_stock_products_v2', updatedProducts);
 
         setIsMovementModalOpen(false);
         setSelectedProductIdForMove(null);

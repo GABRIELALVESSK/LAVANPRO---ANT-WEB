@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useSubscription } from "@/hooks/useSubscription";
+import { useBusinessData } from "@/components/business-data-provider";
 import { Users, Plus, Edit, Trash2, Key, Search, Lock, AlertTriangle } from "lucide-react";
 import { User } from "@supabase/supabase-js";
 
@@ -13,6 +14,8 @@ interface UsersTabProps {
 
 export function UsersTab({ user, showToast }: UsersTabProps) {
     const { isStarter, isPro, isEnterprise } = useSubscription();
+    const { data: businessData } = useBusinessData();
+    const units = businessData?.units || [];
     const [collaborators, setCollaborators] = useState<any[]>([]);
     const [isLoadingUsers, setIsLoadingUsers] = useState(false);
     const [isSavingUser, setIsSavingUser] = useState(false);
@@ -30,7 +33,7 @@ export function UsersTab({ user, showToast }: UsersTabProps) {
     const [userToDelete, setUserToDelete] = useState<any>(null);
     const [resettingUserEmail, setResettingUserEmail] = useState("");
     const [newPassword, setNewPassword] = useState("");
-    const [newUserForm, setNewUserForm] = useState({ name: "", email: "", role: "Atendente", password: "" });
+    const [newUserForm, setNewUserForm] = useState({ name: "", email: "", role: "Atendente", password: "", unit: "Todas as Unidades" });
 
     useEffect(() => {
         fetchCollaborators();
@@ -68,8 +71,7 @@ export function UsersTab({ user, showToast }: UsersTabProps) {
                 email: newUserForm.email,
                 role: newUserForm.role,
                 active: true,
-                has_system_access: true,
-                unit: "Matriz Centro", // default for now, editable in Team page
+                unit: newUserForm.unit,
                 owner_id: ownerId,
             },
         ]);
@@ -77,7 +79,7 @@ export function UsersTab({ user, showToast }: UsersTabProps) {
             showToast("Erro ao salvar colaborador: " + error.message, "error");
         } else {
             showToast("Colaborador adicionado com sucesso!", "success");
-            setNewUserForm({ name: "", email: "", role: "Atendente", password: "" });
+            setNewUserForm({ name: "", email: "", role: "Atendente", password: "", unit: "Todas as Unidades" });
             fetchCollaborators();
             window.dispatchEvent(new CustomEvent("data-synced"));
         }
@@ -93,6 +95,7 @@ export function UsersTab({ user, showToast }: UsersTabProps) {
                 name: (document.getElementById("edit-name") as HTMLInputElement).value,
                 email: (document.getElementById("edit-email") as HTMLInputElement).value,
                 role: (document.getElementById("edit-role") as HTMLSelectElement).value,
+                unit: (document.getElementById("edit-unit") as HTMLSelectElement).value,
             })
             .eq("id", selectedUser.id);
 
@@ -187,6 +190,7 @@ export function UsersTab({ user, showToast }: UsersTabProps) {
                                 <th className="px-6 py-4 text-xs font-bold uppercase text-brand-muted">Nome</th>
                                 <th className="px-6 py-4 text-xs font-bold uppercase text-brand-muted">E-mail</th>
                                 <th className="px-6 py-4 text-xs font-bold uppercase text-brand-muted">Cargo</th>
+                                <th className="px-6 py-4 text-xs font-bold uppercase text-brand-muted">Unidade</th>
                                 <th className="px-6 py-4 text-xs font-bold uppercase text-brand-muted">Status</th>
                                 <th className="px-6 py-4 text-xs font-bold uppercase text-brand-muted text-right">Ações</th>
                             </tr>
@@ -203,7 +207,7 @@ export function UsersTab({ user, showToast }: UsersTabProps) {
                                 </tr>
                             ) : filtered.length === 0 ? (
                                 <tr>
-                                    <td colSpan={5} className="px-6 py-12 text-center text-brand-muted">
+                                    <td colSpan={6} className="px-6 py-12 text-center text-brand-muted">
                                         <Users className="size-12 mx-auto mb-3 opacity-30" />
                                         <p className="text-sm font-medium">Nenhum colaborador encontrado</p>
                                         <p className="text-xs mt-1">Adicione colaboradores usando o botão acima</p>
@@ -225,6 +229,9 @@ export function UsersTab({ user, showToast }: UsersTabProps) {
                                             <span className="px-2.5 py-1 bg-brand-bg text-brand-muted rounded-full text-xs font-semibold border border-brand-darkBorder">
                                                 {collaborator.role}
                                             </span>
+                                        </td>
+                                        <td className="px-6 py-4 text-sm text-brand-muted">
+                                            {collaborator.unit || "Todas"}
                                         </td>
                                         <td className="px-6 py-4">
                                             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-500/10 text-emerald-500 rounded-full text-xs font-semibold border border-emerald-500/20">
@@ -312,6 +319,15 @@ export function UsersTab({ user, showToast }: UsersTabProps) {
                                     <option value="Estoquista">Estoquista</option>
                                 </select>
                             </div>
+                            <div className="space-y-2">
+                                <label className="text-xs font-bold uppercase tracking-wider text-brand-muted">Unidade de Acesso</label>
+                                <select id="edit-unit" defaultValue={selectedUser.unit || "Todas as Unidades"} className="w-full px-4 py-2.5 bg-brand-bg border border-brand-darkBorder rounded-lg focus:ring-2 focus:ring-brand-primary outline-none text-sm text-brand-text">
+                                    <option value="Todas as Unidades">Todas as Unidades</option>
+                                    {units.map((u: any) => (
+                                        <option key={u.id} value={u.name}>{u.name}</option>
+                                    ))}
+                                </select>
+                            </div>
                         </div>
                         <div className="p-6 border-t border-brand-darkBorder flex justify-end gap-3 bg-brand-bg/50">
                             <button onClick={() => { setIsEditModalOpen(false); setSelectedUser(null); }} className="px-4 py-2 text-sm font-bold text-brand-muted hover:bg-brand-card rounded-lg transition-colors border border-brand-darkBorder">Cancelar</button>
@@ -329,7 +345,7 @@ export function UsersTab({ user, showToast }: UsersTabProps) {
                     <div className="bg-brand-card rounded-2xl border border-brand-darkBorder shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
                         <div className="p-6 border-b border-brand-darkBorder flex justify-between items-center">
                             <h3 className="text-xl font-bold text-brand-text">Novo Colaborador</h3>
-                            <button onClick={() => { setIsNewUserModalOpen(false); setNewUserForm({ name: "", email: "", role: "Atendente", password: "" }); }} className="text-brand-muted hover:text-brand-text transition-colors">
+                            <button onClick={() => { setIsNewUserModalOpen(false); setNewUserForm({ name: "", email: "", role: "Atendente", password: "", unit: "Todas as Unidades" }); }} className="text-brand-muted hover:text-brand-text transition-colors">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
                             </button>
                         </div>
@@ -352,12 +368,21 @@ export function UsersTab({ user, showToast }: UsersTabProps) {
                                 </select>
                             </div>
                             <div className="space-y-2">
+                                <label className="text-xs font-bold uppercase tracking-wider text-brand-muted">Unidade de Acesso</label>
+                                <select value={newUserForm.unit} onChange={(e) => setNewUserForm({ ...newUserForm, unit: e.target.value })} className="w-full px-4 py-2.5 bg-brand-bg border border-brand-darkBorder rounded-lg focus:ring-2 focus:ring-brand-primary outline-none text-sm text-brand-text">
+                                    <option value="Todas as Unidades">Todas as Unidades</option>
+                                    {units.map((u: any) => (
+                                        <option key={u.id} value={u.name}>{u.name}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div className="space-y-2">
                                 <label className="text-xs font-bold uppercase tracking-wider text-brand-muted">Senha de Acesso</label>
                                 <input type="password" placeholder="Crie uma senha temporária" value={newUserForm.password} onChange={(e) => setNewUserForm({ ...newUserForm, password: e.target.value })} className="w-full px-4 py-2.5 bg-brand-bg border border-brand-darkBorder rounded-lg focus:ring-2 focus:ring-brand-primary outline-none text-sm text-brand-text placeholder-brand-muted/50" />
                             </div>
                         </div>
                         <div className="p-6 border-t border-brand-darkBorder flex justify-end gap-3 bg-brand-bg/50">
-                            <button onClick={() => { setIsNewUserModalOpen(false); setNewUserForm({ name: "", email: "", role: "Atendente", password: "" }); }} disabled={isSavingUser} className="px-4 py-2 text-sm font-bold text-brand-muted hover:bg-brand-card rounded-lg transition-colors border border-brand-darkBorder disabled:opacity-50">Cancelar</button>
+                            <button onClick={() => { setIsNewUserModalOpen(false); setNewUserForm({ name: "", email: "", role: "Atendente", password: "", unit: "Todas as Unidades" }); }} disabled={isSavingUser} className="px-4 py-2 text-sm font-bold text-brand-muted hover:bg-brand-card rounded-lg transition-colors border border-brand-darkBorder disabled:opacity-50">Cancelar</button>
                             <button onClick={handleSaveNewUser} disabled={isSavingUser || !newUserForm.name || !newUserForm.email} className="px-4 py-2 text-sm font-bold text-white bg-brand-primary hover:bg-brand-primaryHover rounded-lg transition-colors shadow-lg shadow-brand-primary/20 disabled:opacity-50">
                                 {isSavingUser ? "Salvando..." : "Adicionar"}
                             </button>

@@ -15,7 +15,6 @@ import { useState, useMemo, useEffect } from "react";
 import { useUnit } from "@/hooks/useUnit";
 import { useAuth } from "@/hooks/useAuth";
 import { UnitSelector } from "@/components/unit-selector";
-import { pushDataToServer, syncData, syncSave } from "@/lib/dataSync";
 import { useBusinessData } from "@/components/business-data-provider";
 // ─── Types ────────────────────────────────────────────────────────────────────
 type TransactionType = "RECEITA" | "DESPESA";
@@ -194,7 +193,7 @@ function TransactionModal({ data, onChange, onSave, onCancel }: TransactionModal
 export default function FinancePage() {
     const { unitId: activeUnit } = useUnit();
     const { staffName } = useAuth();
-    const { data: businessData } = useBusinessData();
+    const { data: businessData, saveData } = useBusinessData();
     
     // Centralized data from Provider
     const transactions = (businessData.finance || []) as Transaction[];
@@ -228,8 +227,8 @@ export default function FinancePage() {
         setIsCreating(false);
         setForm(blankTransaction("RECEITA", activeUnit));
         
-        // Sincroniza com o servidor imediatamente via syncSave
-        syncSave('lavanpro_finance_transactions', [newTransaction, ...transactions]);
+        // Sincroniza com o servidor imediatamente via saveData
+        saveData('lavanpro_finance_transactions', [newTransaction, ...transactions]);
     };
 
     const handleSettle = (id: string) => {
@@ -237,8 +236,8 @@ export default function FinancePage() {
             t.id === id ? { ...t, status: "PAGO", paidDate: new Date().toISOString().slice(0, 10), paymentMethod: "Dinheiro" } : t
         );
         
-        // Sincroniza com o servidor imediatamente via syncSave
-        syncSave('lavanpro_finance_transactions', updatedTransactions);
+        // Sincroniza com o servidor imediatamente via saveData
+        saveData('lavanpro_finance_transactions', updatedTransactions);
     };
 
     // Computations

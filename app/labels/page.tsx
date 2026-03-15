@@ -20,7 +20,6 @@ import QRCodeLib from "qrcode";
 import ReactQRCode from "react-qr-code";
 import { Order, OrderItem, HistoryEntry } from "@/lib/orders-data";
 import { useAuth } from "@/hooks/useAuth";
-import { syncData, pushDataToServer, syncSave } from "@/lib/dataSync";
 import { useBusinessData } from "@/components/business-data-provider";
 
 const STATUS_CONFIG: Record<string, { color: string; bg: string; progress: number; textColor: string }> = {
@@ -276,7 +275,7 @@ function LabelsContent() {
     const router = useRouter();
     const { user } = useAuth();
     const staffName = user?.user_metadata?.full_name || user?.email?.split("@")[0] || "Administrador";
-    const { data: businessData } = useBusinessData();
+    const { data: businessData, saveData } = useBusinessData();
 
     // Centralized data from Provider
     const labels = (businessData.labels || []) as ReusableLabel[];
@@ -338,19 +337,12 @@ function LabelsContent() {
         }
     }, [isCameraActive]);
 
-    // ── Sincronizar com Banco de Dados ──
-    useEffect(() => {
-        syncData(); // Puxa do servidor no mount
-    }, []);
 
     const showToast = useCallback((msg: string, type: "success" | "error" = "success") => {
         setToast({ msg, type });
         setTimeout(() => setToast(null), 3000);
     }, []);
 
-    // ── Persistir labels e histórico no localStorage ──
-    // A remoção dos useEffects que salvavam no localStorage é intencional.
-    // Agora salvamos explicitamente usando syncSave() em cada ação do usuário.
 
 
     const searchParams = useSearchParams();
@@ -412,7 +404,7 @@ function LabelsContent() {
                 };
             });
 
-            syncSave("lavanpro_labels", [...labels, ...newLabels]);
+            saveData("lavanpro_labels", [...labels, ...newLabels]);
             setIsGenerating(false);
             showToast(`Criamos mais ${qty} etiquetas para seu estoque!`);
         }, 800);
@@ -431,7 +423,7 @@ function LabelsContent() {
         // Simpler delete logic to avoid any issues with window.confirm
         const confirmed = window.confirm(`Remover etiqueta ${label.code} permanentemente?`);
         if (confirmed) {
-            syncSave("lavanpro_labels", labels.filter(l => l.id !== labelId));
+            saveData("lavanpro_labels", labels.filter(l => l.id !== labelId));
             if (selectedLabel?.id === labelId) {
                 setSelectedLabel(null);
             }
@@ -719,7 +711,7 @@ function LabelsContent() {
                 status: "Recebido" as OrderStatus, createdAt: new Date().toISOString(), items: [],
                 history: [{ time: new Date().toLocaleTimeString(), status: "Etiqueta Vinculada", note: `Vinculado à TAG ${label.code}`, staffName }]
             };
-            syncSave("lavanpro_orders_v3", [...globalOrders, newOrderStub]);
+            saveData("lavanpro_orders_v3", [...globalOrders, newOrderStub]);
         }
 
 
@@ -727,8 +719,8 @@ function LabelsContent() {
             ? { ...l, status: "assigned" as const, currentOrderId: trimmedId }
             : l
         );
-        syncSave("lavanpro_labels", updatedLabels);
-        syncSave("lavanpro_label_history", [...labelHistory, { labelId: label.id, orderId: trimmedId, assignedAt: new Date().toISOString(), releasedAt: null }]);
+        saveData("lavanpro_labels", updatedLabels);
+        saveData("lavanpro_label_history", [...labelHistory, { labelId: label.id, orderId: trimmedId, assignedAt: new Date().toISOString(), releasedAt: null }]);
         setSelectedLabel(prev => prev?.id === label.id ? { ...prev, status: "assigned", currentOrderId: trimmedId } : prev);
         setScanModal(prev => prev?.id === label.id ? { ...prev, status: "assigned", currentOrderId: trimmedId } : prev);
         setLinkOrderId("");
@@ -762,7 +754,7 @@ function LabelsContent() {
                 }
                 return o;
             });
-            syncSave("lavanpro_orders_v3", updatedOrders);
+            saveData("lavanpro_orders_v3", updatedOrders);
         } catch (e) { console.error("Erro ao atualizar status do pedido:", e); }
 
         // 2. Se for "Entregue", desvincular automaticamente a etiqueta
@@ -781,14 +773,14 @@ function LabelsContent() {
             ? { ...l, status: "available" as const, currentOrderId: null }
             : l
         );
-        syncSave("lavanpro_labels", updated);
+        saveData("lavanpro_labels", updated);
         
         const updatedHist = labelHistory.map(h =>
             h.labelId === label.id && h.releasedAt === null
                 ? { ...h, releasedAt: new Date().toISOString() }
                 : h
         );
-        syncSave("lavanpro_label_history", updatedHist);
+        saveData("lavanpro_label_history", updatedHist);
         setSelectedLabel(prev => prev?.id === label.id ? { ...prev, status: "available", currentOrderId: null } : prev);
         setScanModal(null);
         showToast(`Etiqueta ${label.code} liberada! Disponível para reuso.`);

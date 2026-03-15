@@ -124,12 +124,6 @@ export function usePermissions() {
                     if (settingsData?.value) {
                         const parsed = settingsData.value as PermissionMatrix;
                         setMatrix(parsed);
-                        localStorage.setItem("lavanpro_permissions", JSON.stringify(parsed));
-                    } else {
-                        const saved = localStorage.getItem("lavanpro_permissions");
-                        if (saved) {
-                            try { setMatrix(JSON.parse(saved)); } catch { /* ignore */ }
-                        }
                     }
                 }
             } catch (err) {

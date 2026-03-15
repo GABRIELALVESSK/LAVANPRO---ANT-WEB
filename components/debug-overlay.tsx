@@ -69,19 +69,23 @@ export function DebugOverlay() {
 
         <Section title="Scope" icon={<Layout />}>
           <Field label="ACTIVE_UNIT" value={unitId} />
-          <Field label="LOCAL_STORAGE_ITEMS" value={Object.keys(localStorage).filter(k => k.startsWith('lavanpro_')).length.toString()} />
+          <Field label="LOCAL_STORAGE_ITEMS" value={typeof window !== 'undefined' ? Object.keys(localStorage).filter(k => k.startsWith('lavanpro_')).length.toString() : '0'} />
         </Section>
 
         <Section title="Persistence Audit" icon={<Clock />}>
-          {['lavanpro_orders_v3', 'lavanpro_units', 'lavanpro_customers'].map(key => (
-            <div key={key} className="flex justify-between items-center py-0.5 border-b border-white/5 last:border-0">
-               <span className="text-brand-muted">{key.replace('lavanpro_', '')}</span>
-               <span className={localStorage.getItem(key) ? "text-emerald-500" : "text-rose-500"}>
-                 {localStorage.getItem(key) ? '✓ Presente' : '✕ Ausente'}
-               </span>
-            </div>
-          ))}
+          {['lavanpro_orders_v3', 'lavanpro_units', 'lavanpro_customers'].map(key => {
+            const isPresent = typeof window !== 'undefined' && !!localStorage.getItem(key);
+            return (
+              <div key={key} className="flex justify-between items-center py-0.5 border-b border-white/5 last:border-0">
+                 <span className="text-brand-muted">{key.replace('lavanpro_', '')}</span>
+                 <span className={isPresent ? "text-emerald-500" : "text-rose-500"}>
+                   {isPresent ? '✓ Presente' : '✕ Ausente'}
+                 </span>
+              </div>
+            );
+          })}
         </Section>
+
         
         <div className="pt-2 text-[9px] text-brand-muted italic text-center">
           Ctrl+Shift+D para alternar visibilidade

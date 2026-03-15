@@ -13,47 +13,41 @@ interface UnitSelectorProps {
 }
 
 export function UnitSelector({ onUnitChange, showAllOption = true }: UnitSelectorProps) {
-  const { data: businessData } = useBusinessData();
-  const [selectedUnit, setSelectedUnit] = useState<string>("all");
-  const [isOpen, setIsOpen] = useState(false);
+  const { data: businessData, saveData } = useBusinessData();
   const { isOwner, staffUnit, loading: permsLoading } = usePermissions();
+  const [isOpen, setIsOpen] = useState(false);
 
-  const units = businessData.units || [];
+  // 1. Determine if user is restricted to a specific unit
+  const isSpecificUnit = !isOwner && staffUnit && staffUnit.toLowerCase() !== "todas as unidades" && staffUnit.toLowerCase() !== "todas";
 
-  // Handle forcing unit for specific staff
+  // 2. Filter available units based on restrictions
+  let units = businessData.units || [];
+  if (isSpecificUnit) {
+      const staffUnitNormalized = staffUnit.trim().toLowerCase();
+      units = units.filter(u => u.name.trim().toLowerCase() === staffUnitNormalized);
+  }
+
+  const selectedUnit = businessData.selectedUnit || "all";
+
+  // Handle forcing unit for specific staff or defaulting to first unit
   useEffect(() => {
     if (permsLoading || units.length === 0) return;
 
-    const isSpecificUnit = staffUnit && staffUnit.toLowerCase() !== "todas as unidades" && staffUnit.toLowerCase() !== "todas";
-    if (!isOwner && isSpecificUnit) {
-      const staffUnitNormalized = staffUnit.trim().toLowerCase();
-      const matchedUnit = units.find(u => u.name.trim().toLowerCase() === staffUnitNormalized);
-      
+    if (isSpecificUnit) {
+      // If restricted, force selectedUnit to match the only available unit
+      const matchedUnit = units[0];
       if (matchedUnit && selectedUnit !== matchedUnit.id) {
-        setSelectedUnit(matchedUnit.id);
-        localStorage.setItem("lavanpro_selected_unit", matchedUnit.id);
+        saveData("lavanpro_selected_unit", matchedUnit.id);
         if (onUnitChange) onUnitChange(matchedUnit.id);
-        window.dispatchEvent(new CustomEvent("unit-changed", { detail: matchedUnit.id }));
       }
     } else {
-      // Default behavior
-      try {
-        const saved = localStorage.getItem("lavanpro_selected_unit");
-        if (saved) {
-            setSelectedUnit(saved);
-        } else if (!showAllOption && units.length > 0) {
-            const firstUnitId = units[0].id;
-            setSelectedUnit(firstUnitId);
-            localStorage.setItem("lavanpro_selected_unit", firstUnitId);
-        } else if (showAllOption) {
-            setSelectedUnit("all");
-            localStorage.setItem("lavanpro_selected_unit", "all");
-        }
-      } catch (e) {
-        console.error("Error accessing localStorage in UnitSelector:", e);
+      // Logic for selecting a default unit if none is selected
+      if (!selectedUnit && !showAllOption && units.length > 0) {
+        const firstUnitId = units[0].id;
+        saveData("lavanpro_selected_unit", firstUnitId);
       }
     }
-  }, [showAllOption, isOwner, staffUnit, permsLoading, units.length]);
+  }, [showAllOption, isSpecificUnit, permsLoading, units.length, selectedUnit, saveData, onUnitChange]);
 
   const handleSelect = (id: string) => {
     if (id === selectedUnit) {
@@ -61,13 +55,9 @@ export function UnitSelector({ onUnitChange, showAllOption = true }: UnitSelecto
         return;
     }
     
-    setSelectedUnit(id);
-    localStorage.setItem("lavanpro_selected_unit", id);
+    saveData("lavanpro_selected_unit", id);
     setIsOpen(false);
     if (onUnitChange) onUnitChange(id);
-    
-    // Notify other components
-    window.dispatchEvent(new CustomEvent("unit-changed", { detail: id }));
   };
 
   const currentUnit = units.find(u => u.id === selectedUnit);

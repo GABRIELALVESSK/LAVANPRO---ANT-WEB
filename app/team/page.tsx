@@ -18,9 +18,10 @@ import {
     ROLES, blankStaff,
     fetchStaff, createStaff, updateStaff, deleteStaff
 } from "@/lib/staffService";
-import { getUnits, type Unit } from "@/lib/units-data";
+import { type Unit } from "@/lib/units-data";
 import { useSubscription } from "@/hooks/useSubscription";
 import { useUnit } from "@/hooks/useUnit";
+import { useBusinessData } from "@/components/business-data-provider";
 
 // ─── Toast ────────────────────────────────────────────────────────────────────
 interface Toast { id: number; message: string; type: "success" | "error" }
@@ -229,8 +230,9 @@ function ProductivityBar({ value, max }: { value: number; max: number }) {
 export default function TeamPage() {
     // Data state
     const { unitId: globalUnitId } = useUnit();
+    const { data: businessData } = useBusinessData();
+    const units = (businessData.units || []) as Unit[];
     const [staffList, setStaffList] = useState<Staff[]>([]);
-    const [units, setUnits] = useState<Unit[]>([]);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const { plan, isEnterprise } = useSubscription();
@@ -281,7 +283,6 @@ export default function TeamPage() {
             setLoading(true);
             const data = await fetchStaff(globalUnitId);
             setStaffList(data);
-            setUnits(getUnits());
         } catch (err) {
             console.error("Erro ao carregar equipe:", err);
             addToast("Erro ao carregar equipe. Tente novamente.", "error");

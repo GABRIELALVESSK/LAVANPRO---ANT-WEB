@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import { syncData, pushDataToServer } from "@/lib/dataSync";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 
@@ -42,12 +41,12 @@ export default function LoginPage() {
             if (mode === 'register') {
                 // ─── FLUXO DE CADASTRO ─────────────────────────────────────────
                 
-                // Verificar existência do e-mail no staff
-                const { data: staffInvite } = await supabase
-                    .from('staff')
-                    .select('id, role, unit, owner_id')
-                    .eq('email', email.toLowerCase().trim())
-                    .maybeSingle();
+                // Verificar existência do e-mail no staff via RPC (Bypass RLS para anônimos)
+                const { data: invitations, error: rpcError } = await supabase
+                    .rpc('get_staff_invitation', { p_email: email.toLowerCase().trim() });
+                
+                if (rpcError) throw rpcError;
+                const staffInvite = invitations && invitations.length > 0 ? invitations[0] : null;
 
                 if (registerType === 'owner') {
                     if (staffInvite) {
@@ -71,13 +70,13 @@ export default function LoginPage() {
 
                     // Criar o registro do owner na tabela staff para consistência
                     if (authData.user) {
+                        const emailLower = email.toLowerCase().trim();
                         await supabase.from('staff').insert({
-                            name: name,
-                            email: email.toLowerCase().trim(),
+                            name: name || 'Dono',
+                            email: emailLower,
                             role: 'Administrador',
                             unit: 'Todas as Unidades',
                             active: true,
-                            has_system_access: true,
                             user_id: authData.user.id,
                             owner_id: authData.user.id, // Owner é dono de si mesmo
                         });
@@ -166,14 +165,8 @@ export default function LoginPage() {
                     }
                 }
 
-                // ─── SINCRONIZAR DADOS ──────────────────────────────────────
-                // Owner → push dados do localStorage para Supabase
-                // Colaborador → pull dados do Supabase para localStorage
-                try {
-                    await syncData();
-                } catch (syncErr) {
-                    console.error('[Login] Erro na sincronização:', syncErr);
-                }
+
+                // Dados são sincronizados automaticamente via BusinessDataProvider + Supabase Realtime
 
                 const nextParam = new URLSearchParams(window.location.search).get('next');
                 showToast("Bem-vindo de volta!", "success");

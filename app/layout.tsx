@@ -2,7 +2,6 @@ import type { Metadata, Viewport } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css'; // Global styles
 import { ThemeProvider } from '@/components/theme-provider';
-import { DataSynchronizer } from '@/components/data-synchronizer';
 import { SidebarProvider } from '@/components/sidebar';
 import { BusinessDataProvider } from '@/components/business-data-provider';
 import { DebugOverlay } from '@/components/debug-overlay';
@@ -33,7 +32,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           enableSystem={false}
           disableTransitionOnChange
         >
-          <DataSynchronizer />
           <BusinessDataProvider>
             <SidebarProvider>
               {children}

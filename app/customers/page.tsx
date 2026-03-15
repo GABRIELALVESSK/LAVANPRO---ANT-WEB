@@ -13,7 +13,6 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useMemo, useEffect } from "react";
 import { useUnit } from "@/hooks/useUnit";
-import { pushDataToServer, syncData, syncSave } from "@/lib/dataSync";
 import { useBusinessData } from "@/components/business-data-provider";
 
 import { Customer, seedCustomers } from "../../lib/customers-data";
@@ -225,14 +224,12 @@ function EditPanel({ data, onChange, onTagToggle, onSave, onCancel, title }: Edi
 // ─── Main Component ────────────────────────────────────────────────────────────
 export default function CustomersPage() {
     const { unitId: activeUnit } = useUnit();
-    const { data: businessData } = useBusinessData();
+    const { data: businessData, saveData } = useBusinessData();
     
     // Centralized data from Provider
     const customers = (businessData.customers || []) as Customer[];
     const orders = (businessData.orders || []) as any[];
 
-    // A remoção do useEffect que salvava 'customers' no localStorage é intencional.
-    // Agora salvamos explicitamente usando syncSave() em cada ação do usuário.
 
 
     const [search, setSearch] = useState("");
@@ -283,8 +280,8 @@ export default function CustomersPage() {
         setFilterTag("Todos");
         setFilterOrigin("Todos");
         
-        // Sincroniza com o servidor imediatamente via syncSave
-        syncSave("lavanpro_customers", [{ ...form, id, createdAt: now, orders: [], unitId: activeUnit !== "all" ? activeUnit : "default" }, ...customers]);
+        // Sincroniza com o servidor imediatamente via saveData
+        saveData("lavanpro_customers", [{ ...form, id, createdAt: now, orders: [], unitId: activeUnit !== "all" ? activeUnit : "default" }, ...customers]);
     };
 
     // Handlers — Edit
@@ -302,8 +299,8 @@ export default function CustomersPage() {
         
         setEditMode(false);
         
-        // Sincroniza com o servidor imediatamente via syncSave
-        syncSave("lavanpro_customers", customers.map(c => c.id === selected.id ? updated : c));
+        // Sincroniza com o servidor imediatamente via saveData
+        saveData("lavanpro_customers", customers.map(c => c.id === selected.id ? updated : c));
     };
 
     // Handlers — Delete
@@ -311,8 +308,8 @@ export default function CustomersPage() {
         setDeleteConfirm(null);
         setSelected(null);
         
-        // Sincroniza com o servidor imediatamente via syncSave
-        syncSave("lavanpro_customers", customers.filter(c => c.id !== id));
+        // Sincroniza com o servidor imediatamente via saveData
+        saveData("lavanpro_customers", customers.filter(c => c.id !== id));
     };
 
     return (

@@ -1,0 +1,14 @@
+   ▲ Next.js 15.5.12
+   - Environments: .env.local
+
+   Creating an optimized production build ...
+<w> [webpack.cache.PackFileCacheStrategy] Serializing big strings (133kiB) impacts deserialization performance (consider using Buffer instead and decode when needed)
+Failed to compile.
+
+./app/login/page.tsx
+Module not found: Can't resolve '@/lib/dataSync'
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+> Build failed because of webpack errors

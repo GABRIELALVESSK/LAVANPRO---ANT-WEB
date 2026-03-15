@@ -11,7 +11,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect, useMemo } from "react";
 import { useUnit } from "@/hooks/useUnit";
 import { UnitSelector } from "@/components/unit-selector";
-import { pushDataToServer, syncData } from "@/lib/dataSync";
+
 
 // --- Types ---
 type ChargeType = "UNIDADE" | "QUILO" | "PECA" | "FIXO";
@@ -71,13 +71,13 @@ const blankService = (unitId: string): ServiceFormData & { unitId: string } => (
 
 // --- Component ---
 import { useBusinessData } from "@/components/business-data-provider";
-import { syncSave } from "@/lib/dataSync";
+
 
 // ... (types unchanged)
 
 export default function ServicesPage() {
     const { unitId: activeUnit } = useUnit();
-    const { data: bizData } = useBusinessData();
+    const { data: bizData, saveData } = useBusinessData();
     
     // Remote data
     const services = (bizData.services || []) as Service[];
@@ -116,7 +116,7 @@ export default function ServicesPage() {
             updated = [...services, newService];
         }
         
-        await syncSave('lavanpro_services_pro', updated);
+        await saveData('lavanpro_services_pro', updated);
         setIsModalOpen(false);
         setFormData(blankService(activeUnit));
         setEditingId(null);
@@ -127,7 +127,7 @@ export default function ServicesPage() {
         e.stopPropagation();
         if (confirm("Deseja realmente excluir este serviço?")) {
             const filtered = services.filter((s) => s.id !== id);
-            await syncSave('lavanpro_services_pro', filtered);
+            await saveData('lavanpro_services_pro', filtered);
         }
     };
 

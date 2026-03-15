@@ -1,26 +1,26 @@
-"use client";
-
-import { useState, useEffect } from "react";
+import { useBusinessData } from "@/components/business-data-provider";
+import { usePermissions } from "@/hooks/usePermissions";
 
 export function useUnit() {
-  const [unitId, setUnitId] = useState<string>("all");
+  const { data } = useBusinessData();
+  const { isOwner, staffUnit } = usePermissions();
+  
+  let unitId = data.selectedUnit || "all";
 
-  useEffect(() => {
-    // Initial load
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem("lavanpro_selected_unit");
-      if (saved) setUnitId(saved);
-    }
-
-    const handleUnitChange = (e: any) => {
-      setUnitId(e.detail);
-    };
-
-    window.addEventListener("unit-changed", handleUnitChange);
-    return () => window.removeEventListener("unit-changed", handleUnitChange);
-  }, []);
+  // Force actual restricted unit if it's set for this staff member
+  const isSpecificUnit = staffUnit && staffUnit.toLowerCase() !== "todas as unidades" && staffUnit.toLowerCase() !== "todas";
+  
+  if (!isOwner && isSpecificUnit) {
+      const units = data.units || [];
+      const staffUnitNormalized = staffUnit.trim().toLowerCase();
+      const matchedUnit = units.find((u: any) => u.name.trim().toLowerCase() === staffUnitNormalized);
+      
+      if (matchedUnit) {
+          unitId = matchedUnit.id;
+      }
+  }
 
   const isAll = unitId === "all" || !unitId || unitId === "";
 
-  return { unitId, isAll };
+  return { unitId, isAll, staffUnit };
 }

@@ -7,7 +7,7 @@ import {
     ArrowRight, Lock, Crown
 } from "lucide-react";
 import { Unit, DEFAULT_OPENING_HOURS } from "@/lib/units-data";
-import { syncSave } from "@/lib/dataSync";
+import { useBusinessData } from "@/components/business-data-provider";
 import { motion, AnimatePresence } from "framer-motion";
 
 interface UnitDataTabProps {
@@ -25,7 +25,8 @@ const DAYS = [
     { key: "sun", label: "Domingo" },
 ];
 
-export function UnitDataTab({ currentPlan, units: initialUnits }: UnitDataTabProps) {
+export default function UnitDataTab({ currentPlan, units: initialUnits }: UnitDataTabProps) {
+    const { saveData } = useBusinessData();
     const isEnterprise = currentPlan === "enterprise";
     const [units, setUnits] = useState<Unit[]>(initialUnits || []);
     const [isEditing, setIsEditing] = useState(false);
@@ -74,7 +75,7 @@ export function UnitDataTab({ currentPlan, units: initialUnits }: UnitDataTabPro
             const newList = units.filter(u => u.id !== id);
             setUnits(newList);
             // Salva na nuvem instantaneamente via centralizado
-            await syncSave('lavanpro_units', newList);
+            await saveData('lavanpro_units', newList);
         }
     };
 
@@ -82,25 +83,31 @@ export function UnitDataTab({ currentPlan, units: initialUnits }: UnitDataTabPro
         if (!editingUnit?.name) return;
         setIsSaving(true);
 
-        let newList: Unit[];
-        if (units.find(u => u.id === editingUnit.id)) {
-            newList = units.map(u => u.id === editingUnit.id ? (editingUnit as Unit) : u);
-        } else {
-            newList = [...units, editingUnit as Unit];
-        }
+        try {
+            let newList: Unit[];
+            if (units.find(u => u.id === editingUnit.id)) {
+                newList = units.map(u => u.id === editingUnit.id ? (editingUnit as Unit) : u);
+            } else {
+                newList = [...units, editingUnit as Unit];
+            }
 
-        // Se marcou como principal, desmarca as outras
-        if (editingUnit.isMain) {
-            newList = newList.map(u => u.id === editingUnit.id ? u : { ...u, isMain: false });
-        }
+            // Se marcou como principal, desmarca as outras
+            if (editingUnit.isMain) {
+                newList = newList.map(u => u.id === editingUnit.id ? u : { ...u, isMain: false });
+            }
 
-        setUnits(newList);
-        // Salva na nuvem instantaneamente via centralizado
-        await syncSave('lavanpro_units', newList);
-        
-        setIsSaving(false);
-        setIsEditing(false);
-        setEditingUnit(null);
+            setUnits(newList);
+            // Salva na nuvem instantaneamente via centralizado
+            await saveData('lavanpro_units', newList);
+            
+            setIsEditing(false);
+            setEditingUnit(null);
+        } catch (error) {
+            console.error("Error saving unit:", error);
+            alert("Erro ao salvar unidade na nuvem.");
+        } finally {
+            setIsSaving(false);
+        }
     };
 
     const updateField = (field: keyof Unit, value: any) => {

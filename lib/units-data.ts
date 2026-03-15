@@ -55,25 +55,6 @@ const DEFAULT_UNIT: Unit = {
     isMain: true
 };
 
-export function getUnits(): Unit[] {
-    if (typeof window === 'undefined') return [];
-    try {
-        const saved = localStorage.getItem("lavanpro_units");
-        const units = saved ? JSON.parse(saved) : [];
-        // Se estiver vazio, retorna a unidade padrão para não quebrar a interface
-        if (Array.isArray(units) && units.length === 0) {
-            return [DEFAULT_UNIT];
-        }
-        return units;
-    } catch {
-        return [DEFAULT_UNIT];
-    }
-}
-
-import { syncSave } from './dataSync';
-
-export function saveUnits(units: Unit[]) {
-    if (typeof window === 'undefined') return;
-    syncSave("lavanpro_units", units);
-}
+// Note: getUnits and saveUnits have been removed. 
+// Use the BusinessDataProvider (useBusinessData) to manage units in a cloud-native way.
 

@@ -32,7 +32,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
 import { usePermissions } from "@/hooks/usePermissions";
-import { syncData } from "@/lib/dataSync";
+
 import { useSubscription, PlanTier } from "@/hooks/useSubscription";
 import { useTheme } from "next-themes";
 import { useEffect, useState, createContext, useContext } from "react";
@@ -135,19 +135,6 @@ export function Sidebar() {
     router.push("/login");
   };
 
-  const handleSyncData = async () => {
-    setIsSyncing(true);
-    try {
-      await syncData();
-      alert("Sincronização concluída com sucesso!");
-    } catch (err) {
-      console.error("Sync error:", err);
-      alert("Erro ao sincronizar dados.");
-    } finally {
-      setIsSyncing(false);
-    }
-  };
-
   const handleUpgrade = async (newPlan: PlanTier) => {
     setIsUpdating(true);
     try {
@@ -203,11 +190,9 @@ export function Sidebar() {
           )}
         </div>
 
-        {/* Unit Selector */}
         <div className="mb-6 relative">
           <UnitSelector onUnitChange={(id) => {
-            localStorage.setItem("lavanpro_selected_unit", id);
-            window.dispatchEvent(new CustomEvent("unit-changed", { detail: id }));
+            // Context update handled by UnitSelector + BusinessDataProvider
           }} />
         </div>
 
@@ -268,17 +253,7 @@ export function Sidebar() {
 
       {/* Bottom */}
       <div className="mt-auto p-5 border-t border-brand-darkBorder space-y-4">
-        {/* Manual Sync */}
-        {(usePermissions().isOwner) && (
-          <button
-            onClick={handleSyncData}
-            disabled={isSyncing}
-            className="w-full flex items-center justify-center gap-2 px-3 py-2.5 bg-brand-primary/10 border border-brand-primary/30 rounded-xl text-brand-primary hover:bg-brand-primary/20 transition-all font-bold text-xs disabled:opacity-50"
-          >
-            <RefreshCw className={`size-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
-            {isSyncing ? "Sincronizando..." : "Sincronizar Agora"}
-          </button>
-        )}
+
 
         {/* Theme toggle */}
         {mounted && (

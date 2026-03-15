@@ -31,7 +31,6 @@ import { Transaction } from "@/app/finance/page";
 import { calculateDashboardMetrics } from "@/lib/dashboard-utils";
 import { UnitSelector } from "@/components/unit-selector";
 import { useUnit } from "@/hooks/useUnit";
-import { syncData } from "@/lib/dataSync";
 import { useBusinessData } from "@/components/business-data-provider";
 
 // Dynamic imports to avoid SSR issues with heavy/DOM-based components

@@ -17,7 +17,6 @@ import { UnitSelector } from "@/components/unit-selector";
 import { useRouter } from "next/navigation";
 import { useUnit } from "@/hooks/useUnit";
 import { useAuth } from "@/hooks/useAuth";
-import { syncData, pushDataToServer, syncSave } from "@/lib/dataSync";
 import { useBusinessData } from "@/components/business-data-provider";
 
 const StatusColors: Record<string, string> = {
@@ -51,7 +50,7 @@ function formatCurrency(v: number) { return v.toLocaleString("pt-BR", { style: "
 export default function OrdersPage() {
     const router = useRouter();
     const { staffName } = useAuth();
-    const { data: businessData, refresh } = useBusinessData();
+    const { data: businessData, refresh, saveData } = useBusinessData();
     const orders = businessData.orders;
     const [isLoaded, setIsLoaded] = useState(false);
     const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
@@ -87,8 +86,6 @@ export default function OrdersPage() {
         refresh("lavanpro_orders_v3");
     }, []);
 
-    // A remoção do useEffect que salvava 'orders' no localStorage é intencional.
-    // Agora salvamos explicitamente usando syncSave() em cada ação do usuário.
 
 
     // Init filters from URL
@@ -220,7 +217,7 @@ export default function OrdersPage() {
             updatedCusts = [newCust, ...updatedCusts];
         }
 
-        syncSave("lavanpro_customers", updatedCusts);
+        saveData("lavanpro_customers", updatedCusts);
 
 
         const freshOrder: Order = {
@@ -242,15 +239,13 @@ export default function OrdersPage() {
         const currentOrders = orders;
         const updatedOrders = [freshOrder, ...currentOrders];
         
-        syncSave("lavanpro_orders_v3", updatedOrders);
+        saveData("lavanpro_orders_v3", updatedOrders);
 
         setIsNewOrderOpen(false);
 
         setCustomerSearch("");
         setShowCustSuggestions(false);
         setNewOrder({ client: "", phone: "", email: "", address: "", delivery: "Entrega em Domicílio", paymentMethod: "PIX", paymentStatus: "A Pagar", estimatedDelivery: "", observations: "", items: [{ ...blankItem }] });
-
-        // Sincronização automática via syncSave acima
 
     };
 
@@ -331,9 +326,9 @@ export default function OrdersPage() {
                         }
                     });
 
-                    // Persiste as alterações no estoque via syncSave
-                    await syncSave("lavanpro_stock_products_v2", products);
-                    await syncSave("lavanpro_stock_movements_v2", movements);
+                    // Persiste as alterações no estoque via saveData
+                    await saveData("lavanpro_stock_products_v2", products);
+                    await saveData("lavanpro_stock_movements_v2", movements);
 
                     // Marca o pedido como debitado para não repetir a lógica
                     (selectedOrder as any).stockDeducted = true;
@@ -374,7 +369,7 @@ export default function OrdersPage() {
                     const updatedLabels = allLabels.map((l: any) =>
                         l.id === linkedLabel.id ? { ...l, status: "available", currentOrderId: null } : l
                     );
-                    syncSave("lavanpro_labels", updatedLabels);
+                    saveData("lavanpro_labels", updatedLabels);
                 }
             } catch (e) {
                 console.error("Erro ao desvincular etiqueta:", e);
@@ -385,7 +380,7 @@ export default function OrdersPage() {
     const handleDeleteOrder = (id: string) => {
         if (confirm("Tem certeza que deseja excluir este pedido? Esta ação é irreversível e removerá o pedido de todos os registros.")) {
             const updated = orders.filter(o => o.id !== id);
-            syncSave("lavanpro_orders_v3", updated);
+            saveData("lavanpro_orders_v3", updated);
             setSelectedOrder(null);
 
         }
@@ -408,7 +403,7 @@ export default function OrdersPage() {
             }
             return c;
         });
-        syncSave("lavanpro_customers", updatedCusts);
+        saveData("lavanpro_customers", updatedCusts);
 
 
         // Desvincula QR automaticamente quando pedido está como Entregue
@@ -422,7 +417,7 @@ export default function OrdersPage() {
                     const updatedLabels = labels.map((l: any) =>
                         l.id === linkedLabel.id ? { ...l, status: "available", currentOrderId: null } : l
                     );
-                    syncSave("lavanpro_labels", updatedLabels);
+                    saveData("lavanpro_labels", updatedLabels);
 
                     try {
                         const history = businessData.label_history || [];
@@ -431,7 +426,7 @@ export default function OrdersPage() {
                                 ? { ...h, releasedAt: new Date().toISOString() }
                                 : h
                         );
-                        syncSave("lavanpro_label_history", updatedHistory);
+                        saveData("lavanpro_label_history", updatedHistory);
                     } catch (err) {
                         console.error("Erro ao atualizar histórico da etiqueta:", err);
                     }
@@ -443,7 +438,7 @@ export default function OrdersPage() {
         }
 
         const updatedOrdersList = orders.map(o => o.id === selectedOrder.id ? selectedOrder : o);
-        syncSave("lavanpro_orders_v3", updatedOrdersList);
+        saveData("lavanpro_orders_v3", updatedOrdersList);
         setSelectedOrder(null);
         setIsStatusDropdown(false);
 
