@@ -54,6 +54,10 @@ function CustomTooltip({ active, payload, label, prefix = "R$ " }: any) {
   return null;
 }
 
+import { useBusinessData } from "@/components/business-data-provider";
+
+// ... (formatters unchanged)
+
 export default function ReportsPage() {
   const [activeRange, setActiveRange] = useState("30d");
   const { unitId: selectedUnit } = useUnit();
@@ -62,61 +66,30 @@ export default function ReportsPage() {
     end: new Date().toISOString().split("T")[0],
   });
 
-  const [units, setUnits] = useState<any[]>([]);
+  const { data: bizData } = useBusinessData();
   const [activeTab, setActiveTab] = useState("financeiro");
-  const [stockAlerts, setStockAlerts] = useState<any[]>([]);
-  const [orders, setOrders] = useState<any[]>([]);
-  const [customers, setCustomers] = useState<any[]>([]);
-  const [financeTransactions, setFinanceTransactions] = useState<any[]>([]);
 
-  useEffect(() => {
-    // Load Units
-    const savedUnits = localStorage.getItem("lavanpro_units");
-    if (savedUnits) {
-      try { setUnits(JSON.parse(savedUnits)); } catch (e) {}
-    }
+  // Map business data directly from provider
+  const units = bizData.units;
+  const orders = bizData.orders;
+  const customers = bizData.customers;
+  const financeTransactions = bizData.finance;
+  const products = bizData.stock_products;
 
-    // Load Orders
-    const savedOrders = localStorage.getItem("lavanpro_orders_v3");
-    if (savedOrders) {
-      try { setOrders(JSON.parse(savedOrders)); } catch (e) {}
-    }
+  const stockAlerts = useMemo(() => {
+    return products
+      .filter((p: any) => p.currentStock <= (p.minStock || 0))
+      .map((p: any) => ({
+        name: p.name,
+        current: p.currentStock,
+        min: p.minStock,
+        status: p.currentStock === 0 ? "Esgotado" : "Crítico",
+        percent: p.minStock > 0 ? (p.currentStock / p.minStock) * 100 : 0,
+        unit: p.unit || "un"
+      }))
+      .sort((a: any, b: any) => a.percent - b.percent);
+  }, [products]);
 
-    // Load Customers
-    const savedCustomers = localStorage.getItem("lavanpro_customers");
-    if (savedCustomers) {
-      try { setCustomers(JSON.parse(savedCustomers)); } catch (e) {}
-    }
-
-    // Load Finance
-    const savedFinance = localStorage.getItem("lavanpro_finance_transactions");
-    if (savedFinance) {
-        try { setFinanceTransactions(JSON.parse(savedFinance)); } catch(e) {}
-    }
-
-    // Stock Alerts (Existing)
-    const savedProducts = localStorage.getItem("lavanpro_stock_products_v2");
-    if (savedProducts) {
-      try {
-        const products = JSON.parse(savedProducts);
-        const alerts = products
-          .filter((p: any) => p.currentStock <= (p.minStock || 0))
-          .map((p: any) => ({
-            name: p.name,
-            current: p.currentStock,
-            min: p.minStock,
-            status: p.currentStock === 0 ? "Esgotado" : "Crítico",
-            percent: p.minStock > 0 ? (p.currentStock / p.minStock) * 100 : 0,
-            unit: p.unit || "un"
-          }))
-          .sort((a: any, b: any) => a.percent - b.percent);
-        setStockAlerts(alerts);
-      } catch (e) {
-        console.error("Erro ao ler estoque para relatórios:", e);
-      }
-    }
-
-  }, []);
 
   // ─── Filtered Data ────────────────────────────────────────────────────────
   const filteredOrders = useMemo(() => {

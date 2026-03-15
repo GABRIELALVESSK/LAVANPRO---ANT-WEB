@@ -1,4 +1,5 @@
 "use client";
+export const dynamic = "force-dynamic";
 
 import { Sidebar, MobileHeader } from "@/components/sidebar";
 import { AccessGuard } from "@/components/access-guard";
@@ -12,7 +13,8 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useMemo, useEffect } from "react";
 import { useUnit } from "@/hooks/useUnit";
-import { pushDataToServer, syncData } from "@/lib/dataSync";
+import { pushDataToServer, syncData, syncSave } from "@/lib/dataSync";
+import { useBusinessData } from "@/components/business-data-provider";
 
 import { Customer, seedCustomers } from "../../lib/customers-data";
 
@@ -223,33 +225,15 @@ function EditPanel({ data, onChange, onTagToggle, onSave, onCancel, title }: Edi
 // ─── Main Component ────────────────────────────────────────────────────────────
 export default function CustomersPage() {
     const { unitId: activeUnit } = useUnit();
-    const [customers, setCustomers] = useState<Customer[]>(seedCustomers);
-    const [isLoaded, setIsLoaded] = useState(false);
+    const { data: businessData } = useBusinessData();
+    
+    // Centralized data from Provider
+    const customers = (businessData.customers || []) as Customer[];
+    const orders = (businessData.orders || []) as any[];
 
-    const [orders, setOrders] = useState<any[]>([]);
+    // A remoção do useEffect que salvava 'customers' no localStorage é intencional.
+    // Agora salvamos explicitamente usando syncSave() em cada ação do usuário.
 
-    useEffect(() => {
-        const loadLocal = () => {
-            const saved = localStorage.getItem("lavanpro_customers");
-            if (saved) { try { setCustomers(JSON.parse(saved)); } catch { } }
-            const savedOrders = localStorage.getItem("lavanpro_orders_v3");
-            if (savedOrders) { try { setOrders(JSON.parse(savedOrders)); } catch { } }
-        };
-
-        loadLocal();
-        setIsLoaded(true);
-
-        // Puxa do servidor ao entrar
-        syncData();
-
-        // Escuta atualizações de fundo
-        window.addEventListener("data-synced", loadLocal);
-        return () => window.removeEventListener("data-synced", loadLocal);
-    }, []);
-
-    useEffect(() => {
-        if (isLoaded) localStorage.setItem("lavanpro_customers", JSON.stringify(customers));
-    }, [customers, isLoaded]);
 
     const [search, setSearch] = useState("");
     const [filterStatus, setFilterStatus] = useState<"Todos" | "Ativo" | "Inativo">("Todos");
@@ -293,14 +277,14 @@ export default function CustomersPage() {
         if (!form.name) return;
         const id = `C${String(customers.length + 1).padStart(3, "0")}`;
         const now = new Date().toISOString().slice(0, 10);
-        setCustomers(prev => [{ ...form, id, createdAt: now, orders: [], unitId: activeUnit !== "all" ? activeUnit : "default" }, ...prev]);
+        
         setIsCreating(false);
         setForm(blankCustomer());
         setFilterTag("Todos");
         setFilterOrigin("Todos");
         
-        // Sincroniza com o servidor imediatamente
-        pushDataToServer();
+        // Sincroniza com o servidor imediatamente via syncSave
+        syncSave("lavanpro_customers", [{ ...form, id, createdAt: now, orders: [], unitId: activeUnit !== "all" ? activeUnit : "default" }, ...customers]);
     };
 
     // Handlers — Edit
@@ -315,22 +299,20 @@ export default function CustomersPage() {
     const handleSaveEdit = () => {
         if (!selected) return;
         const updated = { ...selected, ...editForm };
-        setCustomers(prev => prev.map(c => c.id === selected.id ? updated : c));
-        setSelected(updated);
+        
         setEditMode(false);
         
-        // Sincroniza com o servidor imediatamente
-        pushDataToServer();
+        // Sincroniza com o servidor imediatamente via syncSave
+        syncSave("lavanpro_customers", customers.map(c => c.id === selected.id ? updated : c));
     };
 
     // Handlers — Delete
     const handleDelete = (id: string) => {
-        setCustomers(prev => prev.filter(c => c.id !== id));
         setDeleteConfirm(null);
         setSelected(null);
         
-        // Sincroniza com o servidor imediatamente
-        pushDataToServer();
+        // Sincroniza com o servidor imediatamente via syncSave
+        syncSave("lavanpro_customers", customers.filter(c => c.id !== id));
     };
 
     return (

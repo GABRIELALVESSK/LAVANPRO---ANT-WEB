@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { motion } from "framer-motion";
 import Link from "next/link";
+import { supabase } from "@/lib/supabase";
 
 interface OrderItem {
     service: string;
@@ -74,28 +75,34 @@ export default function OrderTrackingPage() {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        const orderId = params.id as string;
-        const cleanId = orderId.startsWith("ORD-") ? `#${orderId}` : orderId.includes("ORD") ? `#${orderId}` : orderId;
-        
-        // Try to find the order in localStorage
-        const saved = localStorage.getItem("lavanpro_orders_v3");
-        if (saved) {
+        const fetchOrder = async () => {
+            const orderId = params.id as string;
+            const cleanId = orderId.replace("#", "").trim();
+            
             try {
-                const orders: Order[] = JSON.parse(saved);
-                const found = orders.find(o => 
-                    o.id === orderId || 
-                    o.id === `#${orderId}` || 
-                    o.id.replace("#", "") === orderId
-                );
+                // Puxa diretamente do Supabase via RPC para garantir dados reais
+                const { data, error } = await supabase.rpc('get_laundry_data');
                 
-                if (found) {
-                    setOrder(found);
+                if (!error && data) {
+                    const allOrders: Order[] = data.orders || [];
+                    const found = allOrders.find(o => 
+                        o.id === orderId || 
+                        o.id === `#${orderId}` || 
+                        o.id.replace("#", "") === cleanId
+                    );
+                    
+                    if (found) {
+                        setOrder(found);
+                    }
                 }
             } catch (e) {
-                console.error("Erro ao ler pedidos:", e);
+                console.error("Erro ao buscar pedido no Supabase:", e);
+            } finally {
+                setLoading(false);
             }
-        }
-        setLoading(false);
+        };
+
+        fetchOrder();
     }, [params.id]);
 
     if (loading) {

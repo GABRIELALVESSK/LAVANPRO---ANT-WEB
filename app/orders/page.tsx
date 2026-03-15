@@ -1,4 +1,5 @@
 "use client";
+export const dynamic = "force-dynamic";
 
 import { Sidebar, MobileHeader } from "@/components/sidebar";
 import { AccessGuard } from "@/components/access-guard";
@@ -16,7 +17,8 @@ import { UnitSelector } from "@/components/unit-selector";
 import { useRouter } from "next/navigation";
 import { useUnit } from "@/hooks/useUnit";
 import { useAuth } from "@/hooks/useAuth";
-import { syncData, pushDataToServer } from "@/lib/dataSync";
+import { syncData, pushDataToServer, syncSave } from "@/lib/dataSync";
+import { useBusinessData } from "@/components/business-data-provider";
 
 const StatusColors: Record<string, string> = {
     "Recebido": "bg-slate-500",
@@ -49,7 +51,8 @@ function formatCurrency(v: number) { return v.toLocaleString("pt-BR", { style: "
 export default function OrdersPage() {
     const router = useRouter();
     const { staffName } = useAuth();
-    const [orders, setOrders] = useState<Order[]>([]);
+    const { data: businessData, refresh } = useBusinessData();
+    const orders = businessData.orders;
     const [isLoaded, setIsLoaded] = useState(false);
     const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
     const [isNewOrderOpen, setIsNewOrderOpen] = useState(false);
@@ -63,7 +66,7 @@ export default function OrdersPage() {
     const { unitId: activeUnit } = useUnit();
 
     // New order form
-    const [allCustomers, setAllCustomers] = useState<any[]>([]);
+    const allCustomers = businessData.customers;
     const [customerSearch, setCustomerSearch] = useState("");
     const [showCustSuggestions, setShowCustSuggestions] = useState(false);
     const [activeServiceIdx, setActiveServiceIdx] = useState<number | null>(null);
@@ -80,36 +83,13 @@ export default function OrdersPage() {
     });
 
     useEffect(() => {
-        const loadOrders = () => {
-            try {
-                const saved = localStorage.getItem("lavanpro_orders_v3");
-                if (saved) {
-                    setOrders(JSON.parse(saved));
-                }
-            } catch (e) {
-                console.error("Error loading orders from localStorage:", e);
-            }
-        };
-
-        loadOrders();
-
-        // Puxa dados do servidor logo ao abrir a página
-        syncData();
-
-        const handleSync = () => loadOrders();
-        window.addEventListener("data-synced", handleSync);
-        window.addEventListener("storage", handleSync);
         setIsLoaded(true);
-
-        return () => {
-            window.removeEventListener("data-synced", handleSync);
-            window.removeEventListener("storage", handleSync);
-        };
+        refresh("lavanpro_orders_v3");
     }, []);
 
-    useEffect(() => {
-        if (isLoaded) localStorage.setItem("lavanpro_orders_v3", JSON.stringify(orders));
-    }, [orders, isLoaded]);
+    // A remoção do useEffect que salvava 'orders' no localStorage é intencional.
+    // Agora salvamos explicitamente usando syncSave() em cada ação do usuário.
+
 
     // Init filters from URL
     useEffect(() => {
@@ -240,8 +220,8 @@ export default function OrdersPage() {
             updatedCusts = [newCust, ...updatedCusts];
         }
 
-        setAllCustomers(updatedCusts);
-        localStorage.setItem("lavanpro_customers", JSON.stringify(updatedCusts));
+        syncSave("lavanpro_customers", updatedCusts);
+
 
         const freshOrder: Order = {
             id: orderId,
@@ -259,18 +239,19 @@ export default function OrdersPage() {
             lastUpdatedBy: staffName
         };
 
-        const currentOrders = JSON.parse(localStorage.getItem("lavanpro_orders_v3") || "[]");
+        const currentOrders = orders;
         const updatedOrders = [freshOrder, ...currentOrders];
-        localStorage.setItem("lavanpro_orders_v3", JSON.stringify(updatedOrders));
+        
+        syncSave("lavanpro_orders_v3", updatedOrders);
 
-        setOrders(updatedOrders);
         setIsNewOrderOpen(false);
+
         setCustomerSearch("");
         setShowCustSuggestions(false);
         setNewOrder({ client: "", phone: "", email: "", address: "", delivery: "Entrega em Domicílio", paymentMethod: "PIX", paymentStatus: "A Pagar", estimatedDelivery: "", observations: "", items: [{ ...blankItem }] });
 
-        // Sincroniza com o servidor imediatamente
-        pushDataToServer('lavanpro_orders_v3');
+        // Sincronização automática via syncSave acima
+
     };
 
     useEffect(() => {
@@ -282,45 +263,7 @@ export default function OrdersPage() {
         return () => window.removeEventListener("click", handleClick);
     }, []);
 
-    const [realServices, setRealServices] = useState<any[]>([]);
-
-    useEffect(() => {
-        const loadCusts = () => {
-            const savedCustomers = localStorage.getItem("lavanpro_customers");
-            if (savedCustomers) {
-                try { setAllCustomers(JSON.parse(savedCustomers)); } catch { }
-            } else {
-                setAllCustomers(seedCustomers);
-            }
-        };
-
-        const loadServices = () => {
-            const savedServices = localStorage.getItem("lavanpro_services_pro");
-            if (savedServices) {
-                try { setRealServices(JSON.parse(savedServices)); } catch { }
-            }
-        };
-
-        loadCusts();
-        loadServices();
-
-        const handleStorage = (e: StorageEvent) => {
-            if (e.key === "lavanpro_customers") loadCusts();
-            if (e.key === "lavanpro_services_pro") loadServices();
-        };
-
-        const handleSync = () => {
-            loadCusts();
-            loadServices();
-        };
-
-        window.addEventListener("storage", handleStorage);
-        window.addEventListener("data-synced", handleSync);
-        return () => {
-            window.removeEventListener("storage", handleStorage);
-            window.removeEventListener("data-synced", handleSync);
-        };
-    }, []);
+    const realServices = businessData.services;
 
     const currentServices = realServices.length > 0 ? realServices : initialServices;
 
@@ -344,7 +287,7 @@ export default function OrdersPage() {
         setShowCustSuggestions(false);
     };
 
-    const handleStatusChange = (statusOption: string) => {
+    const handleStatusChange = async (statusOption: string) => {
         if (!selectedOrder) return;
 
         const cfg = STATUS_CONFIG[statusOption];
@@ -353,17 +296,15 @@ export default function OrdersPage() {
         // --- MOTOR DE BAIXA DE ESTOQUE ---
         // Gatilho: Quando entra em "Em Lavagem" e ainda não foi debitado
         if (statusOption === "Em Lavagem" && !(selectedOrder as any).stockDeducted) {
-            const savedStockProducts = localStorage.getItem("lavanpro_stock_products_v2");
-            const savedStockMovements = localStorage.getItem("lavanpro_stock_movements_v2");
+            const products = [...(businessData.stock_products || [])];
+            const movements = [...(businessData.stock_movements || [])];
 
-            if (savedStockProducts) {
+            if (products.length > 0) {
                 try {
-                    let products = JSON.parse(savedStockProducts);
-                    let movements = savedStockMovements ? JSON.parse(savedStockMovements) : [];
                     let hasStockIssue = false;
 
                     selectedOrder.items.forEach((item: OrderItem) => {
-                        const service = realServices.find((s: any) => s.name === item.service);
+                        const service = (businessData.services || []).find((s: any) => s.name === item.service);
                         if (service && service.recipe && service.recipe.length > 0) {
                             service.recipe.forEach((recipeItem: any) => {
                                 const productIdx = products.findIndex((p: any) => p.id === recipeItem.productId);
@@ -377,28 +318,25 @@ export default function OrdersPage() {
                                         type: "SAIDA",
                                         productId: recipeItem.productId,
                                         quantity: totalQtyToDeduct,
-                                        unitCost: products[productIdx].unitCost,
+                                        unitCost: products[productIdx].unitCost || 0,
                                         reason: `Consumo Pedido ${selectedOrder.id}`,
                                         user: "Sistema (Automação)"
                                     };
                                     movements.unshift(newMovement);
 
                                     // Atualiza Estoque Atual
-                                    products[productIdx].currentStock = Math.max(0, products[productIdx].currentStock - totalQtyToDeduct);
+                                    products[productIdx].currentStock = Math.max(0, (products[productIdx].currentStock || 0) - totalQtyToDeduct);
                                 }
                             });
                         }
                     });
 
-                    // Persiste as alterações no estoque
-                    localStorage.setItem("lavanpro_stock_products_v2", JSON.stringify(products));
-                    localStorage.setItem("lavanpro_stock_movements_v2", JSON.stringify(movements));
+                    // Persiste as alterações no estoque via syncSave
+                    await syncSave("lavanpro_stock_products_v2", products);
+                    await syncSave("lavanpro_stock_movements_v2", movements);
 
                     // Marca o pedido como debitado para não repetir a lógica
                     (selectedOrder as any).stockDeducted = true;
-
-                    // Notifica a UI de estoque através do evento de storage
-                    window.dispatchEvent(new Event("storage"));
                 } catch (e) {
                     console.error("Erro na automação de estoque:", e);
                 }
@@ -428,20 +366,15 @@ export default function OrdersPage() {
         // Se marcou como "Entregue", desvincular automaticamente a etiqueta QR
         if (statusOption === "Entregue") {
             try {
-                const savedLabels = localStorage.getItem("lavanpro_labels");
-                if (savedLabels) {
-                    const allLabels = JSON.parse(savedLabels);
-                    const cleanId = String(selectedOrder.id).replace("#", "").trim();
-                    const linkedLabel = allLabels.find((l: any) => String(l.currentOrderId || "").trim() === cleanId);
+                const allLabels = businessData.labels || [];
+                const cleanId = String(selectedOrder.id).replace("#", "").trim();
+                const linkedLabel = allLabels.find((l: any) => String(l.currentOrderId || "").trim() === cleanId);
 
-                    if (linkedLabel) {
-                        const updatedLabels = allLabels.map((l: any) =>
-                            l.id === linkedLabel.id ? { ...l, status: "available", currentOrderId: null } : l
-                        );
-                        localStorage.setItem("lavanpro_labels", JSON.stringify(updatedLabels));
-                        pushDataToServer('lavanpro_labels');
-                        window.dispatchEvent(new Event("storage"));
-                    }
+                if (linkedLabel) {
+                    const updatedLabels = allLabels.map((l: any) =>
+                        l.id === linkedLabel.id ? { ...l, status: "available", currentOrderId: null } : l
+                    );
+                    syncSave("lavanpro_labels", updatedLabels);
                 }
             } catch (e) {
                 console.error("Erro ao desvincular etiqueta:", e);
@@ -452,10 +385,9 @@ export default function OrdersPage() {
     const handleDeleteOrder = (id: string) => {
         if (confirm("Tem certeza que deseja excluir este pedido? Esta ação é irreversível e removerá o pedido de todos os registros.")) {
             const updated = orders.filter(o => o.id !== id);
-            localStorage.setItem("lavanpro_orders_v3", JSON.stringify(updated));
-            setOrders(updated);
+            syncSave("lavanpro_orders_v3", updated);
             setSelectedOrder(null);
-            pushDataToServer('lavanpro_orders_v3');
+
         }
     };
 
@@ -476,41 +408,34 @@ export default function OrdersPage() {
             }
             return c;
         });
-        setAllCustomers(updatedCusts);
-        localStorage.setItem("lavanpro_customers", JSON.stringify(updatedCusts));
+        syncSave("lavanpro_customers", updatedCusts);
+
 
         // Desvincula QR automaticamente quando pedido está como Entregue
         if (selectedOrder.status === "Entregue") {
             try {
-                const savedLabels = localStorage.getItem("lavanpro_labels");
-                if (savedLabels) {
-                    const labels = JSON.parse(savedLabels);
-                    const cleanId = String(selectedOrder.id).replace("#", "").trim();
-                    const linkedLabel = labels.find((l: any) => String(l.currentOrderId || "").trim() === cleanId);
+                const labels = businessData.labels;
+                const cleanId = String(selectedOrder.id).replace("#", "").trim();
+                const linkedLabel = labels.find((l: any) => String(l.currentOrderId || "").trim() === cleanId);
 
-                    if (linkedLabel) {
-                        const updatedLabels = labels.map((l: any) =>
-                            l.id === linkedLabel.id ? { ...l, status: "available", currentOrderId: null } : l
+                if (linkedLabel) {
+                    const updatedLabels = labels.map((l: any) =>
+                        l.id === linkedLabel.id ? { ...l, status: "available", currentOrderId: null } : l
+                    );
+                    syncSave("lavanpro_labels", updatedLabels);
+
+                    try {
+                        const history = businessData.label_history || [];
+                        const updatedHistory = history.map((h: any) =>
+                            h.labelId === linkedLabel.id && h.releasedAt === null
+                                ? { ...h, releasedAt: new Date().toISOString() }
+                                : h
                         );
-                        localStorage.setItem("lavanpro_labels", JSON.stringify(updatedLabels));
-
-                        try {
-                            const savedHistory = localStorage.getItem("lavanpro_label_history") || "[]";
-                            const history = JSON.parse(savedHistory);
-                            const updatedHistory = history.map((h: any) =>
-                                h.labelId === linkedLabel.id && h.releasedAt === null
-                                    ? { ...h, releasedAt: new Date().toISOString() }
-                                    : h
-                            );
-                            localStorage.setItem("lavanpro_label_history", JSON.stringify(updatedHistory));
-                            pushDataToServer('lavanpro_label_history');
-                        } catch (err) {
-                            console.error("Erro ao atualizar histórico da etiqueta:", err);
-                        }
-
-                        pushDataToServer('lavanpro_labels');
-                        window.dispatchEvent(new Event("storage"));
+                        syncSave("lavanpro_label_history", updatedHistory);
+                    } catch (err) {
+                        console.error("Erro ao atualizar histórico da etiqueta:", err);
                     }
+                    window.dispatchEvent(new Event("storage"));
                 }
             } catch (e) {
                 console.error("Erro ao desvincular etiqueta:", e);
@@ -518,14 +443,10 @@ export default function OrdersPage() {
         }
 
         const updatedOrdersList = orders.map(o => o.id === selectedOrder.id ? selectedOrder : o);
-        localStorage.setItem("lavanpro_orders_v3", JSON.stringify(updatedOrdersList));
-
-        setOrders(updatedOrdersList);
+        syncSave("lavanpro_orders_v3", updatedOrdersList);
         setSelectedOrder(null);
         setIsStatusDropdown(false);
 
-        // Sincroniza com o servidor imediatamente
-        pushDataToServer('lavanpro_orders_v3');
     };
 
     return (
@@ -1075,21 +996,17 @@ export default function OrdersPage() {
                                         </button>
                                         <button className="p-4 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl text-brand-muted hover:text-white transition-all"><Printer className="size-5" /></button>
                                         {(() => {
-                                            try {
-                                                const savedLabels = localStorage.getItem("lavanpro_labels");
-                                                if (savedLabels) {
-                                                    const allLabels = JSON.parse(savedLabels);
-                                                    const cleanId = String(selectedOrder.id).replace("#", "").trim();
-                                                    const linked = allLabels.find((l: any) => String(l.currentOrderId || "").trim() === cleanId && l.status === "assigned");
-                                                    if (linked) {
-                                                        return (
-                                                            <div className="px-5 py-4 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl text-emerald-400 font-black text-xs tracking-widest uppercase flex items-center gap-3 cursor-default" title={`Já vinculado à ${linked.code}`}>
-                                                                <QrCode className="size-5" /> {linked.code} ✓
-                                                            </div>
-                                                        );
-                                                    }
-                                                }
-                                            } catch { }
+                                            const labels = businessData.labels || [];
+                                            const cleanId = String(selectedOrder.id).replace("#", "").trim();
+                                            const linked = labels.find((l: any) => String(l.currentOrderId || "").trim() === cleanId && l.status === "assigned");
+                                            
+                                            if (linked) {
+                                                return (
+                                                    <div className="px-5 py-4 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl text-emerald-400 font-black text-xs tracking-widest uppercase flex items-center gap-3 cursor-default" title={`Já vinculado à ${linked.code}`}>
+                                                        <QrCode className="size-5" /> {linked.code} ✓
+                                                    </div>
+                                                );
+                                            }
                                             return (
                                                 <button onClick={() => { setSelectedOrder(null); router.push(`/labels?order=${selectedOrder.id.replace('#', '')}`); }} className="px-5 py-4 bg-brand-primary/10 hover:bg-brand-primary/20 border border-brand-primary/20 rounded-2xl text-brand-primary font-black text-xs tracking-widest uppercase transition-all flex items-center gap-3">
                                                     <QrCode className="size-5" /> Vincular QR

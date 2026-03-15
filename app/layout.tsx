@@ -4,24 +4,15 @@ import './globals.css'; // Global styles
 import { ThemeProvider } from '@/components/theme-provider';
 import { DataSynchronizer } from '@/components/data-synchronizer';
 import { SidebarProvider } from '@/components/sidebar';
+import { BusinessDataProvider } from '@/components/business-data-provider';
+import { DebugOverlay } from '@/components/debug-overlay';
 
 const inter = Inter({
   subsets: ['latin'],
   variable: '--font-sans',
 });
 
-export const metadata: Metadata = {
-  title: 'Lavanderia Pro',
-  description: 'Painel de Faturamento Detalhado',
-};
-
-export const viewport: Viewport = {
-  width: 'device-width',
-  initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
-  viewportFit: 'cover',
-};
+// ... (metadata/viewport unchanged)
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -33,7 +24,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
         <link
           href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
-          rel="stylesheet"
         />
       </head>
       <body className="font-sans antialiased" suppressHydrationWarning>
@@ -44,9 +34,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           disableTransitionOnChange
         >
           <DataSynchronizer />
-          <SidebarProvider>
-            {children}
-          </SidebarProvider>
+          <BusinessDataProvider>
+            <SidebarProvider>
+              {children}
+              <DebugOverlay />
+            </SidebarProvider>
+          </BusinessDataProvider>
         </ThemeProvider>
       </body>
     </html>

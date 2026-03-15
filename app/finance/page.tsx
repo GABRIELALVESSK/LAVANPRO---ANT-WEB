@@ -1,4 +1,5 @@
 "use client";
+export const dynamic = "force-dynamic";
 
 import { Sidebar, MobileHeader } from "@/components/sidebar";
 import { AccessGuard } from "@/components/access-guard";
@@ -14,7 +15,8 @@ import { useState, useMemo, useEffect } from "react";
 import { useUnit } from "@/hooks/useUnit";
 import { useAuth } from "@/hooks/useAuth";
 import { UnitSelector } from "@/components/unit-selector";
-import { pushDataToServer, syncData } from "@/lib/dataSync";
+import { pushDataToServer, syncData, syncSave } from "@/lib/dataSync";
+import { useBusinessData } from "@/components/business-data-provider";
 // ─── Types ────────────────────────────────────────────────────────────────────
 type TransactionType = "RECEITA" | "DESPESA";
 type TransactionStatus = "PAGO" | "PENDENTE" | "ATRASADO";
@@ -192,52 +194,12 @@ function TransactionModal({ data, onChange, onSave, onCancel }: TransactionModal
 export default function FinancePage() {
     const { unitId: activeUnit } = useUnit();
     const { staffName } = useAuth();
-    const [transactions, setTransactions] = useState<Transaction[]>([]);
-    const [isLoaded, setIsLoaded] = useState(false);
-
-    // Load from localStorage
-    useEffect(() => {
-        const loadLocal = () => {
-            const saved = localStorage.getItem("lavanpro_finance_transactions");
-            if (saved) {
-                try {
-                    setTransactions(JSON.parse(saved));
-                } catch (e) {
-                    console.error("Erro ao carregar transações:", e);
-                }
-            }
-        };
-
-        loadLocal();
-        setIsLoaded(true);
-
-        // Puxa do servidor ao entrar
-        syncData();
-
-        // Escuta atualizações de fundo (outras abas)
-        const handleStorageChange = (e: StorageEvent) => {
-            if (e.key === "lavanpro_finance_transactions") {
-                loadLocal();
-            }
-        };
-
-        window.addEventListener("data-synced", loadLocal);
-        window.addEventListener("storage", handleStorageChange);
-        return () => {
-            window.removeEventListener("data-synced", loadLocal);
-            window.removeEventListener("storage", handleStorageChange);
-        };
-    }, []);
-
-    // Save to localStorage
-    useEffect(() => {
-        if (isLoaded) {
-            localStorage.setItem("lavanpro_finance_transactions", JSON.stringify(transactions));
-            window.dispatchEvent(new Event("storage"));
-        }
-    }, [transactions, isLoaded]);
-
-    // Filters
+    const { data: businessData } = useBusinessData();
+    
+    // Centralized data from Provider
+    const transactions = (businessData.finance || []) as Transaction[];
+    
+    // UI state
     const [activeTab, setActiveTab] = useState<"TODOS" | "RECEITAS" | "DESPESAS">("TODOS");
     const [search, setSearch] = useState("");
     const [filterPeriod, setFilterPeriod] = useState<"MesAtual" | "Ultimos30" | "Todos">("MesAtual");
@@ -262,21 +224,21 @@ export default function FinancePage() {
             unitId: form.unitId || activeUnit,
             paidDate: form.status === "PAGO" ? new Date().toISOString().slice(0, 10) : undefined 
         };
-        setTransactions(prev => [newTransaction, ...prev]);
+        
         setIsCreating(false);
         setForm(blankTransaction("RECEITA", activeUnit));
         
-        // Sincroniza com o servidor imediatamente
-        pushDataToServer('lavanpro_finance_transactions');
+        // Sincroniza com o servidor imediatamente via syncSave
+        syncSave('lavanpro_finance_transactions', [newTransaction, ...transactions]);
     };
 
     const handleSettle = (id: string) => {
-        setTransactions(prev => prev.map(t =>
+        const updatedTransactions = transactions.map(t =>
             t.id === id ? { ...t, status: "PAGO", paidDate: new Date().toISOString().slice(0, 10), paymentMethod: "Dinheiro" } : t
-        ));
+        );
         
-        // Sincroniza com o servidor imediatamente
-        pushDataToServer('lavanpro_finance_transactions');
+        // Sincroniza com o servidor imediatamente via syncSave
+        syncSave('lavanpro_finance_transactions', updatedTransactions);
     };
 
     // Computations

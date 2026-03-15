@@ -1,11 +1,12 @@
 "use client";
+export const dynamic = "force-dynamic";
 
 import { Sidebar, MobileHeader } from "@/components/sidebar";
 import { AccessGuard } from "@/components/access-guard";
 import { PlanGuard } from "@/components/plan-guard";
 import {
     Activity, AlertCircle, ArrowRight, BarChart3, Calendar, Camera, CheckCheck, CheckCircle, 
-    ChevronRight, ClipboardList, Clock, CreditCard, Cpu, Filter, History, Info, 
+    ChevronRight, ClipboardList, Clock, CreditCard, Cpu, Filter, History as LucideHistory, Info, 
     LayoutDashboard, Link2, LogOut, Mail, MapPin, Package, PackageX, Phone, Plus, 
     Printer, QrCode, RefreshCw, Search, SearchCode, Settings, ShieldCheck, 
     ShoppingBag, Tag, Trash2, TrendingUp, Truck, Unlink2, Users, X
@@ -19,7 +20,8 @@ import QRCodeLib from "qrcode";
 import ReactQRCode from "react-qr-code";
 import { Order, OrderItem, HistoryEntry } from "@/lib/orders-data";
 import { useAuth } from "@/hooks/useAuth";
-import { syncData, pushDataToServer } from "@/lib/dataSync";
+import { syncData, pushDataToServer, syncSave } from "@/lib/dataSync";
+import { useBusinessData } from "@/components/business-data-provider";
 
 const STATUS_CONFIG: Record<string, { color: string; bg: string; progress: number; textColor: string }> = {
     "Recebido": { color: "text-slate-400", bg: "bg-slate-400", progress: 5, textColor: "text-slate-400" },
@@ -274,21 +276,13 @@ function LabelsContent() {
     const router = useRouter();
     const { user } = useAuth();
     const staffName = user?.user_metadata?.full_name || user?.email?.split("@")[0] || "Administrador";
+    const { data: businessData } = useBusinessData();
 
-    const [labels, setLabels] = useState<ReusableLabel[]>(() => {
-        if (typeof window === "undefined") return INITIAL_LABELS;
-        try {
-            const saved = localStorage.getItem("lavanpro_labels");
-            return saved ? JSON.parse(saved) : INITIAL_LABELS;
-        } catch { return INITIAL_LABELS; }
-    });
-    const [history, setHistory] = useState<LabelHistory[]>(() => {
-        if (typeof window === "undefined") return INITIAL_HISTORY;
-        try {
-            const saved = localStorage.getItem("lavanpro_label_history");
-            return saved ? JSON.parse(saved) : INITIAL_HISTORY;
-        } catch { return INITIAL_HISTORY; }
-    });
+    // Centralized data from Provider
+    const labels = (businessData.labels || []) as ReusableLabel[];
+    const labelHistory = (businessData.label_history || []) as LabelHistory[];
+    const globalOrders = (businessData.orders || []) as Order[];
+
     const [search, setSearch] = useState("");
     const [filterStatus, setFilterStatus] = useState<"all" | LabelStatus>("all");
     const [selectedLabel, setSelectedLabel] = useState<ReusableLabel | null>(null);
@@ -296,7 +290,6 @@ function LabelsContent() {
     const [scanModal, setScanModal] = useState<ReusableLabel | null>(null);
     const [linkOrderId, setLinkOrderId] = useState("");
     const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null);
-    const [globalOrders, setGlobalOrders] = useState<Order[]>(SEED_ORDERS_DB);
     const [isCameraActive, setIsCameraActive] = useState(false);
     const [isGenerating, setIsGenerating] = useState(false);
     const [genQty, setGenQty] = useState(5);
@@ -345,33 +338,9 @@ function LabelsContent() {
         }
     }, [isCameraActive]);
 
-    // ── Sincronizar com Banco de Pedidos Global ──
+    // ── Sincronizar com Banco de Dados ──
     useEffect(() => {
-        const syncGlobalData = () => {
-            const saved = localStorage.getItem("lavanpro_orders_v3");
-            if (saved) {
-                try {
-                    const rawOrders = JSON.parse(saved);
-                    setGlobalOrders(rawOrders);
-                } catch (e) { console.error("Erro ao sincronizar pedidos:", e); }
-            }
-            const savedLabels = localStorage.getItem("lavanpro_labels");
-            if (savedLabels) {
-                try {
-                    setLabels(JSON.parse(savedLabels));
-                } catch (e) {}
-            }
-        };
-
-        syncGlobalData();
         syncData(); // Puxa do servidor no mount
-
-        window.addEventListener("storage", syncGlobalData);
-        window.addEventListener("data-synced", syncGlobalData);
-        return () => {
-            window.removeEventListener("storage", syncGlobalData);
-            window.removeEventListener("data-synced", syncGlobalData);
-        };
     }, []);
 
     const showToast = useCallback((msg: string, type: "success" | "error" = "success") => {
@@ -380,12 +349,9 @@ function LabelsContent() {
     }, []);
 
     // ── Persistir labels e histórico no localStorage ──
-    useEffect(() => {
-        localStorage.setItem("lavanpro_labels", JSON.stringify(labels));
-    }, [labels]);
-    useEffect(() => {
-        localStorage.setItem("lavanpro_label_history", JSON.stringify(history));
-    }, [history]);
+    // A remoção dos useEffects que salvavam no localStorage é intencional.
+    // Agora salvamos explicitamente usando syncSave() em cada ação do usuário.
+
 
     const searchParams = useSearchParams();
 
@@ -433,25 +399,24 @@ function LabelsContent() {
         }
         setIsGenerating(true);
         setTimeout(() => {
-            setLabels(prev => {
-                const maxNum = prev.length > 0 ? Math.max(...prev.map(l => l.displayNumber)) : 0;
-                const startNum = maxNum + 1;
-                const newLabels: ReusableLabel[] = Array.from({ length: qty }, (_, i) => {
-                    const n = startNum + i;
-                    return {
-                        id: `label-${Math.random().toString(36).substr(2, 9)}`,
-                        code: `TAG-${String(n).padStart(3, "0")}`,
-                        displayNumber: n,
-                        status: "available",
-                        currentOrderId: null,
-                    };
-                });
-                return [...prev, ...newLabels];
+            const maxNum = labels.length > 0 ? Math.max(...labels.map(l => l.displayNumber)) : 0;
+            const startNum = maxNum + 1;
+            const newLabels: ReusableLabel[] = Array.from({ length: qty }, (_, i) => {
+                const n = startNum + i;
+                return {
+                    id: `label-${Math.random().toString(36).substr(2, 9)}`,
+                    code: `TAG-${String(n).padStart(3, "0")}`,
+                    displayNumber: n,
+                    status: "available",
+                    currentOrderId: null,
+                };
             });
+
+            syncSave("lavanpro_labels", [...labels, ...newLabels]);
             setIsGenerating(false);
-            pushDataToServer('lavanpro_labels');
             showToast(`Criamos mais ${qty} etiquetas para seu estoque!`);
         }, 800);
+
     };
 
     // ── Delete Label ────────────────────────
@@ -466,12 +431,12 @@ function LabelsContent() {
         // Simpler delete logic to avoid any issues with window.confirm
         const confirmed = window.confirm(`Remover etiqueta ${label.code} permanentemente?`);
         if (confirmed) {
-            setLabels(prev => prev.filter(l => l.id !== labelId));
+            syncSave("lavanpro_labels", labels.filter(l => l.id !== labelId));
             if (selectedLabel?.id === labelId) {
                 setSelectedLabel(null);
             }
-            pushDataToServer('lavanpro_labels');
             showToast(`Etiqueta ${label.code} removida.`);
+
         }
     };
 
@@ -754,67 +719,50 @@ function LabelsContent() {
                 status: "Recebido" as OrderStatus, createdAt: new Date().toISOString(), items: [],
                 history: [{ time: new Date().toLocaleTimeString(), status: "Etiqueta Vinculada", note: `Vinculado à TAG ${label.code}`, staffName }]
             };
-            setGlobalOrders(prev => [...prev, newOrderStub]);
-            // Importante: salvar este stub para que outros vejam
-            const currentOrders = JSON.parse(localStorage.getItem("lavanpro_orders_v3") || "[]");
-            localStorage.setItem("lavanpro_orders_v3", JSON.stringify([...currentOrders, newOrderStub]));
-            pushDataToServer('lavanpro_orders_v3');
+            syncSave("lavanpro_orders_v3", [...globalOrders, newOrderStub]);
         }
+
 
         const updatedLabels = labels.map(l => l.id === label.id
             ? { ...l, status: "assigned" as const, currentOrderId: trimmedId }
             : l
         );
-        localStorage.setItem("lavanpro_labels", JSON.stringify(updatedLabels));
-        
-        setLabels(updatedLabels);
-        setHistory(prev => [...prev, { labelId: label.id, orderId: trimmedId, assignedAt: new Date().toISOString(), releasedAt: null }]);
+        syncSave("lavanpro_labels", updatedLabels);
+        syncSave("lavanpro_label_history", [...labelHistory, { labelId: label.id, orderId: trimmedId, assignedAt: new Date().toISOString(), releasedAt: null }]);
         setSelectedLabel(prev => prev?.id === label.id ? { ...prev, status: "assigned", currentOrderId: trimmedId } : prev);
         setScanModal(prev => prev?.id === label.id ? { ...prev, status: "assigned", currentOrderId: trimmedId } : prev);
         setLinkOrderId("");
-        pushDataToServer('lavanpro_labels');
         showToast(`Etiqueta ${label.code} vinculada ao pedido ${trimmedId}!`);
+
+
     };
 
-    const handleStageAdvancement = (label: ReusableLabel, order: Order, newStage: OrderStatus) => {
-        // 1. Atualiza no localStorage global de pedidos
+        const handleStageAdvancement = (label: ReusableLabel, order: Order, newStage: OrderStatus) => {
+        // 1. Atualiza no banco de dados central
         try {
-            const savedOrders = localStorage.getItem("lavanpro_orders_v3");
-            if (savedOrders) {
-                const rawOrders = JSON.parse(savedOrders);
-                const cfg = STATUS_CONFIG[newStage];
-                const now = new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
-                const cleanOrderId = String(order.id).replace("#", "").trim();
+            const cfg = STATUS_CONFIG[newStage];
+            const now = new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+            const cleanOrderId = String(order.id).replace("#", "").trim();
 
-                const updatedOrders = rawOrders.map((o: any) => {
-                    const oCleanId = String(o.id).replace("#", "").trim();
-                    if (oCleanId === cleanOrderId) {
-                        return { 
-                            ...o, 
-                            status: newStage,
-                            progress: cfg?.progress ?? o.progress,
-                            bgColor: cfg?.bg ?? o.bgColor,
-                            textColor: cfg?.textColor ?? o.textColor,
-                            lastUpdatedBy: staffName,
-                            history: [
-                                ...(o.history || []),
-                                { time: now, status: newStage, note: `Status alterado via scan de etiqueta.`, staffName }
-                            ]
-                        };
-                    }
-                    return o;
-                });
-                localStorage.setItem("lavanpro_orders_v3", JSON.stringify(updatedOrders));
-                
-                // Atualiza o estado React diretamente para refletir na UI
-                setGlobalOrders(updatedOrders);
-
-                // PUSH IMEDIATO
-                pushDataToServer('lavanpro_orders_v3');
-
-                // Dispara evento de storage para atualizar outras abas
-                window.dispatchEvent(new Event("storage"));
-            }
+            const updatedOrders = globalOrders.map((o: any) => {
+                const oCleanId = String(o.id).replace("#", "").trim();
+                if (oCleanId === cleanOrderId) {
+                    return { 
+                        ...o, 
+                        status: newStage,
+                        progress: cfg?.progress ?? o.progress,
+                        bgColor: cfg?.bg ?? o.bgColor,
+                        textColor: cfg?.textColor ?? o.textColor,
+                        lastUpdatedBy: staffName,
+                        history: [
+                            ...(o.history || []),
+                            { time: now, status: newStage, note: `Status alterado via scan de etiqueta.`, staffName }
+                        ]
+                    };
+                }
+                return o;
+            });
+            syncSave("lavanpro_orders_v3", updatedOrders);
         } catch (e) { console.error("Erro ao atualizar status do pedido:", e); }
 
         // 2. Se for "Entregue", desvincular automaticamente a etiqueta
@@ -826,25 +774,26 @@ function LabelsContent() {
         }
     };
 
+
     // ── Release label ───────────────────────
     const releaseLabel = (label: ReusableLabel) => {
         const updated = labels.map(l => l.id === label.id
             ? { ...l, status: "available" as const, currentOrderId: null }
             : l
         );
-        localStorage.setItem("lavanpro_labels", JSON.stringify(updated));
+        syncSave("lavanpro_labels", updated);
         
-        setLabels(updated);
-        setHistory(prev => prev.map(h =>
+        const updatedHist = labelHistory.map(h =>
             h.labelId === label.id && h.releasedAt === null
                 ? { ...h, releasedAt: new Date().toISOString() }
                 : h
-        ));
+        );
+        syncSave("lavanpro_label_history", updatedHist);
         setSelectedLabel(prev => prev?.id === label.id ? { ...prev, status: "available", currentOrderId: null } : prev);
         setScanModal(null);
-        pushDataToServer('lavanpro_labels');
         showToast(`Etiqueta ${label.code} liberada! Disponível para reuso.`);
     };
+
 
     // ── Derived data ────────────────────────
     const filteredLabels = useMemo(() => {
@@ -876,7 +825,7 @@ function LabelsContent() {
     const scanLabelState = scanModal ? labels.find(l => l.id === scanModal.id) ?? scanModal : null;
     const scanOrder = scanLabelState ? getOrderForLabel(scanLabelState) : null;
 
-    const labelHistory = (lbl: ReusableLabel) => history.filter(h => h.labelId === lbl.id);
+    const getLabelHistory = (lbl: ReusableLabel) => labelHistory.filter(h => h.labelId === lbl.id);
 
     return (
         <AccessGuard permission="labels">
@@ -951,7 +900,7 @@ function LabelsContent() {
                                         { label: "Total de Etiquetas", value: labels.length, icon: Tag, color: "text-brand-primary" },
                                         { label: "Disponíveis", value: availableCount, icon: CheckCircle, color: "text-emerald-400" },
                                         { label: "Em Uso", value: assignedCount, icon: Link2, color: "text-brand-primary" },
-                                        { label: "Ciclos Históricos", value: history.filter(h => h.releasedAt).length, icon: History, color: "text-amber-400" },
+                                        { label: "Ciclos Históricos", value: labelHistory.filter(h => h.releasedAt).length, icon: LucideHistory, color: "text-amber-400" },
                                     ].map(s => (
                                         <div key={s.label} className="bg-brand-card border border-brand-darkBorder rounded-2xl p-4 flex items-center gap-4">
                                             <div className={`p-2 bg-white/5 rounded-xl ${s.color}`}><s.icon className="size-5" /></div>
@@ -1188,11 +1137,11 @@ function LabelsContent() {
                                                     )}
 
                                                     {/* History */}
-                                                    {labelHistory(selectedLabelState).length > 0 && (
+                                                    {getLabelHistory(selectedLabelState).length > 0 && (
                                                         <div>
-                                                            <p className="text-xs font-bold uppercase tracking-wider text-brand-muted mb-2 flex items-center gap-1.5"><History className="size-3.5" /> Histórico de Usos</p>
+                                                            <p className="text-xs font-bold uppercase tracking-wider text-brand-muted mb-2 flex items-center gap-1.5"><LucideHistory className="size-3.5" /> Histórico de Usos</p>
                                                             <div className="space-y-2">
-                                                                {labelHistory(selectedLabelState).slice().reverse().map((h, i) => (
+                                                                {getLabelHistory(selectedLabelState).slice().reverse().map((h, i) => (
                                                                     <div key={i} className="flex items-center gap-3 text-xs bg-brand-bg border border-brand-darkBorder rounded-xl p-3">
                                                                         <div className={`size-2 rounded-full shrink-0 ${h.releasedAt ? "bg-brand-muted" : "bg-emerald-400"}`} />
                                                                         <div className="flex-1 min-w-0">

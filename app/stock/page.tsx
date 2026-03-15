@@ -1,4 +1,5 @@
 "use client";
+export const dynamic = "force-dynamic";
 
 import { Sidebar, MobileHeader } from "@/components/sidebar";
 import { AccessGuard } from "@/components/access-guard";
@@ -246,17 +247,25 @@ function MovementModal({ products, preselectProductId, onSave, onCancel, unitId 
 }
 
 // ─── Main Component ────────────────────────────────────────────────────────────
+import { useBusinessData } from "@/components/business-data-provider";
+import { syncSave } from "@/lib/dataSync";
+
+// ... (types and helpers unchanged)
+
 export default function StockPage() {
     const { unitId: activeUnit } = useUnit();
-    const [products, setProducts] = useState<Product[]>([]);
-    const [movements, setMovements] = useState<Movement[]>([]);
+    const { data: bizData } = useBusinessData();
+    
+    // Remote data from Provider
+    const products = (bizData.stock_products || []) as Product[];
+    const movements = (bizData.stock_movements || []) as Movement[];
 
-    // State
+    // UI state only
     const [activeTab, setActiveTab] = useState<"ESTOQUE" | "MOVIMENTACOES">("ESTOQUE");
     const [search, setSearch] = useState("");
     const [filterCategory, setFilterCategory] = useState("Todos");
 
-    // Modals
+    // Modals state
     const [isProductModalOpen, setIsProductModalOpen] = useState(false);
     const [isMovementModalOpen, setIsMovementModalOpen] = useState(false);
     const [selectedProductIdForMove, setSelectedProductIdForMove] = useState<string | null>(null);
@@ -264,65 +273,44 @@ export default function StockPage() {
     const [productForm, setProductForm] = useState<ProductFormData & { unitId: string }>(() => blankProduct(activeUnit));
     const [editingProductId, setEditingProductId] = useState<string | null>(null);
 
-    // Sync form with activeUnit
+    // Sync form unitId
     useEffect(() => {
         setProductForm(prev => ({ ...prev, unitId: activeUnit !== "all" ? activeUnit : "default" }));
     }, [activeUnit]);
 
-    useEffect(() => {
-        const loadLocal = () => {
-            const savedProducts = localStorage.getItem("lavanpro_stock_products_v2");
-            const savedMovements = localStorage.getItem("lavanpro_stock_movements_v2");
-            if (savedProducts) { try { setProducts(JSON.parse(savedProducts)); } catch { } }
-            if (savedMovements) { try { setMovements(JSON.parse(savedMovements)); } catch { } }
-        };
-
-        loadLocal();
-        
-        // Puxa dados do servidor logo ao entrar no Estoque
-        syncData();
-
-        // Escuta atualizações de fundo
-        window.addEventListener("data-synced", loadLocal);
-        return () => window.removeEventListener("data-synced", loadLocal);
-    }, []);
-
-    useEffect(() => {
-        localStorage.setItem("lavanpro_stock_products_v2", JSON.stringify(products));
-        localStorage.setItem("lavanpro_stock_movements_v2", JSON.stringify(movements));
-        
-        // Sync to server (with a small delay to avoid too many requests)
-        const timeout = setTimeout(() => {
-            pushDataToServer();
-        }, 1000);
-        return () => clearTimeout(timeout);
-    }, [products, movements]);
-
     const handleProductChange = (f: keyof ProductFormData, v: any) => setProductForm(prev => ({ ...prev, [f]: v }));
 
-    const handleSaveProduct = () => {
+    const handleSaveProduct = async () => {
         if (!productForm.name) return;
+        
+        let updatedProducts: Product[];
         if (editingProductId) {
-            setProducts(prev => prev.map(p => p.id === editingProductId ? { ...productForm, id: p.id } as Product : p));
+            updatedProducts = products.map(p => p.id === editingProductId ? { ...productForm, id: p.id } as Product : p);
         } else {
             const id = `PROD-${String(Date.now()).slice(-6)}`;
-            setProducts(prev => [...prev, { ...productForm, id, unitId: activeUnit !== "all" ? activeUnit : "default" } as Product]);
+            updatedProducts = [...products, { ...productForm, id, unitId: activeUnit !== "all" ? activeUnit : "default" } as Product];
         }
+        
+        await syncSave('lavanpro_stock_products_v2', updatedProducts);
         setIsProductModalOpen(false);
     };
 
-    const handleSaveMovement = (mov: Omit<Movement, "id">) => {
+    const handleSaveMovement = async (mov: Omit<Movement, "id">) => {
         const id = `MOV-${String(Date.now()).slice(-6)}`;
-        setMovements(prev => [{ ...mov, id }, ...prev]);
+        const newMovements = [{ ...mov, id }, ...movements];
 
-        // Update product stock automatically
-        setProducts(prev => prev.map(p => {
+        // Update product stock automatically in the product list
+        const updatedProducts = products.map(p => {
             if (p.id === mov.productId) {
                 const newStock = mov.type === "ENTRADA" ? p.currentStock + mov.quantity : p.currentStock - mov.quantity;
                 return { ...p, currentStock: Math.max(0, newStock) };
             }
             return p;
-        }));
+        });
+
+        // Batch save both to ensure consistency
+        await syncSave('lavanpro_stock_movements_v2', newMovements);
+        await syncSave('lavanpro_stock_products_v2', updatedProducts);
 
         setIsMovementModalOpen(false);
         setSelectedProductIdForMove(null);

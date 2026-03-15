@@ -7,8 +7,10 @@ export function useUnit() {
 
   useEffect(() => {
     // Initial load
-    const saved = localStorage.getItem("lavanpro_selected_unit");
-    if (saved) setUnitId(saved);
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem("lavanpro_selected_unit");
+      if (saved) setUnitId(saved);
+    }
 
     const handleUnitChange = (e: any) => {
       setUnitId(e.detail);

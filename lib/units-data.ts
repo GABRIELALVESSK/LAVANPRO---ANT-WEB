@@ -70,7 +70,10 @@ export function getUnits(): Unit[] {
     }
 }
 
+import { syncSave } from './dataSync';
+
 export function saveUnits(units: Unit[]) {
     if (typeof window === 'undefined') return;
-    localStorage.setItem("lavanpro_units", JSON.stringify(units));
+    syncSave("lavanpro_units", units);
 }
+

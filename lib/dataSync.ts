@@ -5,11 +5,7 @@ import { supabase } from './supabase'
  * Data Sync Service
  * 
  * Sincroniza dados entre localStorage (browser) e Supabase (servidor).
- * - Owner/Admin: SALVA do localStorage para o Supabase
- * - Colaborador: CARREGA do Supabase para o localStorage
- * 
- * Isso garante que colaboradores em outros navegadores vejam
- * os mesmos dados que o admin criou.
+ * Agora com suporte a persistência imediata.
  */
 
 const SYNC_KEYS = [
@@ -27,9 +23,8 @@ const SYNC_KEYS = [
     'lavanpro_label_history',
 ] as const;
 
-type SyncKey = typeof SYNC_KEYS[number];
+export type SyncKey = typeof SYNC_KEYS[number];
 
-// Map localStorage keys to shorter data_key identifiers
 const KEY_MAP: Record<SyncKey, string> = {
     'lavanpro_units': 'units',
     'lavanpro_orders_v3': 'orders',
@@ -46,29 +41,7 @@ const KEY_MAP: Record<SyncKey, string> = {
 };
 
 /**
- * Verifica se o usuário logado é Owner ou Colaborador
- */
-export async function isUserOwner(): Promise<boolean> {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session?.user) return false;
-
-    const meta = session.user.user_metadata;
-    if (meta?.is_owner === true) return true;
-
-    // Check staff table
-    const { data } = await supabase
-        .from('staff')
-        .select('owner_id')
-        .eq('user_id', session.user.id)
-        .maybeSingle();
-
-    // Owner if owner_id matches their own id, or no owner_id (legacy admin)
-    return !data?.owner_id || data.owner_id === session.user.id;
-}
-
-/**
- * PUSH: Admin salva dados do localStorage para o Supabase
- * Chamado quando admin faz alterações (cria pedido, cadastra unidade, etc.)
+ * PUSH: Salva dados do localStorage para o Supabase
  */
 export async function pushDataToServer(specificKey?: SyncKey): Promise<void> {
     if (typeof window === 'undefined') return;
@@ -83,22 +56,18 @@ export async function pushDataToServer(specificKey?: SyncKey): Promise<void> {
             const raw = localStorage.getItem(localKey);
             if (!raw) continue;
 
-            try {
-                const parsed = JSON.parse(raw);
-                const serverKey = KEY_MAP[localKey];
+            const parsed = JSON.parse(raw);
+            const serverKey = KEY_MAP[localKey];
 
-                const { error } = await supabase.rpc('set_laundry_data', {
-                    p_key: serverKey,
-                    p_value: parsed,
-                });
+            const { error } = await supabase.rpc('set_laundry_data', {
+                p_key: serverKey,
+                p_value: parsed,
+            });
 
-                if (error) {
-                    console.error(`[DataSync] Erro ao salvar ${serverKey}:`, error.message);
-                } else {
-                    console.log(`[DataSync] ✅ ${serverKey} sincronizado (${Array.isArray(parsed) ? parsed.length : 1} items)`);
-                }
-            } catch (parseErr) {
-                console.error(`[DataSync] Erro ao parsear ${localKey}:`, parseErr);
+            if (error) {
+                console.error(`[DataSync] Erro ao salvar ${serverKey}:`, error.message);
+            } else {
+                console.log(`[DataSync] ✅ ${serverKey} enviado para nuvem`);
             }
         }
     } catch (err) {
@@ -107,13 +76,15 @@ export async function pushDataToServer(specificKey?: SyncKey): Promise<void> {
 }
 
 /**
- * PULL: Colaborador carrega dados do Supabase para o localStorage
- * Chamado quando o colaborador faz login ou abre o app
+ * PULL: Carrega dados do Supabase para o localStorage
  */
 export async function pullDataFromServer(): Promise<void> {
     if (typeof window === 'undefined') return;
 
     try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.user) return;
+
         for (const localKey of SYNC_KEYS) {
             const serverKey = KEY_MAP[localKey];
 
@@ -121,32 +92,24 @@ export async function pullDataFromServer(): Promise<void> {
                 p_key: serverKey,
             });
 
-            if (error) {
-                console.error(`[DataSync] Erro ao carregar ${serverKey}:`, error.message);
-                continue;
-            }
+            if (error) continue;
 
             if (data !== null) {
                 const serverString = JSON.stringify(data);
                 const rawLocal = localStorage.getItem(localKey);
 
-                // SEGURANÇA: Se o local tem dados e o servidor está vindo vazio '[]', 
-                // não sobrescrevemos o local imediatamente. Damos preferência ao local 
-                // se for a primeira vez sincronizando após correção de SQL.
-                if ((serverString === '[]' || serverString === '{}') && rawLocal && rawLocal !== '[]' && rawLocal !== '{}') {
-                    console.log(`[DataSync] ⚠️ Servidor vazio para ${serverKey}, mantendo dados locais e preparando push.`);
-                    await pushDataToServer(localKey);
-                    continue;
-                }
-
-                // Apenas sobrescreve o navegador se houver MUDANÇAS!
-                if (serverString !== rawLocal) {
+                // Apenas sobrescreve se houver mudanças reais e não for um dado vazio vindo do servidor quando o local tem algo
+                if (serverString !== rawLocal && serverString !== '[]' && serverString !== '{}') {
                     localStorage.setItem(localKey, serverString);
-                    // Avisa a interface do sistema que a nuvem mudou algo
                     window.dispatchEvent(new CustomEvent('data-synced'));
                     if (localKey === 'lavanpro_units') {
                         window.dispatchEvent(new CustomEvent('refresh-units'));
                     }
+                } else if ((serverString === '[]' || serverString === '{}') && rawLocal && rawLocal !== '[]' && rawLocal !== '{}') {
+                    // SE o servidor está vazio mas o local tem dados (ex: nova instalação que ainda não subiu nada)
+                    // NÃO sobrescrevemos o local com vazio. Em vez disso, deixamos o local como está
+                    // para que o sistema possa funcionar offline/cache e subir os dados no próximo push.
+                    console.log(`[DataSync] Mantendo cache local para ${serverKey} (servidor vazio)`);
                 }
             }
         }
@@ -155,37 +118,53 @@ export async function pullDataFromServer(): Promise<void> {
     }
 }
 
-// Controle do pooling em tempo real
-let isRealtimeStarted = false;
+/**
+ * Salva localmente e envia IMEDIATAMENTE para o servidor
+ */
+export async function syncSave(key: SyncKey, data: any) {
+    if (typeof window === 'undefined') return;
+    
+    // 1. Salva no localStorage como cache secundário (opcional, mas evita stale data no read inicial)
+    try {
+        localStorage.setItem(key, JSON.stringify(data));
+    } catch (e) {
+        console.warn(`[DataSync] Failed to save to localStorage: ${key}`, e);
+    }
+    
+    // 2. Dispara evento local para compatibilidade com componentes legados
+    window.dispatchEvent(new CustomEvent('data-synced', { detail: { key, data } }));
+    if (key === 'lavanpro_units') window.dispatchEvent(new CustomEvent('refresh-units'));
+
+    // 3. Envia para o servidor imediatamente
+    const result = await pushDataToServer(key);
+    
+    // 4. Se for sucesso, podemos forçar um refresh no provider ou deixar o Realtime agir
+    return result;
+}
 
 /**
- * SYNC: Sincroniza ativamente sempre mantendo o navegador do usuário fiel à nuvem
+ * SYNC: Alias para puxar dados iniciais
  */
-export async function syncData(): Promise<void> {
-    await pullDataFromServer();
-    
-    if (typeof window !== 'undefined' && !isRealtimeStarted) {
-        isRealtimeStarted = true;
-        setInterval(() => {
-            pullDataFromServer();
-        }, 10000); // 10 Segundos é mais seguro
-    }
+export async function syncData() {
+    return await pullDataFromServer();
 }
 
 /**
  * Hook para manter os dados atualizados automaticamente
  */
-export function useAutoSync(intervalMs = 60000) {
-    useEffect(() => {
-        syncData();
 
+export function useAutoSync(intervalMs = 30000) {
+    useEffect(() => {
+        // Pull inicial
+        pullDataFromServer();
+
+        // Configura pooling
         const timer = setInterval(() => {
             pullDataFromServer();
         }, intervalMs);
 
-        const handleFocus = () => {
-            pullDataFromServer();
-        };
+        // Atualiza ao focar na aba
+        const handleFocus = () => pullDataFromServer();
         window.addEventListener('focus', handleFocus);
 
         return () => {

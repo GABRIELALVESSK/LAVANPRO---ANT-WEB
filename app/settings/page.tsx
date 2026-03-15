@@ -11,6 +11,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import dynamic from "next/dynamic";
 import type { SettingsTab } from "@/components/settings/settings-sidebar";
 import { PaymentSuccessModal } from "@/components/settings/payment-success-modal";
+import { useBusinessData } from "@/components/business-data-provider";
+import { syncSave } from "@/lib/dataSync";
 import { pushDataToServer, syncData } from "@/lib/dataSync";
 
 // Dynamically import all tabs with no SSR to avoid 500 errors
@@ -94,8 +96,10 @@ function SettingsContent() {
     }
   }, [user]);
 
-  // Form states
-  const [companyForm, setCompanyForm] = useState({
+  const { data: bizData } = useBusinessData();
+
+  // Form states synced with Provider
+  const [companyForm, setCompanyForm] = useState(bizData.company || {
     razaoSocial: "",
     nomeFantasia: "Lavanderia Pro",
     cnpj: "",
@@ -106,7 +110,7 @@ function SettingsContent() {
     logo: "",
   });
 
-  const [operationalForm, setOperationalForm] = useState({
+  const [operationalForm, setOperationalForm] = useState(bizData.operational || {
     defaultDeliveryDays: 3,
     autoLabeling: true,
     whatsappNotify: false,
@@ -120,7 +124,7 @@ function SettingsContent() {
     deliveryScheduled: true,
   });
 
-  const [systemForm, setSystemForm] = useState({
+  const [systemForm, setSystemForm] = useState(bizData.system || {
     language: "pt-BR",
     currency: "BRL",
     timezone: "America/Sao_Paulo",
@@ -128,32 +132,12 @@ function SettingsContent() {
     decimalPlaces: 2,
   });
 
-  // Load data from localStorage on mount
+  // Keep forms in sync if data changes remotely
   useEffect(() => {
-    const loadLocalSettings = () => {
-      const savedCompany = localStorage.getItem("lavanpro_company");
-      if (savedCompany) { try { setCompanyForm(JSON.parse(savedCompany)); } catch { } }
-      const savedOperational = localStorage.getItem("lavanpro_operational");
-      if (savedOperational) { try { setOperationalForm(JSON.parse(savedOperational)); } catch { } }
-      const savedSystem = localStorage.getItem("lavanpro_system");
-      if (savedSystem) { try { setSystemForm(JSON.parse(savedSystem)); } catch { } }
-    };
-
-    loadLocalSettings();
-    
-    // Puxa do servidor
-    syncData();
-
-    window.addEventListener("data-synced", loadLocalSettings);
-    return () => window.removeEventListener("data-synced", loadLocalSettings);
-  }, []);
-
-  // Set default tab for non-admins
-  useEffect(() => {
-    if (!loading && !isAdmin && activeTab === 'company') {
-      setActiveTab("operational");
-    }
-  }, [loading, isAdmin, activeTab]);
+    if (bizData.company && Object.keys(bizData.company).length > 0) setCompanyForm(bizData.company);
+    if (bizData.operational && Object.keys(bizData.operational).length > 0) setOperationalForm(bizData.operational);
+    if (bizData.system && Object.keys(bizData.system).length > 0) setSystemForm(bizData.system);
+  }, [bizData]);
 
   const showToast = (message: string, type: "success" | "error" | "info" = "success") => {
     const id = Math.random().toString(36).substring(2, 9);
@@ -165,18 +149,16 @@ function SettingsContent() {
 
   const handleSaveAll = async () => {
     setIsSavingAll(true);
-    await new Promise((resolve) => setTimeout(resolve, 600));
     try {
-      localStorage.setItem("lavanpro_company", JSON.stringify(companyForm));
-      localStorage.setItem("lavanpro_operational", JSON.stringify(operationalForm));
-      localStorage.setItem("lavanpro_system", JSON.stringify(systemForm));
+      // Sincroniza todas as chaves com o servidor via syncSave para garantir Realtime
+      await syncSave('lavanpro_company', companyForm);
+      await syncSave('lavanpro_operational', operationalForm);
+      await syncSave('lavanpro_system', systemForm);
       
-      // Sincroniza com o servidor imediatamente
-      await pushDataToServer();
-      
-      showToast("Todas as alterações foram salvas com sucesso!", "success");
-    } catch {
-      showToast("Erro ao salvar alterações.", "error");
+      showToast("Todas as configurações foram sincronizadas com a nuvem!", "success");
+    } catch (e) {
+      console.error("Save error:", e);
+      showToast("Erro ao sincronizar configurações.", "error");
     } finally {
       setIsSavingAll(false);
     }

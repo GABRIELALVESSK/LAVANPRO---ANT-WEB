@@ -1,4 +1,5 @@
 "use client";
+export const dynamic = "force-dynamic";
 
 import { useState, useEffect, useMemo } from "react";
 import { Sidebar, MobileHeader } from "@/components/sidebar";
@@ -21,7 +22,7 @@ import {
   PackageCheck
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import dynamic from "next/dynamic";
+import nextDynamic from "next/dynamic";
 import { useSubscription } from "@/hooks/useSubscription";
 import { PlanGuard } from "@/components/plan-guard";
 import { AccessGuard } from "@/components/access-guard";
@@ -31,9 +32,10 @@ import { calculateDashboardMetrics } from "@/lib/dashboard-utils";
 import { UnitSelector } from "@/components/unit-selector";
 import { useUnit } from "@/hooks/useUnit";
 import { syncData } from "@/lib/dataSync";
+import { useBusinessData } from "@/components/business-data-provider";
 
 // Dynamic imports to avoid SSR issues with heavy/DOM-based components
-const MainChart = dynamic(() => import("@/components/main-chart").then(mod => mod.MainChart), { 
+const MainChart = nextDynamic(() => import("@/components/main-chart").then(mod => mod.MainChart), { 
   ssr: false,
   loading: () => <div className="h-[400px] w-full bg-brand-card animate-pulse rounded-2xl border border-brand-darkBorder" />
 });
@@ -47,79 +49,15 @@ export default function Page() {
     end: "",
   });
   const { unitId: activeUnit } = useUnit();
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [financeTransactions, setFinanceTransactions] = useState<Transaction[]>([]);
+  const { data: bizData } = useBusinessData();
+  const orders = bizData.orders;
+  const financeTransactions = bizData.finance;
 
   useEffect(() => {
     // Set initial dates on client side only to avoid hydration mismatch
     const start = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
     const end = new Date().toISOString().split("T")[0];
     setCustomDates({ start, end });
-
-    const loadAndPurge = () => {
-      const saved = localStorage.getItem("lavanpro_orders_v3");
-      if (saved) {
-        try {
-          const parsed = JSON.parse(saved);
-          
-          // Purge mock data to ensure "zeroed-out" state as requested
-          const mockIDs = ["#ORD-2856", "#ORD-2855", "#ORD-2854", "#ORD-2853", "#ORD-2852", "#ORD-2851", "#ORD-3792", "ORD-2856", "ORD-3792"];
-          const mockNames = ["Carlos Machado", "Hotel Bela Vista", "Maria Oliveira", "João Silva", "Augusto Silveira", "Mariana Souza", "Rodrigo Santos", "Gabriel Rodrigues Alves (Mock)"];
-          
-          const filtered = parsed.filter((o: any) => 
-            !mockIDs.includes(o.id) && 
-            !mockNames.includes(o.client) &&
-            !o.id.includes("3792") && // Specifically target this one from user screenshot
-            !o.id.includes("2856")
-          );
-
-          if (filtered.length !== parsed.length) {
-            localStorage.setItem("lavanpro_orders_v3", JSON.stringify(filtered));
-          }
-          setOrders(filtered);
-        } catch (e) {
-          console.error("Error loading orders", e);
-        }
-      }
-    };
-
-    loadAndPurge();
-
-    const loadFinance = () => {
-        const savedFin = localStorage.getItem("lavanpro_finance_transactions");
-        if (savedFin) {
-            try {
-                setFinanceTransactions(JSON.parse(savedFin));
-            } catch (e) {
-                console.error("Error loading finance transactions", e);
-            }
-        }
-    };
-    loadFinance();
-    
-    // Puxa dados do servidor logo ao entrar no Dashboard
-    syncData();
-
-    // Listen for sync events
-    const handleSync = () => {
-        loadAndPurge();
-        loadFinance();
-    };
-    window.addEventListener("data-synced", handleSync);
-    
-    // Cleanup other mock legacy data
-    const savedCust = localStorage.getItem("lavanpro_customers");
-    if (savedCust) {
-        try {
-            const parsed = JSON.parse(savedCust);
-            const filtered = parsed.filter((c: any) => !["Carlos Machado", "Hotel Bela Vista", "Maria Oliveira", "João Silva", "Mariana Souza", "Rodrigo Santos", "Gabriel Rodrigues Alves (Mock)"].includes(c.name));
-            if (filtered.length !== parsed.length) localStorage.setItem("lavanpro_customers", JSON.stringify(filtered));
-        } catch(e) {}
-    }
-
-    return () => {
-        window.removeEventListener("data-synced", handleSync);
-    };
   }, []);
 
   const metrics = useMemo(() => {

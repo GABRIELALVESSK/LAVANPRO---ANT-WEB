@@ -1,6 +1,9 @@
 "use client";
 
-import { Building2, Upload } from "lucide-react";
+import { Building2, Upload, RefreshCw } from "lucide-react";
+import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/hooks/useAuth";
+import { useState } from "react";
 
 interface CompanyFormData {
     razaoSocial: string;
@@ -19,23 +22,50 @@ interface CompanyDataTabProps {
 }
 
 export function CompanyDataTab({ form, onChange }: CompanyDataTabProps) {
+    const { user } = useAuth();
+    const [isUploading, setIsUploading] = useState(false);
+
     const update = (field: keyof CompanyFormData, value: string) => {
         onChange({ ...form, [field]: value });
     };
 
-    const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
-        if (file) {
+        if (file && user?.id) {
             if (file.size > 2 * 1024 * 1024) {
                 alert("O arquivo é muito grande! Máximo 2MB.");
                 return;
             }
 
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                onChange({ ...form, logo: reader.result as string });
-            };
-            reader.readAsDataURL(file);
+            try {
+                setIsUploading(true);
+                
+                // Upload to Supabase Storage in 'company' bucket
+                const fileExt = file.name.split('.').pop();
+                const fileName = `logo_${user.id}_${Date.now()}.${fileExt}`;
+                const filePath = `${fileName}`;
+
+                const { error: uploadError } = await supabase.storage
+                    .from('company_assets')
+                    .upload(filePath, file, { 
+                        cacheControl: '3600',
+                        upsert: true 
+                    });
+
+                if (uploadError) throw uploadError;
+
+                const { data: { publicUrl } } = supabase.storage
+                    .from('company_assets')
+                    .getPublicUrl(filePath);
+                
+                // Use the URL with a tiny cache buster just in case
+                update("logo", `${publicUrl}?t=${Date.now()}`);
+            } catch (err: any) {
+                console.error("Logo upload error:", err);
+                alert("Erro ao enviar logo: " + (err.message || "Tente novamente"));
+            } finally {
+                setIsUploading(false);
+            }
         }
     };
 
@@ -78,8 +108,13 @@ export function CompanyDataTab({ form, onChange }: CompanyDataTabProps) {
                         />
                         <label 
                             htmlFor="logo-upload"
-                            className="size-24 rounded-xl bg-brand-bg border-2 border-dashed border-brand-darkBorder flex items-center justify-center text-brand-muted hover:border-brand-primary/50 hover:text-brand-primary transition-colors cursor-pointer group overflow-hidden"
+                            className="size-24 rounded-xl bg-brand-bg border-2 border-dashed border-brand-darkBorder flex items-center justify-center text-brand-muted hover:border-brand-primary/50 hover:text-brand-primary transition-colors cursor-pointer group overflow-hidden relative"
                         >
+                            {isUploading && (
+                                <div className="absolute inset-0 z-10 bg-black/40 flex items-center justify-center">
+                                    <RefreshCw className="size-6 text-white animate-spin" />
+                                </div>
+                            )}
                             {form.logo ? (
                                 <img src={form.logo} alt="Logo preview" className="w-full h-full object-cover transition-transform group-hover:scale-110" />
                             ) : (

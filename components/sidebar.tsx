@@ -117,6 +117,7 @@ export function Sidebar() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [isPlansModalOpen, setIsPlansModalOpen] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const { isMobile, isTablet } = useIsMobile();
   const { isOpen, close } = useSidebar();
 
@@ -323,18 +324,46 @@ export function Sidebar() {
               id="user-avatar-upload" 
               className="hidden" 
               accept="image/*"
-              onChange={(e) => {
+              onChange={async (e) => {
                 const file = e.target.files?.[0];
-                if (file) {
-                  const reader = new FileReader();
-                  reader.onloadend = () => {
-                    const dataUrl = reader.result as string;
-                    if (user?.id) {
-                      localStorage.setItem(`lavanpro_user_avatar_${user.id}`, dataUrl);
-                      window.dispatchEvent(new Event("storage"));
-                    }
-                  };
-                  reader.readAsDataURL(file);
+                if (file && user?.id) {
+                  try {
+                    setIsUploadingAvatar(true);
+                    
+                    // Upload to Supabase Storage
+                    const fileExt = file.name.split('.').pop();
+                    const fileName = `${user.id}_${Math.random().toString(36).substring(7)}.${fileExt}`;
+                    const filePath = `${fileName}`;
+
+                    const { error: uploadError } = await supabase.storage
+                      .from('avatars')
+                      .upload(filePath, file, { 
+                        cacheControl: '3600',
+                        upsert: true 
+                      });
+
+                    if (uploadError) throw uploadError;
+
+                    const { data: { publicUrl } } = supabase.storage
+                      .from('avatars')
+                      .getPublicUrl(filePath);
+                    
+                    // Update user metadata with the URL + cache buster
+                    const finalUrl = `${publicUrl}?t=${Date.now()}`;
+                    
+                    const { error: updateError } = await supabase.auth.updateUser({
+                      data: { avatar_url: finalUrl }
+                    });
+
+                    if (updateError) throw updateError;
+                    
+                    alert("Foto de perfil atualizada!");
+                  } catch (err: any) {
+                    console.error("Avatar upload error:", err);
+                    alert("Erro ao enviar foto: " + (err.message || "Tente novamente"));
+                  } finally {
+                    setIsUploadingAvatar(false);
+                  }
                 }
               }}
             />
@@ -343,22 +372,23 @@ export function Sidebar() {
               className="size-9 rounded-full bg-brand-primary/20 flex items-center justify-center overflow-hidden relative shrink-0 cursor-pointer group hover:ring-2 hover:ring-brand-primary transition-all shadow-lg"
               title="Alterar foto de perfil"
             >
+              {isUploadingAvatar ? (
+                <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                  <RefreshCw className="size-4 text-white animate-spin" />
+                </div>
+              ) : null}
               {(() => {
-                const saved = typeof window !== 'undefined' && user?.id ? localStorage.getItem(`lavanpro_user_avatar_${user.id}`) : null;
-                return saved ? (
-                  <img src={saved} alt="User avatar" className="w-full h-full object-cover transition-transform group-hover:scale-110" />
+                const avatar_url = user?.user_metadata?.avatar_url;
+                return avatar_url ? (
+                  <img src={avatar_url} alt="User avatar" className="w-full h-full object-cover transition-transform group-hover:scale-110" />
                 ) : (
-                  <Image
-                    src="https://picsum.photos/seed/avatar/100/100"
-                    alt="User avatar"
-                    fill
-                    className="object-cover group-hover:scale-110 transition-transform"
-                    referrerPolicy="no-referrer"
-                  />
+                  <div className="size-full bg-brand-primary/20 flex items-center justify-center text-brand-primary font-bold text-xs">
+                    {user?.user_metadata?.full_name?.substring(0, 1) || user?.email?.substring(0, 1).toUpperCase() || "U"}
+                  </div>
                 );
               })()}
               <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                 <Users className="size-3 text-white" />
+                 <UserCog className="size-3 text-white" />
               </div>
             </label>
             <div className="overflow-hidden">

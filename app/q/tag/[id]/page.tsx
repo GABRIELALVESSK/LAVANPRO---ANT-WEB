@@ -24,15 +24,15 @@ export default function ResolverTagPage() {
                     return;
                 }
 
-                // 2. Load data from LocalStorage (since current app logic is client-side)
-                const storedLabels = localStorage.getItem("lavanpro_labels");
-                if (!storedLabels) {
-                    setError("Base de dados de etiquetas não localizada.");
+                // 2. Load data from Supabase
+                const { data, error: rpcError } = await supabase.rpc('get_laundry_data');
+                if (rpcError || !data) {
+                    setError("Erro ao carregar banco de dados de etiquetas.");
                     setLoading(false);
                     return;
                 }
 
-                const labels = JSON.parse(storedLabels);
+                const labels = data.labels || [];
                 const tagCode = String(id).toUpperCase();
                 
                 // Fuzzy match (TAG-001 vs 1 vs TAG1)

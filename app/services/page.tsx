@@ -10,6 +10,7 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect, useMemo } from "react";
 import { useUnit } from "@/hooks/useUnit";
+import { UnitSelector } from "@/components/unit-selector";
 import { pushDataToServer, syncData } from "@/lib/dataSync";
 
 // --- Types ---
@@ -69,74 +70,26 @@ const blankService = (unitId: string): ServiceFormData & { unitId: string } => (
 });
 
 // --- Component ---
+import { useBusinessData } from "@/components/business-data-provider";
+import { syncSave } from "@/lib/dataSync";
+
+// ... (types unchanged)
+
 export default function ServicesPage() {
     const { unitId: activeUnit } = useUnit();
-    const [services, setServices] = useState<Service[]>([]);
+    const { data: bizData } = useBusinessData();
+    
+    // Remote data
+    const services = (bizData.services || []) as Service[];
+    const stockProducts = (bizData.stock_products || []) as any[];
+
+    // UI state
     const [activeCategory, setActiveCategory] = useState("Todas");
     const [search, setSearch] = useState("");
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingId, setEditingId] = useState<string | null>(null);
     const [formData, setFormData] = useState<ServiceFormData & { unitId: string }>(blankService(activeUnit));
     const [activeTab, setActiveTab] = useState<"geral" | "receita">("geral");
-
-    // Load from LocalStorage
-    useEffect(() => {
-        const loadLocalServices = () => {
-            const saved = localStorage.getItem("lavanpro_services_pro");
-            if (saved) {
-                try {
-                    setServices(JSON.parse(saved));
-                } catch (e) {
-                    console.error("Error loading services", e);
-                }
-            } else {
-                const seed: Service[] = [
-                    {
-                        id: "1",
-                        name: "Lavagem de Edredom Casal",
-                        category: "Edredons & Cobertores",
-                        chargeType: "UNIDADE",
-                        price: 55.0,
-                        recipe: [
-                            { id: "r1", productId: "PROD-101", name: "Sabão Líquido Omo Pro", quantity: 0.1, unit: "L", unitCost: 14.50 },
-                            { id: "r2", productId: "PROD-102", name: "Amaciante Comfort Pro", quantity: 0.05, unit: "L", unitCost: 12.00 },
-                            { id: "r3", productId: "PROD-105", name: "Saco Plástico G", quantity: 1, unit: "un", unitCost: 0.80 },
-                        ],
-                        executionTime: "72h",
-                        description: "Tratamento profundo com secagem industrial.",
-                        unitId: "default"
-                    },
-                    {
-                        id: "2",
-                        name: "Lavagem de Roupa de Cor (Cid)",
-                        category: "Lavanderia",
-                        chargeType: "QUILO",
-                        price: 18.5,
-                        recipe: [
-                            { id: "r4", productId: "PROD-101", name: "Sabão Líquido Omo Pro", quantity: 0.05, unit: "L", unitCost: 14.50 },
-                        ],
-                        executionTime: "48h",
-                        unitId: "default"
-                    },
-                ];
-                setServices(seed);
-                localStorage.setItem("lavanpro_services_pro", JSON.stringify(seed));
-            }
-        };
-
-        loadLocalServices();
-        
-        // Puxa do servidor
-        syncData();
-
-        window.addEventListener("data-synced", loadLocalServices);
-        return () => window.removeEventListener("data-synced", loadLocalServices);
-    }, []);
-
-    const saveToLocalStorage = (newServices: Service[]) => {
-        localStorage.setItem("lavanpro_services_pro", JSON.stringify(newServices));
-        setServices(newServices);
-    };
 
     const calculateTotalCost = (service: Service | ServiceFormData) => {
         if (service.recipe.length === 0) return service.costOverride || 0;
@@ -152,33 +105,29 @@ export default function ServicesPage() {
     const handleSave = async () => {
         if (!formData.name || formData.price <= 0) return;
 
+        let updated: Service[];
         if (editingId) {
-            const updated = services.map((s) => (s.id === editingId ? { ...formData, id: s.id } as Service : s));
-            saveToLocalStorage(updated);
+            updated = services.map((s) => (s.id === editingId ? { ...formData, id: s.id } as Service : s));
         } else {
             const newService: Service = {
                 ...formData,
                 id: Math.random().toString(36).substring(2, 9),
             };
-            saveToLocalStorage([...services, newService]);
+            updated = [...services, newService];
         }
+        
+        await syncSave('lavanpro_services_pro', updated);
         setIsModalOpen(false);
         setFormData(blankService(activeUnit));
         setEditingId(null);
         setActiveTab("geral");
-
-        // Sincroniza com servidor
-        await pushDataToServer();
     };
 
     const handleDelete = async (id: string, e: React.MouseEvent) => {
         e.stopPropagation();
         if (confirm("Deseja realmente excluir este serviço?")) {
             const filtered = services.filter((s) => s.id !== id);
-            saveToLocalStorage(filtered);
-            
-            // Sincroniza com servidor
-            await pushDataToServer();
+            await syncSave('lavanpro_services_pro', filtered);
         }
     };
 
@@ -189,14 +138,14 @@ export default function ServicesPage() {
         setActiveTab("geral");
     };
 
-    const addRecipeItem = (prod: typeof MOCK_STOCK_PRODUCTS[0]) => {
+    const addRecipeItem = (prod: any) => {
         const newItem: RecipeItem = {
             id: Math.random().toString(36).substring(2, 7),
             productId: prod.id,
             name: prod.name,
             quantity: 0.1,
             unit: prod.unit,
-            unitCost: prod.cost
+            unitCost: prod.unitCost || 0
         };
         setFormData({ ...formData, recipe: [...formData.recipe, newItem] });
     };
@@ -244,23 +193,28 @@ export default function ServicesPage() {
                                     </h1>
                                     <p className="text-brand-muted text-sm font-medium">Gestão avançada de fichas técnicas, insumos e lucratividade real.</p>
                                 </motion.div>
-                                <div className="flex items-center gap-3">
-                                    <div className="relative group">
-                                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-brand-muted group-focus-within:text-brand-primary transition-colors" />
-                                        <input
-                                            type="text"
-                                            placeholder="Buscar por nome ou categoria..."
-                                            className="pl-10 pr-4 py-2.5 bg-brand-card border border-brand-darkBorder rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary w-64 md:w-80 shadow-inner"
-                                            value={search}
-                                            onChange={(e) => setSearch(e.target.value)}
-                                        />
+                                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
+                                    <div className="min-w-[200px]">
+                                        <UnitSelector />
                                     </div>
-                                    <button
-                                        onClick={() => { setFormData(blankService(activeUnit)); setEditingId(null); setIsModalOpen(true); }}
-                                        className="flex items-center gap-2 px-6 py-2.5 bg-brand-primary text-white rounded-xl font-bold shadow-lg shadow-brand-primary/20 hover:bg-brand-primaryHover transform active:scale-95 transition-all"
-                                    >
-                                        <Plus className="size-4" /> Novo Serviço
-                                    </button>
+                                    <div className="flex items-center gap-3">
+                                        <div className="relative group flex-1 sm:flex-initial">
+                                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-brand-muted group-focus-within:text-brand-primary transition-colors" />
+                                            <input
+                                                type="text"
+                                                placeholder="Buscar..."
+                                                className="pl-10 pr-4 py-2.5 bg-brand-card border border-brand-darkBorder rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary w-full sm:w-64 md:w-80 shadow-inner"
+                                                value={search}
+                                                onChange={(e) => setSearch(e.target.value)}
+                                            />
+                                        </div>
+                                        <button
+                                            onClick={() => { setFormData(blankService(activeUnit)); setEditingId(null); setIsModalOpen(true); }}
+                                            className="flex items-center justify-center gap-2 px-6 py-2.5 bg-brand-primary text-white rounded-xl font-bold shadow-lg shadow-brand-primary/20 hover:bg-brand-primaryHover transform active:scale-95 transition-all shrink-0"
+                                        >
+                                            <Plus className="size-4" /> <span className="hidden sm:inline">Novo Serviço</span>
+                                        </button>
+                                    </div>
                                 </div>
                             </header>
 
@@ -559,11 +513,11 @@ export default function ServicesPage() {
                                                     </div>
                                                 </div>
 
-                                                {/* Product Selector (Mocked for Stock) */}
+                                                {/* Product Selector (Sycned with Stock) */}
                                                 <div className="space-y-3">
                                                     <label className="text-[10px] font-black uppercase text-brand-muted flex items-center gap-2">Adicionar Insumo do Estoque</label>
                                                     <div className="flex flex-wrap gap-2">
-                                                        {MOCK_STOCK_PRODUCTS.map(p => (
+                                                        {stockProducts.slice(0, 10).map(p => (
                                                             <button
                                                                 key={p.id}
                                                                 onClick={() => addRecipeItem(p)}
@@ -572,6 +526,9 @@ export default function ServicesPage() {
                                                                 <Plus className="size-3" /> {p.name}
                                                             </button>
                                                         ))}
+                                                        {stockProducts.length === 0 && (
+                                                            <p className="text-[10px] text-brand-muted italic">Nenhum produto em estoque para vincular.</p>
+                                                        )}
                                                     </div>
                                                 </div>
                                             </motion.div>
