@@ -237,7 +237,7 @@ function SettingsContent() {
                     <CompanyDataTab form={companyForm} onChange={setCompanyForm} />
                   )}
                   {activeTab === "unit" && (
-                    <UnitDataTab currentPlan={currentPlan} />
+                    <UnitDataTab currentPlan={currentPlan} units={bizData.units || []} />
                   )}
                   {activeTab === "users" && (
                     <UsersTab user={user} showToast={showToast} />

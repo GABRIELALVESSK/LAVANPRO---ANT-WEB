@@ -6,12 +6,13 @@ import {
     XCircle, Shield, Building2, Clock, Map, User, Phone, Mail, FileText,
     ArrowRight, Lock, Crown
 } from "lucide-react";
-import { Unit, DEFAULT_OPENING_HOURS, getUnits, saveUnits } from "@/lib/units-data";
-import { pushDataToServer } from "@/lib/dataSync";
+import { Unit, DEFAULT_OPENING_HOURS } from "@/lib/units-data";
+import { syncSave } from "@/lib/dataSync";
 import { motion, AnimatePresence } from "framer-motion";
 
 interface UnitDataTabProps {
     currentPlan: string;
+    units: Unit[];
 }
 
 const DAYS = [
@@ -24,20 +25,22 @@ const DAYS = [
     { key: "sun", label: "Domingo" },
 ];
 
-export function UnitDataTab({ currentPlan }: UnitDataTabProps) {
+export function UnitDataTab({ currentPlan, units: initialUnits }: UnitDataTabProps) {
     const isEnterprise = currentPlan === "enterprise";
-    const [units, setUnits] = useState<Unit[]>([]);
+    const [units, setUnits] = useState<Unit[]>(initialUnits || []);
     const [isEditing, setIsEditing] = useState(false);
     const [editingUnit, setEditingUnit] = useState<Partial<Unit> | null>(null);
     const [isSaving, setIsSaving] = useState(false);
 
+    // Sincroniza o estado interno com os dados que vêm do Provider (Nuvem)
     useEffect(() => {
-        setUnits(getUnits());
-    }, []);
+        if (initialUnits) {
+            setUnits(initialUnits);
+        }
+    }, [initialUnits]);
 
     const handleNewUnit = () => {
         if (!isEnterprise && units.length >= 1) {
-            // Should be handled by UI block, but double check
             return;
         }
         setEditingUnit({
@@ -66,19 +69,18 @@ export function UnitDataTab({ currentPlan }: UnitDataTabProps) {
         setIsEditing(true);
     };
 
-    const handleDelete = (id: string) => {
+    const handleDelete = async (id: string) => {
         if (confirm("Tem certeza que deseja excluir esta unidade? Esta ação é irreversível e pode afetar pedidos vinculados.")) {
             const newList = units.filter(u => u.id !== id);
             setUnits(newList);
-            saveUnits(newList);
-            pushDataToServer('lavanpro_units');
+            // Salva na nuvem instantaneamente via centralizado
+            await syncSave('lavanpro_units', newList);
         }
     };
 
     const handleSave = async () => {
         if (!editingUnit?.name) return;
         setIsSaving(true);
-        await new Promise(r => setTimeout(r, 800)); // Smooth feeling
 
         let newList: Unit[];
         if (units.find(u => u.id === editingUnit.id)) {
@@ -87,14 +89,15 @@ export function UnitDataTab({ currentPlan }: UnitDataTabProps) {
             newList = [...units, editingUnit as Unit];
         }
 
-        // If this is set as main, unset others
+        // Se marcou como principal, desmarca as outras
         if (editingUnit.isMain) {
             newList = newList.map(u => u.id === editingUnit.id ? u : { ...u, isMain: false });
         }
 
         setUnits(newList);
-        saveUnits(newList);
-        pushDataToServer('lavanpro_units');
+        // Salva na nuvem instantaneamente via centralizado
+        await syncSave('lavanpro_units', newList);
+        
         setIsSaving(false);
         setIsEditing(false);
         setEditingUnit(null);
