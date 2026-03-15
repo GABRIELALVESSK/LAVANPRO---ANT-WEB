@@ -5,7 +5,6 @@ export const dynamic = 'force-dynamic';
 
 const ASAAS_API_URL = process.env.ASAAS_API_URL || "https://sandbox.asaas.com/api/v3";
 const ASAAS_API_KEY = process.env.ASAAS_API_KEY || "";
-console.log("===> ASAAS API KEY CARREGADA:", ASAAS_API_KEY);
 
 type PlanTier = "free" | "pro" | "enterprise";
 
