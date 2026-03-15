@@ -46,25 +46,45 @@ export function AccessProfilesTab() {
                 .eq("key", "permissions_matrix")
                 .single();
 
+            let loadedMatrix: PermissionMatrix | null = null;
+
             if (error) {
                 // If table doesn't exist or no row, try localStorage fallback
                 console.warn("Supabase load failed, trying localStorage:", error.message);
                 const saved = localStorage.getItem("lavanpro_permissions");
                 if (saved) {
-                    try { setMatrix(JSON.parse(saved)); } catch { /* ignore */ }
+                    try { loadedMatrix = JSON.parse(saved); } catch { /* ignore */ }
                 }
             } else if (data?.value) {
-                const parsed = data.value as PermissionMatrix;
-                setMatrix(parsed);
+                loadedMatrix = data.value as PermissionMatrix;
                 // Also sync to localStorage for backward compatibility
-                localStorage.setItem("lavanpro_permissions", JSON.stringify(parsed));
+                localStorage.setItem("lavanpro_permissions", JSON.stringify(loadedMatrix));
+            }
+
+            if (loadedMatrix) {
+                const merged = { ...DEFAULT_MATRIX };
+                for (const r of ROLES) {
+                    if (loadedMatrix[r]) {
+                        merged[r] = { ...DEFAULT_MATRIX[r], ...loadedMatrix[r] };
+                    }
+                }
+                setMatrix(merged);
             }
         } catch (err) {
             console.error("Error loading permissions:", err);
             // Fallback to localStorage
             const saved = localStorage.getItem("lavanpro_permissions");
             if (saved) {
-                try { setMatrix(JSON.parse(saved)); } catch { /* ignore */ }
+                try {
+                    const parsed = JSON.parse(saved);
+                    const merged = { ...DEFAULT_MATRIX };
+                    for (const r of ROLES) {
+                        if (parsed[r]) {
+                            merged[r] = { ...DEFAULT_MATRIX[r], ...parsed[r] };
+                        }
+                    }
+                    setMatrix(merged);
+                } catch { /* ignore */ }
             }
         } finally {
             setLoading(false);
@@ -116,8 +136,8 @@ export function AccessProfilesTab() {
         const newMatrix = {
             ...matrix,
             [role]: {
-                ...matrix[role],
-                [permission]: !matrix[role][permission],
+                ...(matrix[role] || DEFAULT_MATRIX[role] || {}),
+                [permission]: !(matrix[role]?.[permission] ?? false),
             },
         };
         setMatrix(newMatrix);
@@ -211,7 +231,7 @@ export function AccessProfilesTab() {
                                             <label className="relative inline-flex items-center cursor-pointer">
                                                 <input
                                                     type="checkbox"
-                                                    checked={matrix[role][perm.key]}
+                                                    checked={matrix[role]?.[perm.key] ?? false}
                                                     onChange={() => togglePermission(role, perm.key)}
                                                     disabled={role === "Administrador" || saving}
                                                     className="sr-only peer"

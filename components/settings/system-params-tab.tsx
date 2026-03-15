@@ -68,7 +68,7 @@ export function SystemParamsTab({ form, onChange }: SystemParamsTabProps) {
                 <h4 className="text-sm font-bold uppercase tracking-wider text-brand-muted mb-6">Regionalização</h4>
                 <div className="space-y-4">
                     <ParamRow icon={Globe} iconColor="bg-blue-500/10 text-blue-500" label="Idioma do Painel" description="Define o idioma de toda a interface do sistema">
-                        <select className={selectClass} value={form.language} onChange={(e) => update("language", e.target.value)}>
+                        <select className={selectClass} value={form?.language || "pt-BR"} onChange={(e) => update("language", e.target.value)}>
                             <option value="pt-BR">Português (Brasil)</option>
                             <option value="en-US">English (US)</option>
                             <option value="es">Español</option>
@@ -76,7 +76,7 @@ export function SystemParamsTab({ form, onChange }: SystemParamsTabProps) {
                     </ParamRow>
 
                     <ParamRow icon={DollarSign} iconColor="bg-emerald-500/10 text-emerald-500" label="Moeda Padrão" description="Moeda utilizada para exibição de preços e relatórios">
-                        <select className={selectClass} value={form.currency} onChange={(e) => update("currency", e.target.value)}>
+                        <select className={selectClass} value={form?.currency || "BRL"} onChange={(e) => update("currency", e.target.value)}>
                             <option value="BRL">Real (R$ BRL)</option>
                             <option value="USD">Dólar ($ USD)</option>
                             <option value="EUR">Euro (€ EUR)</option>
@@ -84,7 +84,7 @@ export function SystemParamsTab({ form, onChange }: SystemParamsTabProps) {
                     </ParamRow>
 
                     <ParamRow icon={Clock} iconColor="bg-violet-500/10 text-violet-500" label="Fuso Horário" description="Horário base para registros e relatórios">
-                        <select className={selectClass} value={form.timezone} onChange={(e) => update("timezone", e.target.value)}>
+                        <select className={selectClass} value={form?.timezone || "America/Sao_Paulo"} onChange={(e) => update("timezone", e.target.value)}>
                             <option value="America/Sao_Paulo">Brasília (GMT-3)</option>
                             <option value="America/Manaus">Manaus (GMT-4)</option>
                             <option value="America/Cuiaba">Cuiabá (GMT-4)</option>
@@ -100,7 +100,7 @@ export function SystemParamsTab({ form, onChange }: SystemParamsTabProps) {
                 <h4 className="text-sm font-bold uppercase tracking-wider text-brand-muted mb-6">Formatação</h4>
                 <div className="space-y-4">
                     <ParamRow icon={Calendar} iconColor="bg-amber-500/10 text-amber-500" label="Formato de Data" description="Define como as datas são exibidas no sistema">
-                        <select className={selectClass} value={form.dateFormat} onChange={(e) => update("dateFormat", e.target.value)}>
+                        <select className={selectClass} value={form?.dateFormat || "DD/MM/YYYY"} onChange={(e) => update("dateFormat", e.target.value)}>
                             <option value="DD/MM/YYYY">DD/MM/AAAA</option>
                             <option value="MM/DD/YYYY">MM/DD/AAAA</option>
                             <option value="YYYY-MM-DD">AAAA-MM-DD</option>
@@ -108,7 +108,7 @@ export function SystemParamsTab({ form, onChange }: SystemParamsTabProps) {
                     </ParamRow>
 
                     <ParamRow icon={Hash} iconColor="bg-rose-500/10 text-rose-500" label="Casas Decimais" description="Quantidade de casas decimais em valores monetários">
-                        <select className={selectClass} value={form.decimalPlaces.toString()} onChange={(e) => update("decimalPlaces", parseInt(e.target.value))}>
+                        <select className={selectClass} value={(form?.decimalPlaces ?? 2).toString()} onChange={(e) => update("decimalPlaces", parseInt(e.target.value))}>
                             <option value="0">0 casas</option>
                             <option value="2">2 casas</option>
                             <option value="3">3 casas</option>
