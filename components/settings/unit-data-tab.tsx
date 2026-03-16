@@ -29,7 +29,7 @@ const DAYS = [
 
 export default function UnitDataTab({ currentPlan, isEnterprise, isTrialing, units: initialUnits }: UnitDataTabProps) {
     const { saveData } = useBusinessData();
-    const canHaveMultiple = isEnterprise || isTrialing;
+    const canHaveMultiple = isEnterprise;
     const [units, setUnits] = useState<Unit[]>(initialUnits || []);
     const [isEditing, setIsEditing] = useState(false);
     const [editingUnit, setEditingUnit] = useState<Partial<Unit> | null>(null);
@@ -400,7 +400,7 @@ export default function UnitDataTab({ currentPlan, isEnterprise, isTrialing, uni
                             <Plus className="size-4" /> Nova Unidade
                         </button>
                         <p className="text-[9px] font-black text-amber-500 uppercase tracking-widest flex items-center gap-1">
-                            <Crown className="size-2.5" /> Requisito Professional/Enterprise
+                            <Crown className="size-2.5" /> Requisito Enterprise
                         </p>
                     </div>
                 ) : (
