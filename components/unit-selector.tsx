@@ -6,6 +6,7 @@ import { Unit } from "@/lib/units-data";
 import { motion, AnimatePresence } from "framer-motion";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useBusinessData } from "./business-data-provider";
+import { useSubscription } from "@/hooks/useSubscription";
 
 interface UnitSelectorProps {
   onUnitChange?: (unitId: string) => void;
@@ -15,23 +16,28 @@ interface UnitSelectorProps {
 export function UnitSelector({ onUnitChange, showAllOption = true }: UnitSelectorProps) {
   const { data: businessData, saveData } = useBusinessData();
   const { isOwner, staffUnit, loading: permsLoading } = usePermissions();
+  const { isEnterprise, loading: subLoading } = useSubscription();
   const [isOpen, setIsOpen] = useState(false);
 
   // 1. Determine if user is restricted to a specific unit
-  const isSpecificUnit = !isOwner && staffUnit && staffUnit.toLowerCase() !== "todas as unidades" && staffUnit.toLowerCase() !== "todas";
+  // They are restricted if they are standard/pro (not enterprise) OR if they are a staff member restricted to a unit
+  const isSpecificUnit = (!subLoading && !isEnterprise) || (!isOwner && staffUnit && staffUnit.toLowerCase() !== "todas as unidades" && staffUnit.toLowerCase() !== "todas");
 
   // 2. Filter available units based on restrictions
   let units = businessData.units || [];
-  if (isSpecificUnit) {
+  if (!isOwner && staffUnit && staffUnit.toLowerCase() !== "todas as unidades" && staffUnit.toLowerCase() !== "todas") {
       const staffUnitNormalized = staffUnit.trim().toLowerCase();
       units = units.filter(u => u.name.trim().toLowerCase() === staffUnitNormalized);
+  } else if (!subLoading && !isEnterprise && units.length > 0) {
+      // If not enterprise, restrict to the first unit
+      units = [units[0]];
   }
 
   const selectedUnit = businessData.selectedUnit || "all";
 
   // Handle forcing unit for specific staff or defaulting to first unit
   useEffect(() => {
-    if (permsLoading || units.length === 0) return;
+    if (permsLoading || subLoading || units.length === 0) return;
 
     if (isSpecificUnit) {
       // If restricted, force selectedUnit to match the only available unit
@@ -47,7 +53,7 @@ export function UnitSelector({ onUnitChange, showAllOption = true }: UnitSelecto
         saveData("lavanpro_selected_unit", firstUnitId);
       }
     }
-  }, [showAllOption, isSpecificUnit, permsLoading, units.length, selectedUnit, saveData, onUnitChange]);
+  }, [showAllOption, isSpecificUnit, permsLoading, subLoading, units.length, selectedUnit, saveData, onUnitChange]);
 
   const handleSelect = (id: string) => {
     if (id === selectedUnit) {
@@ -61,6 +67,12 @@ export function UnitSelector({ onUnitChange, showAllOption = true }: UnitSelecto
   };
 
   const currentUnit = units.find(u => u.id === selectedUnit);
+
+  // Hide entirely if we are restricted and it's the only one anyway? 
+  // The user says "pode deixar invisivel. só manter visivel pro enterprise"
+  if (!subLoading && !isEnterprise) {
+      return null;
+  }
 
   return (
     <div className="relative">

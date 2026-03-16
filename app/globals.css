@@ -163,4 +163,8 @@
   .safe-bottom {
     padding-bottom: env(safe-area-inset-bottom, 16px);
   }
+
+  .transition-soft {
+    transition: all 300ms ease-in-out;
+  }
 }

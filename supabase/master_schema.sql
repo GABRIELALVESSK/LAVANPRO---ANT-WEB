@@ -157,14 +157,13 @@ $$;
 
 -- Função auxiliar para verificar convites de staff (Pública mas segura)
 create or replace function public.get_staff_invitation(p_email text)
-returns table (id uuid, role text, unit text, owner_id uuid) 
+returns table (id uuid, role text, unit text, owner_id uuid, user_id uuid) 
 language plpgsql security definer as $$
 begin
     return query 
-    select s.id, s.role, s.unit, s.owner_id 
+    select s.id, s.role, s.unit, s.owner_id, s.user_id 
     from public.staff s 
-    where lower(s.email) = lower(p_email) 
-    and s.user_id is null;
+    where lower(s.email) = lower(p_email);
 end;
 $$;
 
