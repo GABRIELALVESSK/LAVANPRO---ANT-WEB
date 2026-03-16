@@ -74,7 +74,14 @@ export default function UnitDataTab({ currentPlan, isEnterprise, isTrialing, uni
 
     const handleDelete = async (id: string) => {
         if (confirm("Tem certeza que deseja excluir esta unidade? Esta ação é irreversível e pode afetar pedidos vinculados.")) {
-            const newList = units.filter(u => u.id !== id);
+            const unitToDelete = units.find(u => u.id === id);
+            let newList = units.filter(u => u.id !== id);
+            
+            // Se deletou a principal e sobraram outras, promove a primeira a principal
+            if (unitToDelete?.isMain && newList.length > 0) {
+                newList = newList.map((u, idx) => idx === 0 ? { ...u, isMain: true } : u);
+            }
+
             setUnits(newList);
             // Salva na nuvem instantaneamente via centralizado
             await saveData('lavanpro_units', newList);
