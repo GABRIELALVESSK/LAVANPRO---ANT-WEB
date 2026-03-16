@@ -49,6 +49,7 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
                 description: "Endereço, horário, contato local",
                 icon: MapPin,
                 adminOnly: true,
+                requiredPlan: "enterprise",
             },
         ],
     },

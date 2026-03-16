@@ -380,6 +380,26 @@ export default function UnitDataTab({ currentPlan, isEnterprise, isTrialing, uni
         );
     }
 
+    if (!isEnterprise) {
+        return (
+            <div className="flex flex-col items-center justify-center py-20 px-6 text-center animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <div className="size-20 rounded-2xl bg-gradient-to-br from-amber-500/20 to-brand-primary/20 flex items-center justify-center text-amber-500 mb-6 border border-amber-500/20 shadow-2xl">
+                    <Crown className="size-10" />
+                </div>
+                <h3 className="text-2xl font-black text-brand-text mb-3 tracking-tight">Gestão Multi-unidades</h3>
+                <p className="text-brand-muted max-w-sm mb-8 leading-relaxed">
+                    A gestão de múltiplas lavanderias e filiais é exclusiva do plano <span className="text-amber-500 font-bold">Enterprise</span>.
+                </p>
+                <button 
+                    onClick={() => window.location.href = '/settings?tab=features'}
+                    className="flex items-center gap-2 px-8 py-3 bg-brand-primary text-white rounded-xl text-sm font-bold hover:scale-105 transition-all shadow-xl shadow-brand-primary/25"
+                >
+                    Conhecer Plano Enterprise
+                </button>
+            </div>
+        );
+    }
+
     return (
         <div className="space-y-8 animate-in fade-in duration-500">
             {/* Header */}

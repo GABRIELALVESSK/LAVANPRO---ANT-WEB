@@ -119,10 +119,29 @@ function SettingsContent() {
 
   // Keep forms in sync if data changes remotely
   useEffect(() => {
-    if (bizData.company && Object.keys(bizData.company).length > 0) setCompanyForm(bizData.company);
+    if (bizData.company && Object.keys(bizData.company).length > 0) {
+      const baseForm = { ...bizData.company };
+      
+      // If NOT enterprise, we merge the data of the first unit into the company form
+      if (!isEnterprise && bizData.units && bizData.units.length > 0) {
+        const u = bizData.units[0];
+        setCompanyForm({
+          ...baseForm,
+          street: u.street || "",
+          number: u.number || "",
+          neighborhood: u.neighborhood || "",
+          city: u.city || "",
+          state: u.state || "",
+          zipCode: u.zipCode || "",
+          responsible: u.responsible || "",
+        });
+      } else {
+        setCompanyForm(baseForm as any);
+      }
+    }
     if (bizData.operational && Object.keys(bizData.operational).length > 0) setOperationalForm(bizData.operational);
     if (bizData.system && Object.keys(bizData.system).length > 0) setSystemForm(bizData.system);
-  }, [bizData]);
+  }, [bizData, isEnterprise]);
 
   const showToast = (message: string, type: "success" | "error" | "info" = "success") => {
     const id = Math.random().toString(36).substring(2, 9);
@@ -139,6 +158,33 @@ function SettingsContent() {
       await saveData('lavanpro_company', companyForm);
       await saveData('lavanpro_operational', operationalForm);
       await saveData('lavanpro_system', systemForm);
+
+      // Se não for enterprise, garante que a unidade principal esteja sincronizada com os dados da empresa
+      if (!isEnterprise) {
+        const currentUnits = bizData.units || [];
+        const firstUnit = currentUnits[0] || { 
+          id: Math.random().toString(36).substring(2, 9), 
+          isMain: true,
+          status: 'active',
+          createdAt: new Date().toISOString()
+        };
+
+        const updatedUnit = {
+          ...firstUnit,
+          name: companyForm.nomeFantasia || companyForm.razaoSocial,
+          phone: companyForm.phone,
+          email: companyForm.email,
+          street: companyForm.street,
+          number: companyForm.number,
+          neighborhood: companyForm.neighborhood,
+          city: companyForm.city,
+          state: companyForm.state,
+          zipCode: companyForm.zipCode,
+          responsible: companyForm.responsible
+        };
+
+        await saveData('lavanpro_units', [updatedUnit]);
+      }
       
       showToast("Todas as configurações foram sincronizadas com a nuvem!", "success");
     } catch (e) {

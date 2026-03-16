@@ -14,6 +14,14 @@ interface CompanyFormData {
     phone: string;
     website: string;
     logo: string;
+    // Address fields (integrated from Unit for single-unit users)
+    street?: string;
+    number?: string;
+    neighborhood?: string;
+    city?: string;
+    state?: string;
+    zipCode?: string;
+    responsible?: string;
 }
 
 interface CompanyDataTabProps {
@@ -218,6 +226,83 @@ export function CompanyDataTab({ form, onChange }: CompanyDataTabProps) {
                             placeholder="https://www.empresa.com.br"
                             value={form.website}
                             onChange={(e) => update("website", e.target.value)}
+                        />
+                    </div>
+                </div>
+            </div>
+
+            <div className="bg-brand-card p-6 rounded-xl border border-brand-darkBorder">
+                <h4 className="text-sm font-bold uppercase tracking-wider text-brand-muted mb-6">Endereço & Responsável</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2 md:col-span-2">
+                        <label className="text-xs font-bold uppercase tracking-wider text-brand-muted">Responsável pela Unidade</label>
+                        <input
+                            className="w-full px-4 py-2.5 bg-brand-bg border border-brand-darkBorder rounded-lg focus:ring-2 focus:ring-brand-primary transition-all outline-none text-sm text-brand-text"
+                            type="text"
+                            placeholder="Nome do gerente ou responsável"
+                            value={form.responsible || ""}
+                            onChange={(e) => update("responsible", e.target.value)}
+                        />
+                    </div>
+                    <div className="space-y-2">
+                        <label className="text-xs font-bold uppercase tracking-wider text-brand-muted">CEP</label>
+                        <input
+                            className="w-full px-4 py-2.5 bg-brand-bg border border-brand-darkBorder rounded-lg focus:ring-2 focus:ring-brand-primary transition-all outline-none text-sm text-brand-text"
+                            type="text"
+                            placeholder="00000-000"
+                            value={form.zipCode || ""}
+                            onChange={(e) => update("zipCode", e.target.value)}
+                        />
+                    </div>
+                    <div className="space-y-2">
+                        <label className="text-xs font-bold uppercase tracking-wider text-brand-muted">Estado (UF)</label>
+                        <input
+                            className="w-full px-4 py-2.5 bg-brand-bg border border-brand-darkBorder rounded-lg focus:ring-2 focus:ring-brand-primary transition-all outline-none text-sm text-brand-text"
+                            type="text"
+                            placeholder="Ex: SP"
+                            maxLength={2}
+                            value={form.state || ""}
+                            onChange={(e) => update("state", e.target.value.toUpperCase())}
+                        />
+                    </div>
+                    <div className="space-y-2">
+                        <label className="text-xs font-bold uppercase tracking-wider text-brand-muted">Cidade</label>
+                        <input
+                            className="w-full px-4 py-2.5 bg-brand-bg border border-brand-darkBorder rounded-lg focus:ring-2 focus:ring-brand-primary transition-all outline-none text-sm text-brand-text"
+                            type="text"
+                            placeholder="Ex: São Paulo"
+                            value={form.city || ""}
+                            onChange={(e) => update("city", e.target.value)}
+                        />
+                    </div>
+                    <div className="space-y-2">
+                        <label className="text-xs font-bold uppercase tracking-wider text-brand-muted">Bairro</label>
+                        <input
+                            className="w-full px-4 py-2.5 bg-brand-bg border border-brand-darkBorder rounded-lg focus:ring-2 focus:ring-brand-primary transition-all outline-none text-sm text-brand-text"
+                            type="text"
+                            placeholder="Ex: Centro"
+                            value={form.neighborhood || ""}
+                            onChange={(e) => update("neighborhood", e.target.value)}
+                        />
+                    </div>
+                    <div className="space-y-2 flex-1">
+                        <label className="text-xs font-bold uppercase tracking-wider text-brand-muted">Rua/Logradouro</label>
+                        <input
+                            className="w-full px-4 py-2.5 bg-brand-bg border border-brand-darkBorder rounded-lg focus:ring-2 focus:ring-brand-primary transition-all outline-none text-sm text-brand-text"
+                            type="text"
+                            placeholder="Rua..."
+                            value={form.street || ""}
+                            onChange={(e) => update("street", e.target.value)}
+                        />
+                    </div>
+                    <div className="space-y-2 w-32">
+                        <label className="text-xs font-bold uppercase tracking-wider text-brand-muted">Número</label>
+                        <input
+                            className="w-full px-4 py-2.5 bg-brand-bg border border-brand-darkBorder rounded-lg focus:ring-2 focus:ring-brand-primary transition-all outline-none text-sm text-brand-text"
+                            type="text"
+                            placeholder="123"
+                            value={form.number || ""}
+                            onChange={(e) => update("number", e.target.value)}
                         />
                     </div>
                 </div>
