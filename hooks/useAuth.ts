@@ -68,8 +68,8 @@ export function useAuth() {
     return {
         user,
         loading,
-        isAdmin: user?.user_metadata?.role === 'admin' || user?.user_metadata?.is_owner === true,
-        isManager: user?.user_metadata?.role === 'manager',
+        isAdmin: user?.user_metadata?.role === 'admin' || user?.user_metadata?.role === 'Administrador' || user?.user_metadata?.is_owner === true,
+        isManager: user?.user_metadata?.role === 'manager' || user?.user_metadata?.role === 'Gerente',
         staffName: user?.user_metadata?.full_name || user?.email || 'Usuário',
         ownerId: user?.user_metadata?.owner_id || user?.id
     };

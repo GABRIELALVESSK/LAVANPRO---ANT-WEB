@@ -73,16 +73,18 @@ export function useSubscription(): SubscriptionData {
                         if (ownerSub && isMounted) {
                             const currentPlan = ownerSub.plan as PlanTier;
                             const trialEnd = ownerSub.trial_end ? new Date(ownerSub.trial_end) : null;
+                            const isTrialing = ownerSub.status === 'trialing';
                             const isTrialExpired = currentPlan === 'free' && trialEnd !== null && new Date() > trialEnd;
+                            const hasActiveTrial = isTrialing && !isTrialExpired;
 
                             setData({
                                 plan: currentPlan,
                                 status: ownerSub.status,
                                 trialEnd: trialEnd,
-                                isStarter: currentPlan === 'free',
-                                isPro: currentPlan === 'pro' || currentPlan === 'enterprise',
+                                isStarter: (currentPlan === 'free' || !currentPlan) && !hasActiveTrial,
+                                isPro: currentPlan === 'pro' || currentPlan === 'enterprise' || hasActiveTrial,
                                 isEnterprise: currentPlan === 'enterprise',
-                                isTrialing: ownerSub.status === 'trialing',
+                                isTrialing: isTrialing,
                                 isTrialExpired: isTrialExpired,
                                 trialDaysRemaining: trialEnd 
                                     ? Math.max(0, Math.ceil((trialEnd.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)))
@@ -98,16 +100,18 @@ export function useSubscription(): SubscriptionData {
                     const currentPlan = sub.plan as PlanTier;
                     const currentStatus = sub.status;
                     const trialEnd = sub.trial_end ? new Date(sub.trial_end) : null;
-                    const isTrialExpired = currentPlan === 'free' && trialEnd !== null && new Date() > trialEnd;
+                    const isTrialing = currentStatus === 'trialing';
+                    const isTrialExpired = (currentPlan === 'free' || !currentPlan) && trialEnd !== null && new Date() > trialEnd;
+                    const hasActiveTrial = isTrialing && !isTrialExpired;
 
                     setData({
                         plan: currentPlan,
                         status: currentStatus,
                         trialEnd: trialEnd,
-                        isStarter: currentPlan === 'free',
-                        isPro: currentPlan === 'pro' || currentPlan === 'enterprise',
+                        isStarter: (currentPlan === 'free' || !currentPlan) && !hasActiveTrial,
+                        isPro: currentPlan === 'pro' || currentPlan === 'enterprise' || hasActiveTrial,
                         isEnterprise: currentPlan === 'enterprise',
-                        isTrialing: currentStatus === 'trialing',
+                        isTrialing: isTrialing,
                         isTrialExpired: isTrialExpired,
                         trialDaysRemaining: trialEnd 
                             ? Math.max(0, Math.ceil((trialEnd.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)))

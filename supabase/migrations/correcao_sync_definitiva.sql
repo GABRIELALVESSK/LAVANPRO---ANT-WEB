@@ -21,7 +21,7 @@ BEGIN
         RETURN NULL;
     END IF;
 
-    -- Checar se eh owner via user_metadata
+    -- 1. Checar se eh owner via user_metadata
     SELECT COALESCE(
         (raw_user_meta_data->>'is_owner')::BOOLEAN, 
         FALSE
@@ -29,14 +29,14 @@ BEGIN
     FROM auth.users 
     WHERE id = v_uid;
 
-    -- Se eh owner, retorna ele mesmo e garante que esta no staff
+    -- 2. Se eh owner, retorna ele mesmo e garante que esta no staff
     IF v_is_owner = TRUE THEN
         INSERT INTO public.staff (user_id, owner_id, name, role, email)
         SELECT 
             v_uid, 
             v_uid, 
             COALESCE(u.raw_user_meta_data->>'name', u.email, 'Administrador'),
-            'admin',
+            'Administrador',
             u.email
         FROM auth.users u WHERE u.id = v_uid
         ON CONFLICT (user_id) DO UPDATE SET owner_id = v_uid;
@@ -44,7 +44,7 @@ BEGIN
         RETURN v_uid;
     END IF;
 
-    -- Colaborador: buscar o owner_id na tabela staff
+    -- 3. Colaborador: buscar o owner_id na tabela staff
     SELECT s.owner_id INTO v_owner
     FROM public.staff s
     WHERE s.user_id = v_uid
@@ -54,20 +54,15 @@ BEGIN
         RETURN v_owner;
     END IF;
 
-    -- Fallback: buscar qualquer owner existente no sistema
-    SELECT s.user_id INTO v_owner
+    -- 4. Fallback: procurar pelo admin dono do e-mail (caso o owner_id esteja nulo por algum erro)
+    -- Isso ajuda se o colaborador foi inserido mas o owner_id nao foi propagado
+    SELECT s.owner_id INTO v_owner
     FROM public.staff s
-    WHERE s.role = 'admin'
+    WHERE s.role IN ('Administrador', 'admin', 'Owner')
+    ORDER BY s.created_at ASC
     LIMIT 1;
 
-    IF v_owner IS NOT NULL THEN
-        -- Corrige o colaborador automaticamente
-        UPDATE public.staff SET owner_id = v_owner WHERE user_id = v_uid;
-        RETURN v_owner;
-    END IF;
-
-    -- Ultimo recurso
-    RETURN v_uid;
+    RETURN COALESCE(v_owner, v_uid);
 END;
 $$;
 

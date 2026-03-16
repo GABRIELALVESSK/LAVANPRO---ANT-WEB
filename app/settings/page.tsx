@@ -12,6 +12,7 @@ import dynamic from "next/dynamic";
 import type { SettingsTab } from "@/components/settings/settings-sidebar";
 import { PaymentSuccessModal } from "@/components/settings/payment-success-modal";
 import { useBusinessData } from "@/components/business-data-provider";
+import { useSubscription } from "@/hooks/useSubscription";
 
 
 // Dynamically import all tabs with no SSR to avoid 500 errors
@@ -34,9 +35,7 @@ function SettingsContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
 
-  const [currentPlan, setCurrentPlan] = useState<PlanTier>("free");
-  const [planStatus, setPlanStatus] = useState<string>("trialing");
-  const [trialEndsAt, setTrialEndsAt] = useState<Date | null>(null);
+  const { plan: currentPlan, status: planStatus, trialEnd: trialEndsAt, isEnterprise, isTrialing, loading: subLoading } = useSubscription();
   const [showSuccessModal, setShowSuccessModal] = useState(false);
 
   useEffect(() => {
@@ -64,11 +63,10 @@ function SettingsContent() {
     );
   }, [user]);
 
-  // Fetch plan from Supabase
+  // Sync with Asaas
   useEffect(() => {
     if (user) {
-      const fetchPlan = async () => {
-        // 1. Sincroniza ativamente com Sandbox Asaas primeiro
+      const syncAsaas = async () => {
         try {
           await fetch("/api/asaas/sync", {
             method: "POST",
@@ -78,20 +76,8 @@ function SettingsContent() {
         } catch (e) {
           console.log("Sync error:", e);
         }
-
-        // 2. Lê a versão mais atual do BD
-        const { data, error } = await supabase.rpc('get_my_subscription');
-        if (data && data.length > 0) {
-          const sub = data[0];
-          setCurrentPlan(sub.plan as PlanTier);
-          setPlanStatus(sub.status);
-          setTrialEndsAt(sub.trial_end ? new Date(sub.trial_end) : null);
-
-          // Avisa outros componentes (o Sidebar) que o plano mudou ativamente
-          window.dispatchEvent(new CustomEvent('refresh-subscription'));
-        }
       };
-      fetchPlan();
+      syncAsaas();
     }
   }, [user]);
 
@@ -207,7 +193,7 @@ function SettingsContent() {
           </header>
 
           <div className="flex-1 flex overflow-hidden relative">
-            {(loading || !user) && (
+            {(loading || subLoading || !user) && (
               <div className="absolute inset-0 bg-brand-bg/50 backdrop-blur-sm z-50 flex items-center justify-center">
                 <div className="size-12 border-4 border-brand-primary/30 border-t-brand-primary rounded-full animate-spin"></div>
               </div>
@@ -236,7 +222,12 @@ function SettingsContent() {
                     <CompanyDataTab form={companyForm} onChange={setCompanyForm} />
                   )}
                   {activeTab === "unit" && (
-                    <UnitDataTab currentPlan={currentPlan} units={bizData.units || []} />
+                    <UnitDataTab 
+                        currentPlan={currentPlan} 
+                        isEnterprise={isEnterprise}
+                        isTrialing={isTrialing}
+                        units={bizData.units || []} 
+                    />
                   )}
                   {activeTab === "users" && (
                     <UsersTab user={user} showToast={showToast} />

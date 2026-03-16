@@ -307,7 +307,7 @@ export function FeatureStatusTab({ currentPlan }: FeatureStatusTabProps) {
                                             'bg-brand-primary text-white hover:bg-brand-primaryHover shadow-lg shadow-brand-primary/20'
                                             }`}
                                     >
-                                        {currentPlan === 'pro' ? 'Aguarde Atualização' : <><ArrowUp className="size-4" /> Escolher Profissional</>}
+                                        {currentPlan === 'pro' ? 'Seu Plano Atual' : <><ArrowUp className="size-4" /> Escolher Profissional</>}
                                     </button>
                                 </div>
 

@@ -12,6 +12,8 @@ import { motion, AnimatePresence } from "framer-motion";
 
 interface UnitDataTabProps {
     currentPlan: string;
+    isEnterprise: boolean;
+    isTrialing: boolean;
     units: Unit[];
 }
 
@@ -25,9 +27,9 @@ const DAYS = [
     { key: "sun", label: "Domingo" },
 ];
 
-export default function UnitDataTab({ currentPlan, units: initialUnits }: UnitDataTabProps) {
+export default function UnitDataTab({ currentPlan, isEnterprise, isTrialing, units: initialUnits }: UnitDataTabProps) {
     const { saveData } = useBusinessData();
-    const isEnterprise = currentPlan === "enterprise";
+    const canHaveMultiple = isEnterprise || isTrialing;
     const [units, setUnits] = useState<Unit[]>(initialUnits || []);
     const [isEditing, setIsEditing] = useState(false);
     const [editingUnit, setEditingUnit] = useState<Partial<Unit> | null>(null);
@@ -41,7 +43,7 @@ export default function UnitDataTab({ currentPlan, units: initialUnits }: UnitDa
     }, [initialUnits]);
 
     const handleNewUnit = () => {
-        if (!isEnterprise && units.length >= 1) {
+        if (!canHaveMultiple && units.length >= 1) {
             return;
         }
         setEditingUnit({
@@ -385,13 +387,13 @@ export default function UnitDataTab({ currentPlan, units: initialUnits }: UnitDa
                     </div>
                 </div>
                 
-                {(!isEnterprise && units.length >= 1) ? (
+                {(!canHaveMultiple && units.length >= 1) ? (
                     <div className="flex flex-col items-end gap-1">
                         <button disabled className="px-6 py-2.5 bg-brand-darkBorder text-brand-muted rounded-xl text-sm font-bold cursor-not-allowed flex items-center gap-2">
                             <Plus className="size-4" /> Nova Unidade
                         </button>
                         <p className="text-[9px] font-black text-amber-500 uppercase tracking-widest flex items-center gap-1">
-                            <Crown className="size-2.5" /> Requisito Enterprise
+                            <Crown className="size-2.5" /> Requisito Professional/Enterprise
                         </p>
                     </div>
                 ) : (
@@ -405,7 +407,7 @@ export default function UnitDataTab({ currentPlan, units: initialUnits }: UnitDa
             </div>
 
             {/* Plan Info for Non-Enterprise */}
-            {!isEnterprise && units.length >= 1 && (
+            {!canHaveMultiple && units.length >= 1 && (
                 <div className="bg-brand-primary/5 border border-brand-primary/20 p-6 rounded-2xl flex items-center justify-between group">
                     <div className="flex items-center gap-4">
                         <div className="size-12 rounded-full bg-brand-primary/10 flex items-center justify-center text-brand-primary border border-brand-primary/10">
@@ -439,15 +441,15 @@ export default function UnitDataTab({ currentPlan, units: initialUnits }: UnitDa
                                 <Building2 className="size-6" />
                             </div>
                             <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <button onClick={() => handleEdit(unit)} className="p-2 hover:bg-brand-primary/10 text-brand-muted hover:text-brand-primary rounded-lg transition-all">
-                                    <Edit2 className="size-3.5" />
-                                </button>
-                                {!unit.isMain && (
-                                    <button onClick={() => handleDelete(unit.id)} className="p-2 hover:bg-rose-500/10 text-brand-muted hover:text-rose-500 rounded-lg transition-all">
-                                        <Trash2 className="size-3.5" />
+                                    <button onClick={() => handleEdit(unit)} className="p-2 hover:bg-brand-primary/10 text-brand-muted hover:text-brand-primary rounded-lg transition-all">
+                                        <Edit2 className="size-3.5" />
                                     </button>
-                                )}
-                            </div>
+                                    {(!unit.isMain || units.length === 1 || isTrialing) && (
+                                        <button onClick={() => handleDelete(unit.id)} className="p-2 hover:bg-rose-500/10 text-brand-muted hover:text-rose-500 rounded-lg transition-all">
+                                            <Trash2 className="size-3.5" />
+                                        </button>
+                                    )}
+                                </div>
                         </div>
                         <h4 className="text-lg font-bold text-brand-text group-hover:text-brand-primary transition-colors">{unit.name}</h4>
                         <div className="mt-4 space-y-2">
