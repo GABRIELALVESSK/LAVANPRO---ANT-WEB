@@ -111,7 +111,7 @@ export function Sidebar() {
   const router = useRouter();
   const { user } = useAuth();
   const { canAccessRoute } = usePermissions();
-  const { isStarter, isEnterprise, plan } = useSubscription();
+  const { isStarter, isEnterprise, plan, isTrialExpired, trialDaysRemaining } = useSubscription();
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -253,6 +253,43 @@ export function Sidebar() {
 
       {/* Bottom */}
       <div className="mt-auto p-5 border-t border-brand-darkBorder space-y-4">
+        {/* Trial Status Card */}
+        {mounted && plan === 'free' && !isTrialExpired && (
+          <div className="bg-gradient-to-br from-brand-primary/10 to-brand-primary/5 border border-brand-primary/20 rounded-2xl p-4 space-y-3 relative overflow-hidden group">
+            <div className="absolute top-0 right-0 p-2 opacity-10 group-hover:opacity-20 transition-opacity">
+              <Crown className="size-8 text-brand-primary" />
+            </div>
+            
+            <div className="flex items-center gap-2 text-brand-primary">
+              <RefreshCw className="size-3.5 animate-spin-slow" />
+              <span className="text-[10px] font-bold uppercase tracking-wider">Período de Teste</span>
+            </div>
+
+            <div className="space-y-1 relative">
+              <div className="flex items-baseline justify-between">
+                <span className="text-2xl font-black text-brand-text">
+                  {trialDaysRemaining}
+                </span>
+                <span className="text-[10px] font-bold text-brand-muted uppercase">de 7 dias</span>
+              </div>
+              <div className="h-1.5 w-full bg-brand-darkBorder rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-brand-primary transition-all duration-1000 ease-out"
+                  style={{ 
+                    width: `${(trialDaysRemaining / 7) * 100}%` 
+                  }}
+                />
+              </div>
+            </div>
+
+            <button 
+              onClick={() => router.push('/settings?tab=status')}
+              className="w-full py-2 bg-brand-primary text-white text-[11px] font-bold rounded-xl shadow-lg shadow-brand-primary/20 hover:bg-brand-primaryHover transition-all hover:scale-[1.02] active:scale-[0.98]"
+            >
+              Assinar Plano
+            </button>
+          </div>
+        )}
 
 
         {/* Theme toggle */}

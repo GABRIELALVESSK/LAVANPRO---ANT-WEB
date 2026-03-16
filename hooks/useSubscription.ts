@@ -13,6 +13,8 @@ export interface SubscriptionData {
     isPro: boolean;
     isEnterprise: boolean;
     isTrialing: boolean;
+    isTrialExpired: boolean;
+    trialDaysRemaining: number;
 }
 
 export function useSubscription(): SubscriptionData {
@@ -28,6 +30,8 @@ export function useSubscription(): SubscriptionData {
         isPro: false,
         isEnterprise: false,
         isTrialing: false,
+        isTrialExpired: false,
+        trialDaysRemaining: 7,
     });
 
     const [loading, setLoading] = useState(true);
@@ -68,14 +72,21 @@ export function useSubscription(): SubscriptionData {
                         
                         if (ownerSub && isMounted) {
                             const currentPlan = ownerSub.plan as PlanTier;
+                            const trialEnd = ownerSub.trial_end ? new Date(ownerSub.trial_end) : null;
+                            const isTrialExpired = currentPlan === 'free' && trialEnd !== null && new Date() > trialEnd;
+
                             setData({
                                 plan: currentPlan,
                                 status: ownerSub.status,
-                                trialEnd: ownerSub.trial_end ? new Date(ownerSub.trial_end) : null,
+                                trialEnd: trialEnd,
                                 isStarter: currentPlan === 'free',
                                 isPro: currentPlan === 'pro' || currentPlan === 'enterprise',
                                 isEnterprise: currentPlan === 'enterprise',
                                 isTrialing: ownerSub.status === 'trialing',
+                                isTrialExpired: isTrialExpired,
+                                trialDaysRemaining: trialEnd 
+                                    ? Math.max(0, Math.ceil((trialEnd.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)))
+                                    : 7,
                             });
                         }
                     }
@@ -86,15 +97,21 @@ export function useSubscription(): SubscriptionData {
                     const sub = subData[0];
                     const currentPlan = sub.plan as PlanTier;
                     const currentStatus = sub.status;
+                    const trialEnd = sub.trial_end ? new Date(sub.trial_end) : null;
+                    const isTrialExpired = currentPlan === 'free' && trialEnd !== null && new Date() > trialEnd;
 
                     setData({
                         plan: currentPlan,
                         status: currentStatus,
-                        trialEnd: sub.trial_end ? new Date(sub.trial_end) : null,
+                        trialEnd: trialEnd,
                         isStarter: currentPlan === 'free',
                         isPro: currentPlan === 'pro' || currentPlan === 'enterprise',
                         isEnterprise: currentPlan === 'enterprise',
                         isTrialing: currentStatus === 'trialing',
+                        isTrialExpired: isTrialExpired,
+                        trialDaysRemaining: trialEnd 
+                            ? Math.max(0, Math.ceil((trialEnd.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)))
+                            : 7,
                     });
                 }
             } catch (err) {

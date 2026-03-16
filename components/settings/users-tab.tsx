@@ -45,14 +45,18 @@ export function UsersTab({ user, showToast }: UsersTabProps) {
     const fetchCollaborators = async () => {
         if (!user) return;
         setIsLoadingUsers(true);
-        const { data, error } = await supabase
-            .from("staff")
-            .select("*")
-            .order("created_at", { ascending: false });
+        try {
+            // Usamos RPC para garantir que o owner_id seja resolvido corretamente no servidor
+            const { data, error } = await supabase.rpc('get_staff_members');
 
-        if (data) setCollaborators(data);
-        if (error) console.error("Error fetching staff:", error);
-        setIsLoadingUsers(false);
+            if (error) throw error;
+            if (data) setCollaborators(data);
+        } catch (error) {
+            console.error("Error fetching staff:", error);
+            showToast("Erro ao carregar colaboradores", "error");
+        } finally {
+            setIsLoadingUsers(false);
+        }
     };
 
     const handleSaveNewUser = async () => {
@@ -62,69 +66,79 @@ export function UsersTab({ user, showToast }: UsersTabProps) {
         }
         setIsSavingUser(true);
 
-        // Get the current admin's user_id to set as owner_id
-        const ownerId = user?.id;
+        try {
+            // Usamos RPC para garantir que o owner_id seja o raiz da organização,
+            // mesmo que quem esteja adicionando seja um gerente/administrador.
+            const { error } = await supabase.rpc('add_staff_member', {
+                p_name: newUserForm.name,
+                p_email: newUserForm.email,
+                p_role: newUserForm.role,
+                p_unit: newUserForm.unit
+            });
 
-        const { error } = await supabase.from("staff").insert([
-            {
-                name: newUserForm.name,
-                email: newUserForm.email,
-                role: newUserForm.role,
-                active: true,
-                unit: newUserForm.unit,
-                owner_id: ownerId,
-            },
-        ]);
-        if (error) {
-            showToast("Erro ao salvar colaborador: " + error.message, "error");
-        } else {
+            if (error) throw error;
+
             showToast("Colaborador adicionado com sucesso!", "success");
             setNewUserForm({ name: "", email: "", role: "Atendente", password: "", unit: "Todas as Unidades" });
+            setIsNewUserModalOpen(false);
             fetchCollaborators();
             window.dispatchEvent(new CustomEvent("data-synced"));
+        } catch (error: any) {
+            showToast("Erro ao salvar colaborador: " + (error.message || "Erro desconhecido"), "error");
+        } finally {
+            setIsSavingUser(false);
         }
-        setIsSavingUser(false);
     };
 
     const handleUpdateUser = async () => {
         if (!selectedUser) return;
         setIsSavingUser(true);
-        const { error } = await supabase
-            .from("staff")
-            .update({
-                name: (document.getElementById("edit-name") as HTMLInputElement).value,
-                email: (document.getElementById("edit-email") as HTMLInputElement).value,
-                role: (document.getElementById("edit-role") as HTMLSelectElement).value,
-                unit: (document.getElementById("edit-unit") as HTMLSelectElement).value,
-            })
-            .eq("id", selectedUser.id);
 
-        if (error) {
-            showToast("Erro ao atualizar colaborador: " + error.message, "error");
-        } else {
+        try {
+            const { error } = await supabase.rpc('update_staff_member', {
+                p_id: selectedUser.id,
+                p_name: (document.getElementById("edit-name") as HTMLInputElement).value,
+                p_email: (document.getElementById("edit-email") as HTMLInputElement).value,
+                p_role: (document.getElementById("edit-role") as HTMLSelectElement).value,
+                p_unit: (document.getElementById("edit-unit") as HTMLSelectElement).value,
+                p_active: true
+            });
+
+            if (error) throw error;
+
             showToast("Colaborador atualizado com sucesso!", "success");
             setIsEditModalOpen(false);
             setSelectedUser(null);
             fetchCollaborators();
             window.dispatchEvent(new CustomEvent("data-synced"));
+        } catch (error: any) {
+            showToast("Erro ao atualizar colaborador: " + error.message, "error");
+        } finally {
+            setIsSavingUser(false);
         }
-        setIsSavingUser(false);
     };
 
     const handleDeleteUser = async () => {
         if (!userToDelete) return;
         setIsDeletingUserId(userToDelete.id);
-        const { error } = await supabase.from("staff").delete().eq("id", userToDelete.id);
-        if (error) {
-            showToast("Erro ao excluir colaborador: " + error.message, "error");
-        } else {
+
+        try {
+            const { error } = await supabase.rpc('delete_staff_member', {
+                p_id: userToDelete.id
+            });
+
+            if (error) throw error;
+
             showToast("Colaborador removido com sucesso!", "success");
             fetchCollaborators();
             setIsDeleteModalOpen(false);
             window.dispatchEvent(new CustomEvent("data-synced"));
+        } catch (error: any) {
+            showToast("Erro ao excluir colaborador: " + error.message, "error");
+        } finally {
+            setIsDeletingUserId(null);
+            setUserToDelete(null);
         }
-        setIsDeletingUserId(null);
-        setUserToDelete(null);
     };
 
     const confirmResetPassword = () => {

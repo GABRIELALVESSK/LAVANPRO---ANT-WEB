@@ -59,6 +59,9 @@ export default function LoginPage() {
                         throw new Error("Este e-mail está vinculado a uma conta de colaborador. Acesse como colaborador.");
                     }
 
+                    const trialEndDate = new Date();
+                    trialEndDate.setDate(trialEndDate.getDate() + 7);
+
                     const { data: authData, error: authError } = await supabase.auth.signUp({
                         email,
                         password,
@@ -67,6 +70,7 @@ export default function LoginPage() {
                                 full_name: name,
                                 role: "owner",
                                 is_owner: true,
+                                subscription_trial_end: trialEndDate.toISOString()
                             }
                         }
                     });

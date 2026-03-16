@@ -36,12 +36,12 @@ const ALWAYS_ALLOWED_ROUTES = ["/login"];
 
 function normaliseRole(role: string | null | undefined): RoleName {
     if (!role) return "Atendente";
-    const r = role.trim();
-    if (r === "Administrador") return "Administrador";
-    if (r === "Gerente" || r === "Gerente Geral") return "Gerente";
-    if (r === "Estoquista" || r === "Operador de Máquinas" || r === "Motorista") return "Estoquista";
-    if (r === "Atendente") return "Atendente";
-    console.warn("[usePermissions] Unknown role:", r, "→ defaulting to Atendente");
+    const r = role.trim().toLowerCase();
+    if (r === "administrador" || r === "admin" || r === "owner") return "Administrador";
+    if (r === "gerente" || r === "gerente geral") return "Gerente";
+    if (r === "estoquista" || r === "operador de máquinas" || r === "motorista") return "Estoquista";
+    if (r === "atendente") return "Atendente";
+    console.warn("[usePermissions] Unknown role:", role, "→ defaulting to Atendente");
     return "Atendente";
 }
 
@@ -146,9 +146,24 @@ export function usePermissions() {
         if (!dataLoaded || !user) return false;
         if (isOwner) return true;
         if (!userRole) return false;
+        
         const rolePerms = matrix[userRole as RoleName];
-        if (!rolePerms) return false;
-        return rolePerms[permission] ?? false;
+        if (!rolePerms) {
+            console.warn(`[usePermissions] No permissions found for role: ${userRole}`);
+            return false;
+        }
+
+        // Suporte para formato de array (master_schema.sql)
+        if (Array.isArray(rolePerms)) {
+            const allowed = (rolePerms as unknown as string[]).includes(permission);
+            if (!allowed) console.log(`[usePermissions] Access denied to ${permission} for ${userRole} (Array format)`);
+            return allowed;
+        }
+
+        // Suporte para formato de objeto (DEFAULT_MATRIX)
+        const allowed = (rolePerms as Record<string, boolean>)[permission] ?? false;
+        if (!allowed) console.log(`[usePermissions] Access denied to ${permission} for ${userRole} (Object format)`);
+        return allowed;
     };
 
     const canAccessRoute = (route: string): boolean => {

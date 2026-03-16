@@ -11,6 +11,8 @@ const inter = Inter({
   variable: '--font-sans',
 });
 
+import { SubscriptionGuard } from '@/components/subscription-guard';
+
 // ... (metadata/viewport unchanged)
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -35,7 +37,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         >
           <BusinessDataProvider>
             <SidebarProvider>
-              {children}
+              <SubscriptionGuard>
+                {children}
+              </SubscriptionGuard>
               <DebugOverlay />
             </SidebarProvider>
           </BusinessDataProvider>
