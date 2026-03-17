@@ -162,26 +162,41 @@ function SettingsContent() {
       // Se não for enterprise, garante que a unidade principal esteja sincronizada com os dados da empresa
       if (!isEnterprise) {
         const currentUnits = bizData.units || [];
-        const firstUnit = currentUnits[0] || { 
-          id: Math.random().toString(36).substring(2, 9), 
-          isMain: true,
-          status: 'active',
-          createdAt: new Date().toISOString()
-        };
-
-        const updatedUnit = {
-          ...firstUnit,
-          name: companyForm.nomeFantasia || companyForm.razaoSocial,
-          phone: companyForm.phone,
-          email: companyForm.email,
-          street: companyForm.street,
-          number: companyForm.number,
-          neighborhood: companyForm.neighborhood,
-          city: companyForm.city,
-          state: companyForm.state,
-          zipCode: companyForm.zipCode,
-          responsible: companyForm.responsible
-        };
+        const existingFirst = currentUnits[0];
+        
+        let updatedUnit: any;
+        if (existingFirst) {
+          updatedUnit = {
+            ...existingFirst,
+            name: companyForm.nomeFantasia || companyForm.razaoSocial,
+            email: companyForm.email,
+            phone: companyForm.phone,
+            street: companyForm.street || existingFirst.street || "",
+            number: companyForm.number || existingFirst.number || "",
+            neighborhood: companyForm.neighborhood || existingFirst.neighborhood || "",
+            city: companyForm.city || existingFirst.city || "",
+            state: companyForm.state || existingFirst.state || "",
+            zipCode: companyForm.zipCode || existingFirst.zipCode || "",
+            responsible: companyForm.responsible || existingFirst.responsible || ""
+          };
+        } else {
+          updatedUnit = {
+            id: Math.random().toString(36).substring(2, 9),
+            isMain: true,
+            status: 'active',
+            createdAt: new Date().toISOString(),
+            name: companyForm.nomeFantasia || companyForm.razaoSocial,
+            email: companyForm.email,
+            phone: companyForm.phone,
+            street: companyForm.street || "",
+            number: companyForm.number || "",
+            neighborhood: companyForm.neighborhood || "",
+            city: companyForm.city || "",
+            state: companyForm.state || "",
+            zipCode: companyForm.zipCode || "",
+            responsible: companyForm.responsible || ""
+          }
+        }
 
         await saveData('lavanpro_units', [updatedUnit]);
       }
