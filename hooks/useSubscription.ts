@@ -58,26 +58,47 @@ export function useSubscription(): SubscriptionData {
                     // Fallback: usar o que está nos metadados do Auth do próprio usuário
                     if (isMounted) {
                         const meta = user.user_metadata || {};
-                        const currentPlan = (meta.plan as PlanTier) || 'pro'; // Default pro para fallback seguro
+                        const currentPlan = (meta.plan as PlanTier) || 'pro';
                         const currentStatus = meta.subscription_status || 'active';
-                        const trialEnd = meta.subscription_trial_end ? new Date(meta.subscription_trial_end) : null;
+                        const trialEndRaw = meta.subscription_trial_end;
+                        const trialEnd = trialEndRaw ? new Date(trialEndRaw) : null;
+                        
                         const isTrialing = currentStatus === 'trialing';
-                        const isTrialExpired = (currentPlan === 'free' || !currentPlan) && trialEnd !== null && new Date() > trialEnd;
+                        
+                        // Calculate days using calendar dates
+                        const today = new Date();
+                        today.setHours(0, 0, 0, 0);
+                        
+                        let daysRemaining = 7;
+                        let isTrialExpired = false;
+
+                        if (trialEnd) {
+                            const endForExpired = new Date(trialEnd); // exact time for expiration check
+                            
+                            const endDay = new Date(trialEnd);
+                            endDay.setHours(0, 0, 0, 0);
+                            
+                            daysRemaining = Math.max(0, Math.round((endDay.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)));
+                            
+                            // It's expired if we are past the exact end timestamp AND it's a free/starter account
+                            isTrialExpired = (currentPlan === 'free' || !currentPlan) && new Date() > endForExpired;
+                        }
+
                         const hasActiveTrial = isTrialing && !isTrialExpired;
 
-                        setData({
-                            plan: currentPlan,
-                            status: currentStatus,
-                            trialEnd: trialEnd,
-                            isStarter: (currentPlan === 'free' || !currentPlan) && !hasActiveTrial,
-                            isPro: currentPlan === 'pro' || currentPlan === 'enterprise' || hasActiveTrial,
-                            isEnterprise: currentPlan === 'enterprise',
-                            isTrialing: isTrialing,
-                            isTrialExpired: isTrialExpired,
-                            trialDaysRemaining: trialEnd 
-                                ? Math.max(0, Math.ceil((trialEnd.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)))
-                                : 7,
-                        });
+                        if (isMounted) {
+                            setData({
+                                plan: currentPlan,
+                                status: currentStatus,
+                                trialEnd: trialEnd,
+                                isStarter: (currentPlan === 'free' || !currentPlan) && !hasActiveTrial,
+                                isPro: currentPlan === 'pro' || currentPlan === 'enterprise' || hasActiveTrial,
+                                isEnterprise: currentPlan === 'enterprise',
+                                isTrialing: isTrialing,
+                                isTrialExpired: isTrialExpired,
+                                trialDaysRemaining: daysRemaining,
+                            });
+                        }
                     }
                     return;
                 }
@@ -86,9 +107,27 @@ export function useSubscription(): SubscriptionData {
                     const sub = subData[0];
                     const currentPlan = sub.plan as PlanTier || 'pro';
                     const currentStatus = sub.status || 'active';
-                    const trialEnd = sub.trial_end ? new Date(sub.trial_end) : null;
+                    const trialEndRaw = sub.trial_end;
+                    const trialEnd = trialEndRaw ? new Date(trialEndRaw) : null;
+                    
                     const isTrialing = currentStatus === 'trialing';
-                    const isTrialExpired = (currentPlan === 'free' || !currentPlan) && trialEnd !== null && new Date() > trialEnd;
+
+                    // Calculate days using calendar dates
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+                    
+                    let daysRemaining = 7;
+                    let isTrialExpired = false;
+
+                    if (trialEnd) {
+                        const endForExpired = new Date(trialEnd);
+                        const endDay = new Date(trialEnd);
+                        endDay.setHours(0, 0, 0, 0);
+                        
+                        daysRemaining = Math.max(0, Math.round((endDay.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)));
+                        isTrialExpired = (currentPlan === 'free' || !currentPlan) && new Date() > endForExpired;
+                    }
+
                     const hasActiveTrial = isTrialing && !isTrialExpired;
 
                     setData({
@@ -100,9 +139,7 @@ export function useSubscription(): SubscriptionData {
                         isEnterprise: currentPlan === 'enterprise',
                         isTrialing: isTrialing,
                         isTrialExpired: isTrialExpired,
-                        trialDaysRemaining: trialEnd 
-                            ? Math.max(0, Math.ceil((trialEnd.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)))
-                            : 7,
+                        trialDaysRemaining: daysRemaining,
                     });
                 } else if (isMounted) {
                     // Sem dados retornados e sem erro

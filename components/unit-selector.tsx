@@ -71,9 +71,14 @@ export function UnitSelector({ onUnitChange, showAllOption = true }: UnitSelecto
 
   const currentUnit = units.find(u => u.id === selectedUnit);
 
+  // Wait for loadings to finish before deciding to show or hide, avoiding flicker
+  if (subLoading || permsLoading) {
+      return null;
+  }
+
   // Hide entirely if we are restricted and it's the only one anyway? 
   // The user says "pode deixar invisivel. só manter visivel pro enterprise"
-  if (!subLoading && (!isEnterprise || units.length <= 1)) {
+  if (!isEnterprise || units.length <= 1) {
       return null;
   }
 
