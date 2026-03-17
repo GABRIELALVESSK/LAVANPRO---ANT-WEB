@@ -1,0 +1,196 @@
+﻿commit 05725576cd4812eb2c4034753206a1091b58581c
+Author: GABRIELALVESSK <93455510+GABRIELALVESSK@users.noreply.github.com>
+Date:   Sun Mar 15 20:48:21 2026 -0300
+
+    fix(users): remove non-existent has_system_access column from user insertion
+
+diff --git a/components/business-data-provider.tsx b/components/business-data-provider.tsx
+index f87ff97..79d7604 100644
+--- a/components/business-data-provider.tsx
++++ b/components/business-data-provider.tsx
+@@ -2,7 +2,6 @@
+ 
+ import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+ import { supabase } from '@/lib/supabase';
+-import { SyncKey } from '@/lib/dataSync';
+ import { Order } from '@/lib/orders-data';
+ import { Customer } from '@/lib/customers-data';
+ import { Unit } from '@/lib/units-data';
+@@ -20,14 +19,32 @@ interface BusinessData {
+     services: any[];
+     labels: any[];
+     label_history: any[];
++    selectedUnit: string;
+ }
+ 
+ interface BusinessDataContextType {
+     data: BusinessData;
+     isLoading: boolean;
+-    refresh: (key?: SyncKey) => Promise<void>;
++    refresh: (key?: string) => Promise<void>;
++    saveData: (key: string, value: any) => Promise<void>;
+ }
+ 
++const SERVER_KEYS = [
++    'lavanpro_units',
++    'lavanpro_orders_v3',
++    'lavanpro_customers',
++    'lavanpro_finance_transactions',
++    'lavanpro_stock_products_v2',
++    'lavanpro_stock_movements_v2',
++    'lavanpro_company',
++    'lavanpro_operational',
++    'lavanpro_system',
++    'lavanpro_services_pro',
++    'lavanpro_labels',
++    'lavanpro_label_history',
++    'lavanpro_selected_unit',
++];
++
+ const KEY_MAP: Record<string, keyof BusinessData> = {
+     'lavanpro_units': 'units',
+     'lavanpro_orders_v3': 'orders',
+@@ -41,6 +58,7 @@ const KEY_MAP: Record<string, keyof BusinessData> = {
+     'lavanpro_services_pro': 'services',
+     'lavanpro_labels': 'labels',
+     'lavanpro_label_history': 'label_history',
++    'lavanpro_selected_unit': 'selectedUnit',
+ };
+ 
+ const INITIAL_DATA: BusinessData = {
+@@ -56,6 +74,7 @@ const INITIAL_DATA: BusinessData = {
+     services: [],
+     labels: [],
+     label_history: [],
++    selectedUnit: 'all',
+ };
+ 
+ const BusinessDataContext = createContext<BusinessDataContextType | undefined>(undefined);
+@@ -64,45 +83,49 @@ export function BusinessDataProvider({ children }: { children: React.ReactNode }
+     const [data, setData] = useState<BusinessData>(INITIAL_DATA);
+     const [isLoading, setIsLoading] = useState(true);
+ 
+-    const fetchData = useCallback(async (key?: string) => {
++    const fetchData = useCallback(async (singleKey?: string) => {
+         try {
+             const { data: { session } } = await supabase.auth.getSession();
+-            if (!session?.user) return;
+-
+-            const keysToFetch = key ? [key] : Object.values(KEY_MAP);
++            if (!session?.user) {
++                setIsLoading(false);
++                return;
++            }
+ 
+-            const newData = { ...data };
+-            let hasChanges = false;
++            const keysToFetch = singleKey ? [singleKey] : SERVER_KEYS;
++            const updatedData = { ...data };
++            let changed = false;
+ 
+-            for (const serverKey of keysToFetch) {
++            for (const key of keysToFetch) {
+                 const { data: serverData, error } = await supabase.rpc('get_laundry_data', {
+-                    p_key: serverKey,
++                    p_key: key,
+                 });
+ 
+                 if (!error && serverData !== null) {
+-                    const typedKey = serverKey as keyof BusinessData;
+-                    // @ts-ignore
+-                    newData[typedKey] = serverData;
+-                    hasChanges = true;
++                    const localKey = KEY_MAP[key];
++                    if (localKey) {
++                        (updatedData as any)[localKey] = serverData;
++                        changed = true;
++                    }
+                 }
+             }
+ 
+-            if (hasChanges) {
+-                setData(prev => ({ ...prev, ...newData }));
++            if (changed) {
++                setData(updatedData);
+             }
+         } catch (err) {
+-            console.error('[BusinessData] Error fetching data:', err);
++            console.error('[BusinessData] Error:', err);
+         } finally {
+             setIsLoading(false);
+         }
+     }, [data]);
+ 
+     useEffect(() => {
++        // Initial load
+         fetchData();
+ 
+-        // Supabase Realtime Subscription
++        // Realtime Subscription
+         const channel = supabase
+-            .channel('laundry_data_changes')
++            .channel('laundry_data_realtime')
+             .on(
+                 'postgres_changes',
+                 {
+@@ -111,18 +134,13 @@ export function BusinessDataProvider({ children }: { children: React.ReactNode }
+                     table: 'laundry_data',
+                 },
+                 (payload) => {
+-                    console.log('[BusinessData] Realtime update received:', payload);
+-                    const serverKey = (payload.new as any)?.data_key;
+-                    const updatedValue = (payload.new as any)?.data_value;
+-                    
+-                    if (serverKey && KEY_MAP[serverKey]) {
+-                        const localKey = KEY_MAP[serverKey];
++                    const newData = payload.new as any;
++                    if (newData && newData.data_key && KEY_MAP[newData.data_key]) {
++                        const localKey = KEY_MAP[newData.data_key];
+                         setData(prev => ({
+                             ...prev,
+-                            [localKey]: updatedValue
++                            [localKey]: newData.data_value
+                         }));
+-                        // Also dispatch local events for legacy compatibility
+-                        window.dispatchEvent(new CustomEvent('data-synced'));
+                     }
+                 }
+             )
+@@ -133,14 +151,32 @@ export function BusinessDataProvider({ children }: { children: React.ReactNode }
+         };
+     }, []);
+ 
+-    const refresh = useCallback(async (localKey?: SyncKey) => {
+-        const serverKey = localKey ? KEY_MAP[localKey] : undefined;
+-        // @ts-ignore
+-        await fetchData(serverKey);
++    const saveData = useCallback(async (key: string, value: any) => {
++        try {
++            const { error } = await supabase.rpc('set_laundry_data', {
++                p_key: key,
++                p_value: value,
++            });
++
++            if (error) throw error;
++
++            // Optional: local update for immediate feedback (though realtime will handle it)
++            const localKey = KEY_MAP[key];
++            if (localKey) {
++                setData(prev => ({ ...prev, [localKey]: value }));
++            }
++        } catch (err) {
++            console.error('[BusinessData] Error saving:', err);
++            throw err;
++        }
++    }, []);
++
++    const refresh = useCallback(async (key?: string) => {
++        await fetchData(key);
+     }, [fetchData]);
+ 
+     return (
+-        <BusinessDataContext.Provider value={{ data, isLoading, refresh }}>
++        <BusinessDataContext.Provider value={{ data, isLoading, refresh, saveData }}>
+             {children}
+         </BusinessDataContext.Provider>
+     );

@@ -124,7 +124,16 @@ export function CompanyDataTab({ form, onChange }: CompanyDataTabProps) {
                                 </div>
                             )}
                             {form.logo ? (
-                                <img src={form.logo} alt="Logo preview" className="w-full h-full object-cover transition-transform group-hover:scale-110" />
+                                <img 
+                                    src={form.logo} 
+                                    alt="Logo preview" 
+                                    className="w-full h-full object-cover transition-transform group-hover:scale-110" 
+                                    onError={(e) => {
+                                        (e.target as HTMLImageElement).src = ""; // Clear src to trigger fallback or hide
+                                        // Option: set a fallback state if needed, but for now just show default icon if src is empty
+                                        onChange({ ...form, logo: "" });
+                                    }}
+                                />
                             ) : (
                                 <Upload className="size-8 group-hover:scale-110 transition-transform" />
                             )}

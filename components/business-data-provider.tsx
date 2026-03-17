@@ -100,11 +100,51 @@ export function BusinessDataProvider({ children }: { children: React.ReactNode }
                     p_key: key,
                 });
 
-                if (!error && serverData !== null) {
+                if (!error && serverData !== null && JSON.stringify(serverData) !== '[]' && JSON.stringify(serverData) !== '{}') {
+                    // Dado real encontrado no servidor
                     const localKey = KEY_MAP[key];
                     if (localKey) {
                         (updatedData as any)[localKey] = serverData;
                         changed = true;
+                    }
+                } else if (!error) {
+                    // Servidor não tem dados ou retornou array/objeto vazio.
+                    // TENTATIVA DE RESGATE DOS DADOS QUE ESTAVAM SALVOS NO NAVEGADOR (LOCALSTORAGE) ANTES DA MIGRAÇÃO
+                    if (typeof window !== 'undefined') {
+                        try {
+                            const historicLocalData = localStorage.getItem(key);
+                            if (historicLocalData && historicLocalData !== '[]' && historicLocalData !== '{}') {
+                                const parsedHistory = JSON.parse(historicLocalData);
+                                const localKey = KEY_MAP[key];
+                                if (localKey) {
+                                    (updatedData as any)[localKey] = parsedHistory;
+                                    changed = true;
+                                    
+                                    // Sobe silenciosamente para a nuvem para que fique salvo no banco de dados definitivo (Supabase)
+                                    // Não mexe no localStorage a pedido do usuário
+                                    const uploadHistory = async () => {
+                                        try {
+                                            await supabase.rpc('set_laundry_data', {
+                                                p_key: key,
+                                                p_value: parsedHistory,
+                                            });
+                                        } catch (e: any) {
+                                            console.error("Erro ao subir dado histórico", e);
+                                        }
+                                    };
+                                    uploadHistory();
+                                }
+                            } else if (serverData !== null) {
+                                // Assume o vazio do servidor se não houver no local tbm
+                                const localKey = KEY_MAP[key];
+                                if (localKey) {
+                                    (updatedData as any)[localKey] = serverData;
+                                    changed = true;
+                                }
+                            }
+                        } catch (e) {
+                            console.error("Falha ao ler histórico local", e);
+                        }
                     }
                 }
             }

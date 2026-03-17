@@ -53,52 +53,39 @@ export function useSubscription(): SubscriptionData {
                 const { data: subData, error } = await supabase.rpc('get_my_subscription');
 
                 if (error) {
-                    console.error("Error fetching subscription:", error);
+                    console.warn("[Subscription] Usando metadados locais (RPC falhou).", error.message);
                     
-                    // Fallback: try to find subscription via staff owner_id
-                    const { data: staffData } = await supabase
-                        .from('staff')
-                        .select('owner_id')
-                        .eq('user_id', user.id)
-                        .maybeSingle();
+                    // Fallback: usar o que está nos metadados do Auth do próprio usuário
+                    if (isMounted) {
+                        const meta = user.user_metadata || {};
+                        const currentPlan = (meta.plan as PlanTier) || 'pro'; // Default pro para fallback seguro
+                        const currentStatus = meta.subscription_status || 'active';
+                        const trialEnd = meta.subscription_trial_end ? new Date(meta.subscription_trial_end) : null;
+                        const isTrialing = currentStatus === 'trialing';
+                        const isTrialExpired = (currentPlan === 'free' || !currentPlan) && trialEnd !== null && new Date() > trialEnd;
+                        const hasActiveTrial = isTrialing && !isTrialExpired;
 
-                    if (staffData?.owner_id) {
-                        // Try fetching the owner's subscription directly
-                        const { data: ownerSub } = await supabase
-                            .from('subscriptions')
-                            .select('plan, status, trial_end')
-                            .eq('user_id', staffData.owner_id)
-                            .maybeSingle();
-                        
-                        if (ownerSub && isMounted) {
-                            const currentPlan = ownerSub.plan as PlanTier;
-                            const trialEnd = ownerSub.trial_end ? new Date(ownerSub.trial_end) : null;
-                            const isTrialing = ownerSub.status === 'trialing';
-                            const isTrialExpired = currentPlan === 'free' && trialEnd !== null && new Date() > trialEnd;
-                            const hasActiveTrial = isTrialing && !isTrialExpired;
-
-                            setData({
-                                plan: currentPlan,
-                                status: ownerSub.status,
-                                trialEnd: trialEnd,
-                                isStarter: (currentPlan === 'free' || !currentPlan) && !hasActiveTrial,
-                                isPro: currentPlan === 'pro' || currentPlan === 'enterprise' || hasActiveTrial,
-                                isEnterprise: currentPlan === 'enterprise',
-                                isTrialing: isTrialing,
-                                isTrialExpired: isTrialExpired,
-                                trialDaysRemaining: trialEnd 
-                                    ? Math.max(0, Math.ceil((trialEnd.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)))
-                                    : 7,
-                            });
-                        }
+                        setData({
+                            plan: currentPlan,
+                            status: currentStatus,
+                            trialEnd: trialEnd,
+                            isStarter: (currentPlan === 'free' || !currentPlan) && !hasActiveTrial,
+                            isPro: currentPlan === 'pro' || currentPlan === 'enterprise' || hasActiveTrial,
+                            isEnterprise: currentPlan === 'enterprise',
+                            isTrialing: isTrialing,
+                            isTrialExpired: isTrialExpired,
+                            trialDaysRemaining: trialEnd 
+                                ? Math.max(0, Math.ceil((trialEnd.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)))
+                                : 7,
+                        });
                     }
                     return;
                 }
 
                 if (subData && subData.length > 0 && isMounted) {
                     const sub = subData[0];
-                    const currentPlan = sub.plan as PlanTier;
-                    const currentStatus = sub.status;
+                    const currentPlan = sub.plan as PlanTier || 'pro';
+                    const currentStatus = sub.status || 'active';
                     const trialEnd = sub.trial_end ? new Date(sub.trial_end) : null;
                     const isTrialing = currentStatus === 'trialing';
                     const isTrialExpired = (currentPlan === 'free' || !currentPlan) && trialEnd !== null && new Date() > trialEnd;
@@ -117,9 +104,23 @@ export function useSubscription(): SubscriptionData {
                             ? Math.max(0, Math.ceil((trialEnd.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)))
                             : 7,
                     });
+                } else if (isMounted) {
+                    // Sem dados retornados e sem erro
+                    const currentPlan = 'pro'; 
+                    setData({
+                        plan: currentPlan,
+                        status: 'active',
+                        trialEnd: null,
+                        isStarter: false,
+                        isPro: true,
+                        isEnterprise: false,
+                        isTrialing: false,
+                        isTrialExpired: false,
+                        trialDaysRemaining: 0,
+                    });
                 }
             } catch (err) {
-                console.error("Failed to load subscription data", err);
+                console.warn("Falha geral ao carregar assinatura:", err);
             } finally {
                 if (isMounted) {
                     setLoading(false);

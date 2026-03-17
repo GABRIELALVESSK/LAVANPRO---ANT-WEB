@@ -1,0 +1,14 @@
+﻿­ƒöì Verificando banco de dados...
+­ƒôª Encontrados 0 registros (chaves) em laundry_data:
+
+­ƒôè TOTAL ENCONTRADO NO BANCO:
+- Pedidos (lavanpro_orders_v3): 0
+- Clientes (lavanpro_customers): 0
+
+­ƒæñ Usu├írios encontrados (2):
+- gabriel23900@gmail.com (gabriel23900@gmail.com) | Role: owner
+  > user_id:  dd96597a-df15-47d3-8b39-899c5510f1b8
+  > owner_id: dd96597a-df15-47d3-8b39-899c5510f1b8
+- teste (waranaj164@flosek.com) | Role: Gerente
+  > user_id:  null
+  > owner_id: dd96597a-df15-47d3-8b39-899c5510f1b8

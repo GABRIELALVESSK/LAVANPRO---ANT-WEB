@@ -63,37 +63,28 @@ export function usePermissions() {
         async function loadAll() {
             try {
                 // ── 1. Load staff record for current user ─────────────────────
-                // First try RPC (server-side, bypasses RLS issues)
                 let staffRole: string | null = null;
                 let staffOwnerId: string | null = null;
                 let currentStaffUnit: string | null = null;
+                let currentStaffUnitId: string | null = null;
 
-                const { data: rpcData, error: rpcError } = await supabase
-                    .rpc("get_my_staff_role");
+                const { data: directData, error } = await supabase
+                    .from("staff")
+                    .select("role, owner_id, unit, unit_id")
+                    .eq("user_id", user!.id)
+                    .maybeSingle();
 
-                if (rpcError) {
-                    console.error("[usePermissions] RPC get_my_staff_role error:", rpcError);
-                    // Fallback: direct query by user_id
-                    const { data: directData } = await supabase
-                        .from("staff")
-                        .select("role, owner_id, unit")
-                        .eq("user_id", user!.id)
-                        .maybeSingle();
-                    
-                    staffRole = directData?.role || null;
-                    staffOwnerId = directData?.owner_id || null;
-                    currentStaffUnit = directData?.unit || null;
-                } else {
-                    const row = Array.isArray(rpcData) ? rpcData[0] : rpcData;
-                    console.log("[usePermissions] RPC result:", row);
-                    staffRole = row?.role || null;
-                    staffOwnerId = row?.owner_id || null;
-                    currentStaffUnit = row?.unit || null;
+                if (!error && directData) {
+                    staffRole = directData.role;
+                    staffOwnerId = directData.owner_id;
+                    currentStaffUnit = directData.unit;
+                    currentStaffUnitId = directData.unit_id;
                 }
 
                 if (!cancelled) {
                     setOwnerId(staffOwnerId);
-                    setStaffUnit(currentStaffUnit);
+                    setStaffUnit(currentStaffUnitId || currentStaffUnit); // Prefers UUID, fallbacks to string
+
 
                     // Determine if user is the owner:
                     // - owner_id matches their own user id, OR

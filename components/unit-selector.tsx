@@ -27,7 +27,10 @@ export function UnitSelector({ onUnitChange, showAllOption = true }: UnitSelecto
   let units = businessData.units || [];
   if (!isOwner && staffUnit && staffUnit.toLowerCase() !== "todas as unidades" && staffUnit.toLowerCase() !== "todas") {
       const staffUnitNormalized = staffUnit.trim().toLowerCase();
-      units = units.filter(u => u.name.trim().toLowerCase() === staffUnitNormalized);
+      units = units.filter(u => 
+          u.id.toLowerCase() === staffUnitNormalized || 
+          u.name.trim().toLowerCase() === staffUnitNormalized
+      );
   } else if (!subLoading && !isEnterprise && units.length > 0) {
       // If not enterprise, restrict to the first unit
       units = [units[0]];

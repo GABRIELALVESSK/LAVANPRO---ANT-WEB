@@ -347,6 +347,7 @@ export function Sidebar() {
                     const fileName = `${user.id}_${Math.random().toString(36).substring(7)}.${fileExt}`;
                     const filePath = `${fileName}`;
 
+                    // Tenta garantir que o bucket existe (opcional se já souber que existe)
                     const { error: uploadError } = await supabase.storage
                       .from('avatars')
                       .upload(filePath, file, { 
@@ -369,7 +370,10 @@ export function Sidebar() {
 
                     if (updateError) throw updateError;
                     
+                    // Forçar atualização local sem refresh total se possível, 
+                    // mas o alert e reload garantem que o usuário veja a mudança
                     alert("Foto de perfil atualizada!");
+                    window.location.reload(); 
                   } catch (err: any) {
                     console.error("Avatar upload error:", err);
                     alert("Erro ao enviar foto: " + (err.message || "Tente novamente"));
@@ -385,18 +389,36 @@ export function Sidebar() {
               title="Alterar foto de perfil"
             >
               {isUploadingAvatar ? (
-                <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                <div className="absolute inset-0 bg-black/40 flex items-center justify-center z-10">
                   <RefreshCw className="size-4 text-white animate-spin" />
                 </div>
               ) : null}
               {(() => {
                 const avatar_url = user?.user_metadata?.avatar_url;
-                return avatar_url ? (
-                  <img src={avatar_url} alt="User avatar" className="w-full h-full object-cover transition-transform group-hover:scale-110" />
-                ) : (
-                  <div className="size-full bg-brand-primary/20 flex items-center justify-center text-brand-primary font-bold text-xs">
-                    {user?.user_metadata?.full_name?.substring(0, 1) || user?.email?.substring(0, 1).toUpperCase() || "U"}
-                  </div>
+                if (!avatar_url) {
+                  return (
+                    <div className="size-full bg-brand-primary/20 flex items-center justify-center text-brand-primary font-bold text-xs">
+                      {user?.user_metadata?.full_name?.substring(0, 1) || user?.email?.substring(0, 1).toUpperCase() || "U"}
+                    </div>
+                  );
+                }
+                return (
+                  <img 
+                    src={avatar_url} 
+                    alt="User avatar" 
+                    className="w-full h-full object-cover transition-transform group-hover:scale-110" 
+                    onError={(e) => {
+                      // Se a imagem falhar, remove a URL para mostrar as iniciais
+                      (e.target as HTMLImageElement).style.display = 'none';
+                      const parent = (e.target as HTMLImageElement).parentElement;
+                      if (parent && !parent.querySelector('.fallback-avatar')) {
+                        const fallback = document.createElement('div');
+                        fallback.className = 'fallback-avatar size-full bg-brand-primary/20 flex items-center justify-center text-brand-primary font-bold text-xs';
+                        fallback.innerText = user?.user_metadata?.full_name?.substring(0, 1) || user?.email?.substring(0, 1).toUpperCase() || "U";
+                        parent.appendChild(fallback);
+                      }
+                    }}
+                  />
                 );
               })()}
               <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">

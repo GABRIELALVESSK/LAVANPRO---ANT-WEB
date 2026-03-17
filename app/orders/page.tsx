@@ -641,7 +641,15 @@ export default function OrdersPage() {
                                             <Plus className="size-7 text-brand-primary" />
                                         </div>
                                         <div>
-                                            <h3 className="text-2xl font-black text-white tracking-tight">Novo Pedido</h3>
+                                            <h3 className="text-2xl font-black text-white tracking-tight flex items-center gap-3">
+                                                Novo Pedido
+                                                {activeUnit !== "all" && (
+                                                    <span className="px-2.5 py-1 rounded-md bg-brand-primary/20 border border-brand-primary/30 text-[10px] text-brand-primary uppercase tracking-widest flex items-center gap-1">
+                                                        <MapPin className="size-3" />
+                                                        {businessData.units.find(u => u.id === activeUnit)?.name || "Unidade"}
+                                                    </span>
+                                                )}
+                                            </h3>
                                             <p className="text-xs text-brand-muted font-bold uppercase tracking-widest mt-0.5">Registro de Entrada de Serviço</p>
                                         </div>
                                     </div>
