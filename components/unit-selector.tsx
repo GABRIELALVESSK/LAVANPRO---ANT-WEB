@@ -73,7 +73,7 @@ export function UnitSelector({ onUnitChange, showAllOption = true }: UnitSelecto
 
   // Hide entirely if we are restricted and it's the only one anyway? 
   // The user says "pode deixar invisivel. só manter visivel pro enterprise"
-  if (!subLoading && !isEnterprise) {
+  if (!subLoading && (!isEnterprise || units.length <= 1)) {
       return null;
   }
 
