@@ -597,7 +597,7 @@ export default function OrdersPage() {
                                                             <div className="flex justify-end gap-2">
                                                                 <button
                                                                     onClick={(e) => { e.stopPropagation(); handleDeleteOrder(order.id); }}
-                                                                    className="p-2.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 rounded-lg border border-rose-500/20 transition-all opacity-0 group-hover:opacity-100"
+                                                                    className="p-2.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 rounded-lg border border-rose-500/20 transition-all opacity-50 group-hover:opacity-100"
                                                                     title="Excluir Pedido"
                                                                 >
                                                                     <Trash2 className="size-4" />
